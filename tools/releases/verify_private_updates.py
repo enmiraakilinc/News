@@ -14,11 +14,14 @@ from google.auth.transport.requests import AuthorizedSession
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from tools.admin.firebase_config import PROJECT_ID, admin_key_path
+from tools.admin.firebase_config import PROJECT_ID, admin_key_path, admin_session
 
 def main():
-    credentials = service_account.Credentials.from_service_account_file(str(admin_key_path()), scopes=['https://www.googleapis.com/auth/cloud-platform'])
-    admin = AuthorizedSession(credentials)
+    try:
+        credentials = service_account.Credentials.from_service_account_file(str(admin_key_path()), scopes=['https://www.googleapis.com/auth/cloud-platform'])
+    except FileNotFoundError:
+        credentials = None
+    admin = admin_session()
     base = f'https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents'
     config = json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text())
     api_key = config['client'][0]['api_key'][0]['current_key']
@@ -40,12 +43,18 @@ def main():
     grant_created = False
     try:
         now = int(time.time())
-        custom = jwt.encode(credentials.signer, {'iss':credentials.service_account_email,'sub':credentials.service_account_email,
-            'aud':'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
-            'iat':now,'exp':now+300,'uid':uid}).decode()
-        r = requests.post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken',
-            params={'key':api_key},json={'token':custom,'returnSecureToken':True},timeout=30)
-        r.raise_for_status()
+        if credentials is not None:
+            custom = jwt.encode(credentials.signer, {'iss':credentials.service_account_email,'sub':credentials.service_account_email,
+                'aud':'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+                'iat':now,'exp':now+300,'uid':uid}).decode()
+            r = requests.post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken',
+                params={'key':api_key},json={'token':custom,'returnSecureToken':True},timeout=30)
+            r.raise_for_status()
+        else:
+            r = requests.post('https://identitytoolkit.googleapis.com/v1/accounts:signUp', params={'key':api_key}, json={'returnSecureToken':True},timeout=30)
+            r.raise_for_status()
+            uid = r.json()['localId']
+            grant = f'{base}/updateAccess/{uid}'
         id_token = r.json()['idToken']
         headers = {'Authorization':'Bearer '+id_token}
         assert requests.get(endpoint+'/updates/latest',headers=headers,timeout=30).status_code == 403

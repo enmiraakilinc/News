@@ -10,3 +10,16 @@ def admin_key_path():
     if not keys:
         raise FileNotFoundError('Firebase yönetim anahtarı bulunamadı.')
     return max(keys, key=lambda path: path.stat().st_mtime)
+
+
+def admin_session():
+    """Use a local service key when available, otherwise the existing owner CLI login."""
+    try:
+        key = admin_key_path()
+    except FileNotFoundError:
+        from tools.admin.google_owner_session import owner_session
+        return owner_session()
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import AuthorizedSession
+    return AuthorizedSession(service_account.Credentials.from_service_account_file(
+        str(key), scopes=['https://www.googleapis.com/auth/cloud-platform']))

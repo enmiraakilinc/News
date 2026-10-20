@@ -12,9 +12,9 @@ from google.auth.transport.requests import AuthorizedSession
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from tools.admin.firebase_config import PROJECT_ID,admin_key_path
+from tools.admin.firebase_config import PROJECT_ID,admin_session
 GH='C:/Program Files/GitHub CLI/gh.exe'
-REPO='kunduracimelek/NeuralScope'
+from tools.releases.repository import RELEASE_REPOSITORY as REPO
 
 def gh(*args):
     return subprocess.check_output([GH,*args],text=True,encoding='utf-8').strip()
@@ -23,7 +23,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--version',required=True)
     parser.add_argument('--publish',action='store_true',required=True)
-    parser.add_argument('--private',action='store_true',help='Publish only to a private repository and authenticated update service.')
+    parser.add_argument('--private',action='store_true',default=True,help='Publish only to a private repository and authenticated update service.')
     parser.add_argument('--notes-file',type=Path,default=ROOT/'docs/releases/NEXT_PUBLIC_NOTES.txt')
     args=parser.parse_args()
     notes=args.notes_file.read_text(encoding='utf-8-sig').strip() if args.notes_file.exists() else 'Görünüm ve kararlılık iyileştirmeleri.'
@@ -59,7 +59,7 @@ def main():
         response.raise_for_status()
         for chunk in response.iter_content(1024*1024):remote.update(chunk);size+=len(chunk)
     if remote.hexdigest()!=digest or size!=report['bytes']:raise RuntimeError('Public download mismatch.')
-    session=AuthorizedSession(service_account.Credentials.from_service_account_file(str(admin_key_path()),scopes=['https://www.googleapis.com/auth/cloud-platform']))
+    session=admin_session()
     config_name='private_app_version' if args.private else 'app_version'
     endpoint=f'https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents/config/{config_name}'
     response=session.get(endpoint,timeout=30);response.raise_for_status();previous=response.json()
@@ -69,7 +69,7 @@ def main():
     if not backup.exists():backup.write_text(json.dumps(previous,indent=2),encoding='utf-8')
     fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':args.version},'url':{'stringValue':url},'urlsByAbi':{'mapValue':{'fields':{'arm64-v8a':{'stringValue':url}}}},'notes':{'stringValue':notes}}
     if args.private:
-        fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':args.version},'notes':{'stringValue':notes},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':digest}}
+        fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':args.version},'notes':{'stringValue':notes},'repository':{'stringValue':REPO},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':digest}}
     response=session.patch(endpoint,params=[('updateMask.fieldPaths',key)for key in fields]+[('currentDocument.updateTime',previous['updateTime'])],json={'fields':fields},timeout=30);response.raise_for_status()
     config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
     response=session.get(endpoint,timeout=30) if args.private else requests.get(endpoint,params={'key':config['client'][0]['api_key'][0]['current_key']},timeout=30)

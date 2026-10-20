@@ -85,7 +85,7 @@ Eski botun kayıtları yeni sisteme otomatik taşınmaz ve silinmez. Geçişten 
 /temizle
 ```
 
-`/proje_ekle` yalnızca bir kayıt oluşturur; depoya yetki kazandırmaz. NeuralScope'un APK yayın deposu olması kaynakların orada bulunduğunu göstermez. Kaynakları ve özel dosyaları kontrol etmeden o depoya yüklemeyin.
+`/proje_ekle` yalnızca bir kayıt oluşturur; depoya yetki kazandırmaz. Uygulamanin kaynak ve APK deposu enschumacher/Neural-Haber ozel deposudur. Yerel anahtarlar kaynak koduna eklenmez.
 
 ## Etkinleştirme — onaydan sonra
 

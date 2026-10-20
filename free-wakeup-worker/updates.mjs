@@ -1,3 +1,4 @@
+import {streamReleaseAsset} from './release_asset.mjs';
 const json = (status, message) => Response.json({message}, {status, headers:{'Cache-Control':'no-store'}});
 // Access is granted by the administrator, never by client-writable profiles.
 export async function privateUpdates(request, env, {fetch:fetcher=fetch, token}={}) {
@@ -26,6 +27,7 @@ export async function privateUpdates(request, env, {fetch:fetcher=fetch, token}=
     const f = (await response.json()).fields;
     const version = f?.name?.stringValue, asset = f?.assetId?.integerValue;
     const repo = env.GITHUB_RELEASE_REPO;
+    if(f.repository?.stringValue && f.repository.stringValue!==repo) return json(503,'G?ncelleme kayd? haz?rlan?yor.');
     if (!/^\d+\.\d+\.\d+$/.test(version ?? '') || !/^\d+$/.test(asset ?? '') || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo ?? '')) throw Error('config');
     if (path === '/updates/latest') {
       return Response.json({code:Number(f.code.integerValue),name:version,
@@ -33,23 +35,6 @@ export async function privateUpdates(request, env, {fetch:fetcher=fetch, token}=
         notes:f.notes?.stringValue ?? '',sha256:f.sha256?.stringValue ?? ''}, {headers:{'Cache-Control':'no-store'}});
     }
     if (new URL(request.url).searchParams.get('version') !== version) return json(409,'Daha yeni bir güncelleme var. Güncelleme ekranını yeniden aç.');
-    const headers = {Authorization:`Bearer ${env.GITHUB_RELEASE_TOKEN.trim()}`,Accept:'application/octet-stream','User-Agent':'private-app-updater','X-GitHub-Api-Version':'2022-11-28'};
-    stage = 'asset-api';
-    let apk = await fetcher(`https://api.github.com/repos/${repo}/releases/assets/${asset}`,{headers,redirect:'manual'});
-    if (apk.status === 302) {
-      stage = 'asset-redirect';
-      const location = new URL(apk.headers.get('Location'));
-      if (location.protocol !== 'https:' || !['release-assets.githubusercontent.com','objects.githubusercontent.com'].includes(location.hostname)) throw Error('redirect');
-      // Never forward the GitHub token to the asset host or the application.
-      stage = 'asset-fetch';
-      apk = await fetcher(location.toString(),{redirect:'manual'});
-    }
-    if (!apk.ok) return Response.json({message:'Güncelleme indirilemiyor. Daha sonra yeniden dene.',code:`upstream-${apk.status}`},{status:503,headers:{'Cache-Control':'no-store'}});
-    const output = new Headers({'Content-Type':'application/vnd.android.package-archive','Cache-Control':'private, no-store',
-      'Content-Disposition':`attachment; filename="update-${version}.apk"`,'X-Content-Type-Options':'nosniff'});
-    const length = apk.headers.get('Content-Length');
-    if (length) output.set('Content-Length',length);
-    stage = 'asset-stream';
-    return new Response(apk.body,{status:200,headers:output});
+    return streamReleaseAsset(env,fetcher,asset,version);
   } catch { return Response.json({message:'Güncelleme hizmetine şu anda ulaşılamıyor.',code:stage},{status:503,headers:{'Cache-Control':'no-store'}}); }
 }

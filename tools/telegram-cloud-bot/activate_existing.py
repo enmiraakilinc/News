@@ -104,7 +104,7 @@ def main():
     local_app=ROOT/'flutter_application_1'
     remote=subprocess.run(['git','-c',f'safe.directory={local_app.as_posix()}','remote','get-url','origin'],cwd=local_app,text=True,capture_output=True).stdout.strip()
     match=re.fullmatch(r'(?:https://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?',remote)
-    app_repo=match.group(1) if match else 'kunduracimelek/NeuralScope'
+    app_repo=match.group(1) if match else 'enschumacher/Neural-Haber'
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',app_repo):raise RuntimeError('Unexpected app repository.')
     seed=BACKUP/'seed.sql'
     seed.write_text("INSERT OR IGNORE INTO projects(alias,repo) VALUES('uygulama','"+app_repo+"');\nINSERT OR IGNORE INTO projects(alias,repo) VALUES('bot','kunduracimelek/bot');\nINSERT OR IGNORE INTO projects(alias,repo) VALUES('eski-notlar','kunduracimelek/bot');\nINSERT OR IGNORE INTO settings(key,value) VALUES('selected','uygulama');\n",encoding='utf-8')
