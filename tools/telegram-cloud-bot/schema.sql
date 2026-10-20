@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS projects (alias TEXT PRIMARY KEY, repo TEXT NOT NULL, workflow TEXT NOT NULL DEFAULT '', ref TEXT NOT NULL DEFAULT 'main');
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, project TEXT NOT NULL REFERENCES projects(alias), body TEXT NOT NULL, created INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS task_project ON tasks(project, created);
+CREATE TABLE IF NOT EXISTS messages (chat INTEGER NOT NULL, id INTEGER NOT NULL, project TEXT NOT NULL, task TEXT, created INTEGER NOT NULL, PRIMARY KEY(chat,id));
+CREATE INDEX IF NOT EXISTS message_scope ON messages(project,task,created);
+CREATE TABLE IF NOT EXISTS confirmations (nonce TEXT PRIMARY KEY, project TEXT NOT NULL, task TEXT, action TEXT NOT NULL, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS pc_jobs (
+  id TEXT PRIMARY KEY, project TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'pending', lease TEXT, lease_until INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pc_pending ON pc_jobs(project,state,created);
+CREATE TABLE IF NOT EXISTS pc_status (project TEXT PRIMARY KEY, seen INTEGER NOT NULL, last_error TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS commands (project TEXT NOT NULL, name TEXT NOT NULL, code TEXT NOT NULL, PRIMARY KEY(project,name));

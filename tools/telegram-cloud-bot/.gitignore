@@ -1,0 +1,7 @@
+.wrangler/
+.dev.vars
+node_modules/
+pc-local.json
+.pc-agent-state.json
+.pc-agent-state.tmp
+__pycache__/

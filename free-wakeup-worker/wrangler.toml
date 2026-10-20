@@ -1,0 +1,21 @@
+name = "neural-wakeup"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+# Free Workers only: no paid bindings or video relay.
+# SERVICE_ACCOUNT_JSON is an encrypted secret, never a var.
+[durable_objects]
+bindings = [{ name = "WAKE_RATE", class_name = "WakeRateLimiter" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WakeRateLimiter"]
+
+[triggers]
+# First day of each month, 09:00 Europe/Istanbul (06:00 UTC).
+crons = ["0 6 1 * *"]
+
+[vars]
+GITHUB_RELEASE_REPO = "kunduracimelek/NeuralScope"
+FIREBASE_PROJECT_ID = "star-galeri"
+FIREBASE_API_KEY = "AIzaSyADivGDDPrRNA72L9FkN356TuWe2ZcR4Xw"

@@ -1,0 +1,14 @@
+name = "telegram-project-assistant"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+# Keep this separate from the application's wakeup Worker; use Workers Free.
+[[d1_databases]]
+binding = "DB"
+database_name = "telegram-project-assistant"
+database_id = "1947cf0a-b19e-4569-8748-50c5ee60760a"
+[observability]
+enabled = false
+[triggers]
+crons = ["0 4 * * *"]
+# Secrets: BOT_TOKEN, OWNER_ID, WEBHOOK_SECRET, PC_SECRET, optional GITHUB_TOKEN.

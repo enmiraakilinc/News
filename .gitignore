@@ -1,0 +1,52 @@
+# Bağımlılıklar & build
+node_modules/
+dist/
+build/
+.next/
+.astro/
+
+# Ortam & sırlar (ASLA push edilmez)
+.env
+.env.*
+*adminsdk*.json
+!.env.example
+
+# OS / editör
+.DS_Store
+*.log
+
+# Private local recovery copy; never publish with source.
+letters-before-2026-08-31-backup.json
+
+# Local credentials, user-data backups and generated release archives.
+private/
+artifacts/
+archive/
+.venv/
+__pycache__/
+
+# Historical local project documents may contain operational details.
+docs/project/
+
+# Local-only files excluded during source transfer.
+.git/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.dart_tool/
+.gradle/
+.pub-cache/
+coverage/
+*.jks
+*.keystore
+*.dpapi
+*.pem
+*.key
+*.apk
+*.aab
+**/local.properties
+**/key.properties
+.mcp.json
+.claude/
+.vscode/
+photo/

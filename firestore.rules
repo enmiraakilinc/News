@@ -1,0 +1,432 @@
+rules_version = '2';
+
+// Star Galeri — kalici guvenlik kurallari.
+// Onceki kurallar Firebase'in "test modu" varsayilaniydi ve 13.08.2026'da
+// suresi doldugu icin butun istekler reddediliyordu. Burada tarih siniri yok.
+//
+// Model: veriler couples/{cid} altinda tutulur. Bir kullanici ancak o cifte
+// UYE ise altindaki mektup/ani/soru/dilek kayitlarina erisebilir. Mektup metni
+// zaten cihazda ucdan uca sifreli; sunucu icerigi goremez.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function girisYapti() {
+      return request.auth != null;
+    }
+
+    // Public release metadata is needed even before account initialization.
+    match /config/app_version {
+      allow get: if true;
+    }
+
+    function uye(cid) {
+      return girisYapti()
+        && request.auth.uid in get(/databases/$(database)/documents/couples/$(cid)).data.members;
+    }
+
+    // Davet kodlari: kod tahmin edilemez oldugu icin tek tek okunabilir,
+    // ama koleksiyonun tamami listelenemez (list izni yok).
+    match /invites/{code} {
+      allow get, create, delete: if girisYapti();
+    }
+
+    match /couples/{cid} {
+      // Uyelik ve gizli kelime ozeti yalnizca mevcut uyelere aciktir.
+      allow get: if uye(cid);
+
+      allow create: if girisYapti()
+        && request.auth.uid in request.resource.data.members;
+
+      // Guncelleme: ya zaten uyesin, ya da davet koduyla KENDINI ekliyorsun.
+      // Ikinci durumda mevcut uyeler korunmali (kimse baskasini atamaz).
+      allow update: if (uye(cid)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['joinProof'])
+            || request.resource.data.joinProof == resource.data.secretCheck))
+        || (girisYapti()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'joinProof'])
+            && request.resource.data.joinProof == resource.data.secretCheck
+            && request.resource.data.members.hasAll(resource.data.members)
+            && request.resource.data.members.hasOnly(resource.data.members.concat([request.auth.uid]))
+            && request.resource.data.secretCheck == resource.data.secretCheck);
+
+      allow delete: if uye(cid);
+
+      // Mektuplar, anilar, sorular, dilekler, sesli notlar, tarifler...
+      match /{belge=**} {
+        allow read, write: if uye(cid);
+      }
+    }
+    // New individual and group chats; the original couple data is independent.
+    match /chatAccounts/{userId}/contacts/{contactId} {
+      allow read: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['alias', 'hidden', 'avatarEmoji', 'avatarPhoto'])
+        && (!request.resource.data.keys().hasAny(['alias'])
+          || (request.resource.data.alias is string
+            && request.resource.data.alias.size() > 0
+            && request.resource.data.alias.size() <= 60))
+        && (!request.resource.data.keys().hasAny(['hidden'])
+          || request.resource.data.hidden is bool)
+        && request.resource.data.get('avatarEmoji', '') is string
+        && request.resource.data.get('avatarEmoji', '').size() <= 64
+        && request.resource.data.get('avatarPhoto', '') is string
+        && request.resource.data.get('avatarPhoto', '').size() <= 32768
+        && (request.resource.data.get('avatarEmoji', '') == '' || request.resource.data.get('avatarPhoto', '') == '');
+    }
+
+    match /chatAccounts/{userId}/starredMessages/{starId} {
+      allow read, delete: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && starId.matches('^[a-f0-9]{64}$')
+        && request.resource.data.keys().hasOnly(['sourceKey', 'messageId', 'starredAt'])
+        && request.resource.data.sourceKey is string
+        && request.resource.data.sourceKey.matches('^(chat|couple)/[A-Za-z0-9_-]{1,200}$')
+        && request.resource.data.messageId is string
+        && request.resource.data.messageId.matches('^[A-Za-z0-9_-]{1,200}$')
+        && request.resource.data.starredAt == request.time;
+    }
+
+    match /config/wakeup {
+      allow get: if true;
+    }
+    match /chatAccounts/{userId}/callDevices/{deviceId} {
+      allow read, delete: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && deviceId.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasOnly(['token', 'enabled', 'updatedAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() >= 20
+        && request.resource.data.token.size() <= 4096 && request.resource.data.enabled is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /chatAccounts/{userId}/wakeDevices/{deviceId} {
+      allow read, delete: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && deviceId.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasOnly(['token', 'updatedAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() >= 20
+        && request.resource.data.token.size() <= 4096 && request.resource.data.updatedAt == request.time;
+    }
+    match /chatAccounts/{userId}/wakePermissions/{permissionId} {
+      allow read, delete: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && permissionId.matches('^[a-f0-9]{64}$')
+        && request.resource.data.keys().hasOnly(['sourceKey', 'enabled', 'volume', 'deviceId'])
+        && request.resource.data.sourceKey is string
+        && request.resource.data.sourceKey.matches('^(chat|couple)/[A-Za-z0-9_-]{1,200}$')
+        && request.resource.data.enabled is bool
+        && request.resource.data.volume is number && request.resource.data.volume >= 0 && request.resource.data.volume <= 1
+        && request.resource.data.deviceId is string && request.resource.data.deviceId.matches('^[a-f0-9]{32}$');
+    }
+    match /chatProfiles/{userId} {
+      allow get: if girisYapti();
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['name', 'emoji', 'photo'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.get('emoji', '') is string
+        && request.resource.data.get('emoji', '').size() <= 64
+        && request.resource.data.get('photo', '') is string
+        && request.resource.data.get('photo', '').size() <= 32768
+        && (request.resource.data.get('emoji', '') == '' || request.resource.data.get('photo', '') == '');
+    }
+
+    match /chatInvites/{code} {
+      allow get: if girisYapti();
+      allow create: if girisYapti() && code.matches('^[0-9]{8}$')
+        && request.resource.data.keys().hasOnly(['owner', 'name', 'expiresAt', 'usedBy', 'createdAt'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.name == get(/databases/$(database)/documents/chatProfiles/$(request.auth.uid)).data.name
+        && request.resource.data.usedBy == null
+        && ((request.resource.data.get('createdAt', null) == request.time && request.resource.data.expiresAt is timestamp)
+          || (!request.resource.data.keys().hasAny(['createdAt']) && request.resource.data.expiresAt > request.time
+            && request.resource.data.expiresAt <= request.time + duration.value(65, 'm')));
+      allow update: if girisYapti() && resource.data.owner != request.auth.uid
+        && resource.data.usedBy == null && davetAktif(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy'])
+        && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if girisYapti() && resource.data.owner == request.auth.uid;
+    }
+
+    function davetAktif(data) {
+      return (data.get('createdAt', null) is timestamp && data.createdAt + duration.value(60, 'm') > request.time)
+        || (!data.keys().hasAny(['createdAt']) && data.expiresAt > request.time);
+    }
+
+    function sohbetUyesi(chatId) {
+      return girisYapti() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+    }
+
+
+    // Explicitly shared contact names; private address books stay owner-only.
+    match /chatContactLabels/{chatId}/names/{userId} {
+      allow read: if sohbetUyesi(chatId);
+      allow create, update: if sohbetUyesi(chatId) && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['label'])
+        && request.resource.data.label is string && request.resource.data.label.size() > 0
+        && request.resource.data.label.size() <= 60;
+      allow delete: if sohbetUyesi(chatId) && request.auth.uid == userId;
+    }
+    match /coupleContactLabels/{cid}/names/{userId} {
+      allow read: if uye(cid);
+      allow create, update: if uye(cid) && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['label'])
+        && request.resource.data.label is string && request.resource.data.label.size() > 0
+        && request.resource.data.label.size() <= 60;
+      allow delete: if uye(cid) && request.auth.uid == userId;
+    }
+    match /config/voice_calls { allow get: if true; }
+    function voiceSource(data) {
+      return data.sourceType in ['chat', 'couple'] && data.sourceId is string
+        && data.sourceId.matches('^[A-Za-z0-9_-]{1,200}$')
+        && data.sourceKey == data.sourceType + '/' + data.sourceId
+        && ((data.sourceType == 'chat'
+          && get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members.size() == 2
+          && data.caller in get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members
+          && data.callee in get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members)
+        || (data.sourceType == 'couple'
+          && get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members.size() == 2
+          && data.caller in get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members
+          && data.callee in get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members));
+    }
+    function voiceParticipant(data) {
+      return girisYapti() && request.auth.uid in [data.caller, data.callee] && voiceSource(data);
+    }
+    function descriptionValid(data, kind) {
+      return data is map && data.keys().hasOnly(['type', 'sdp']) && data.type == kind
+        && data.sdp is string && data.sdp.size() > 0 && data.sdp.size() <= 50000;
+    }
+    match /voiceCalls/{callId} {
+      allow get: if girisYapti() && (!exists(/databases/$(database)/documents/voiceCalls/$(callId)) || voiceParticipant(resource.data));
+      // Inbox queries only expose calls addressed to the authenticated account.
+      // Creation checks real two-member source membership; identities never change.
+      allow list: if girisYapti() && resource.data.callee == request.auth.uid;
+      allow create: if voiceParticipant(request.resource.data)
+        && request.resource.data.keys().hasOnly(['sourceKey', 'sourceType', 'sourceId', 'caller', 'callee', 'state', 'offer', 'createdAt', 'video'])
+        && request.resource.data.caller == request.auth.uid && request.resource.data.callee != request.auth.uid
+        && request.resource.data.get('video', false) is bool
+        && request.resource.data.state == 'ringing' && request.resource.data.createdAt == request.time
+        && descriptionValid(request.resource.data.offer, 'offer');
+      allow update: if voiceParticipant(resource.data)
+        && ((resource.data.state == 'ringing' && request.auth.uid == resource.data.callee
+          && request.time < resource.data.createdAt + duration.value(45, 's')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'answer', 'startedAt'])
+          && request.resource.data.state == 'accepted' && request.resource.data.startedAt == request.time
+          && descriptionValid(request.resource.data.answer, 'answer'))
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'endedAt'])
+          && request.resource.data.state == 'ended' && request.resource.data.endedAt == request.time));
+      allow delete: if voiceParticipant(resource.data) && request.auth.uid == resource.data.caller
+        && (resource.data.state == 'ended' || request.time >= resource.data.createdAt + duration.value(16, 'm'));
+      match /candidates/{candidateId} {
+        allow read, delete: if voiceParticipant(get(/databases/$(database)/documents/voiceCalls/$(callId)).data);
+        allow create: if voiceParticipant(get(/databases/$(database)/documents/voiceCalls/$(callId)).data)
+          && get(/databases/$(database)/documents/voiceCalls/$(callId)).data.state in ['ringing', 'accepted']
+          && request.time < get(/databases/$(database)/documents/voiceCalls/$(callId)).data.createdAt + duration.value(16, 'm')
+          && request.resource.data.keys().hasOnly(['owner', 'candidate', 'sdpMid', 'sdpMLineIndex'])
+          && request.resource.data.owner == request.auth.uid
+          && request.resource.data.candidate is string && request.resource.data.candidate.size() <= 2500
+          && (request.resource.data.sdpMid == null || request.resource.data.sdpMid is string)
+          && (request.resource.data.sdpMLineIndex == null || request.resource.data.sdpMLineIndex is int);
+      }
+    }
+
+    match /chats/{chatId} {
+      allow get: if girisYapti() && (!exists(/databases/$(database)/documents/chats/$(chatId))
+        || request.auth.uid in resource.data.members);
+      allow list: if girisYapti() && request.auth.uid in resource.data.members;
+      allow create: if girisYapti()
+        && request.resource.data.keys().hasOnly(['group', 'title', 'members', 'names', 'createdBy', 'updatedAt', 'inviteCode'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.members is list
+        && request.auth.uid in request.resource.data.members
+        && request.resource.data.members.size() >= 2
+        && request.resource.data.members.size() <= 20
+        && request.resource.data.members.toSet().size() == request.resource.data.members.size()
+        && request.resource.data.names is map
+        && request.resource.data.names.keys().hasAll(request.resource.data.members)
+        && request.resource.data.names.keys().hasOnly(request.resource.data.members)
+        && request.resource.data.names[request.auth.uid] == get(/databases/$(database)/documents/chatProfiles/$(request.auth.uid)).data.name
+        && request.resource.data.title is string && request.resource.data.title.size() <= 60
+        && request.resource.data.updatedAt == request.time
+        && ((request.resource.data.group == true && request.resource.data.title.size() > 0 && request.resource.data.members.size() >= 3)
+          || (request.resource.data.group == false && request.resource.data.members.size() == 2
+            && getAfter(/databases/$(database)/documents/chatInvites/$(request.resource.data.inviteCode)).data.usedBy == request.auth.uid
+            && davetAktif(getAfter(/databases/$(database)/documents/chatInvites/$(request.resource.data.inviteCode)).data)
+            && getAfter(/databases/$(database)/documents/chatInvites/$(request.resource.data.inviteCode)).data.owner in request.resource.data.members
+            && request.resource.data.names[getAfter(/databases/$(database)/documents/chatInvites/$(request.resource.data.inviteCode)).data.owner]
+              == getAfter(/databases/$(database)/documents/chatInvites/$(request.resource.data.inviteCode)).data.name));
+      allow update: if sohbetUyesi(chatId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+
+      match /messages/{messageId} {
+        allow read: if sohbetUyesi(chatId);
+        allow create: if sohbetUyesi(chatId)
+          && request.resource.data.keys().hasOnly(['sender', 'text', 'sentAt', 'openAt', 'readBy', 'replyTo', 'scheduled'])
+          && request.resource.data.sender == request.auth.uid
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 800000
+          && request.resource.data.sentAt == request.time
+          && request.resource.data.openAt is timestamp
+          && request.resource.data.get('scheduled', true) is bool
+          && (request.resource.data.get('scheduled', true) == true || request.resource.data.openAt == request.time)
+          && request.resource.data.readBy == [request.auth.uid]
+          && (request.resource.data.replyTo == null || request.resource.data.replyTo is string);
+        allow update: if sohbetUyesi(chatId) && resource.data.openAt <= request.time
+          && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+          && request.resource.data.readBy.hasAll(resource.data.readBy)
+          && request.resource.data.readBy.hasOnly(resource.data.readBy.concat([request.auth.uid])))
+          || (resource.data.sender == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt'])
+            && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 800000
+            && request.resource.data.editedAt == request.time)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            && request.resource.data.reactions is map
+            && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
+            && request.resource.data.reactions.get(request.auth.uid, '') is string
+            && request.resource.data.reactions.get(request.auth.uid, '').size() <= 64));
+        allow delete: if sohbetUyesi(chatId) && resource.data.sender == request.auth.uid;
+      }
+    }
+
+    // File contents are separate from message listeners and expire server-side.
+    function medyaUyesi(data) {
+      return (data.chatId is string && sohbetUyesi(data.chatId))
+        || (data.coupleId is string && uye(data.coupleId));
+    }
+    function medyaSuresi(data) {
+      return duration.value(2, 'd');
+    }
+    function medyaSilinebilir(data) {
+      return data.owner == request.auth.uid
+        || request.time >= data.createdAt + medyaSuresi(data);
+    }
+    function medyaAktif(data) {
+      return data.ready == true && request.time < data.createdAt + medyaSuresi(data);
+    }
+    // Gallery export consent is separate from normal in-app viewing.
+    match /mediaDownloadRequests/{requestId} {
+      function media() { return get(/databases/$(database)/documents/chatMedia/$(request.resource.data.mediaId)).data; }
+      allow get: if girisYapti() && (requestId.matches('^[A-Za-z0-9]{20}_' + request.auth.uid + '$')
+        || resource.data.ownerUid == request.auth.uid || resource.data.requesterUid == request.auth.uid);
+      allow list: if girisYapti() && (resource.data.ownerUid == request.auth.uid || resource.data.requesterUid == request.auth.uid);
+      allow create: if girisYapti()
+        && request.resource.data.keys().hasOnly(['mediaId', 'ownerUid', 'requesterUid', 'sourceKey', 'status', 'requestedAt', 'expiresAt'])
+        && request.resource.data.mediaId is string
+        && requestId == request.resource.data.mediaId + '_' + request.auth.uid
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.ownerUid == media().owner
+        && media().owner != request.auth.uid && medyaUyesi(media()) && medyaAktif(media())
+        && media().kind in ['photo', 'video']
+        && request.resource.data.sourceKey == (media().chatId is string ? 'chat/' + media().chatId : 'couple/' + media().coupleId)
+        && request.resource.data.expiresAt == media().createdAt + medyaSuresi(media())
+        && request.resource.data.status == 'pending' && request.resource.data.requestedAt == request.time;
+      allow update: if girisYapti() && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','decidedAt'])
+        && resource.data.status == 'pending' && request.resource.data.status in ['approved','declined']
+        && request.resource.data.decidedAt == request.time
+        && media().owner == request.auth.uid && medyaUyesi(media()) && medyaAktif(media());
+      allow delete: if girisYapti() && (resource.data.ownerUid == request.auth.uid || resource.data.requesterUid == request.auth.uid);
+    }
+
+    match /chatMedia/{mediaId} {
+      // This known deleted attachment resolves to not-found for its original chat only.
+      allow get: if mediaId == '1ZC95xAZQPrUbOocOM7E' && sohbetUyesi('direct_T0yLDuYUL2O5nj7kZvfZhGAfHmB2_cFiiF3rJJhVvETi3Gr3HJaZfHgH3')
+        && !exists(/databases/$(database)/documents/chatMedia/$(mediaId));
+      allow create: if girisYapti()
+        && request.resource.data.keys().hasOnly(['owner', 'chatId', 'coupleId', 'name', 'kind', 'size', 'chunks', 'createdAt', 'ready'])
+        && request.resource.data.owner == request.auth.uid
+        && ((request.resource.data.chatId is string && request.resource.data.coupleId == null)
+          || (request.resource.data.coupleId is string && request.resource.data.chatId == null))
+        && medyaUyesi(request.resource.data)
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 800
+        && request.resource.data.kind in ['file', 'photo', 'video', 'audio']
+        && request.resource.data.size is int && request.resource.data.size > 0 && request.resource.data.size <= (request.resource.data.kind == 'video' ? 104857600 : (request.resource.data.kind == 'file' ? 83886080 : 20971520))
+        && request.resource.data.chunks is int && request.resource.data.chunks > 0 && request.resource.data.chunks <= 228
+        && request.resource.data.chunks == int((request.resource.data.size + 460799) / 460800)
+        && request.resource.data.createdAt == request.time && request.resource.data.ready == false;
+      allow read: if girisYapti() && (resource.data.owner == request.auth.uid || medyaUyesi(resource.data));
+      allow update: if girisYapti() && resource.data.owner == request.auth.uid && medyaUyesi(resource.data)
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
+          && resource.data.ready == false && request.resource.data.ready == true
+          && request.time < resource.data.createdAt + medyaSuresi(resource.data))
+        || (resource.data.kind == 'video'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleteRequestedAt'])
+          && request.resource.data.deleteRequestedAt == request.time));
+      allow delete: if girisYapti() && medyaUyesi(resource.data)
+        && medyaSilinebilir(resource.data)
+        && !existsAfter(/databases/$(database)/documents/chatMedia/$(mediaId)/preview/image);
+      match /preview/{previewId} {
+        function media() { return get(/databases/$(database)/documents/chatMedia/$(mediaId)).data; }
+        allow get: if girisYapti() && medyaUyesi(media()) && medyaAktif(media());
+        allow create: if previewId == 'image' && girisYapti()
+          && media().kind == 'photo' && media().owner == request.auth.uid && medyaUyesi(media())
+          && media().ready == false && request.time < media().createdAt + medyaSuresi(media())
+          && request.resource.data.keys().hasOnly(['bytes', 'iv'])
+          && request.resource.data.bytes is bytes && request.resource.data.bytes.size() > 0
+          && request.resource.data.bytes.size() <= 24592
+          && ((media().coupleId == null && !request.resource.data.keys().hasAny(['iv']))
+            || (media().coupleId is string && request.resource.data.iv is bytes && request.resource.data.iv.size() == 16));
+        allow delete: if girisYapti() && medyaUyesi(media()) && medyaSilinebilir(media());
+      }
+      match /chunks/{chunkId} {
+        function media() { return get(/databases/$(database)/documents/chatMedia/$(mediaId)).data; }
+        allow get: if girisYapti() && medyaUyesi(media()) && medyaAktif(media());
+        allow create: if girisYapti() && media().owner == request.auth.uid && medyaUyesi(media())
+          && media().ready == false && request.time < media().createdAt + medyaSuresi(media())
+          && chunkId.matches('^[0-9]{1,3}$') && chunkId == string(int(chunkId)) && int(chunkId) >= 0 && int(chunkId) < media().chunks
+          && request.resource.data.keys().hasOnly(['bytes', 'iv'])
+          && request.resource.data.bytes is bytes && request.resource.data.bytes.size() > 0
+          && request.resource.data.bytes.size() <= 460816
+          && ((media().coupleId == null && !request.resource.data.keys().hasAny(['iv']))
+            || (media().coupleId is string && request.resource.data.iv is bytes && request.resource.data.iv.size() == 16));
+        allow delete: if girisYapti() && medyaUyesi(media())
+          && medyaSilinebilir(media());
+      }
+    }
+    // Small temporary shares. Coordinates never remain inside message text.
+    function konumUyesi(data) {
+      return (data.chatId is string && sohbetUyesi(data.chatId))
+        || (data.coupleId is string && uye(data.coupleId));
+    }
+
+    match /sharedLocations/{shareId} {
+      allow create: if girisYapti()
+        && request.resource.data.keys().hasOnly(['owner', 'chatId', 'coupleId', 'latitude', 'longitude', 'createdAt'])
+        && request.resource.data.owner == request.auth.uid
+        && ((request.resource.data.chatId is string && request.resource.data.coupleId == null)
+          || (request.resource.data.coupleId is string && request.resource.data.chatId == null))
+        && konumUyesi(request.resource.data)
+        && (request.resource.data.latitude is float || request.resource.data.latitude is int)
+        && (request.resource.data.longitude is float || request.resource.data.longitude is int)
+        && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
+        && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180
+        && request.resource.data.createdAt == request.time;
+      allow get: if girisYapti() && konumUyesi(resource.data)
+        && request.time < resource.data.createdAt + duration.value(60, 'm');
+      allow delete: if girisYapti() && konumUyesi(resource.data)
+        && (resource.data.owner == request.auth.uid
+          || request.time >= resource.data.createdAt + duration.value(60, 'm'));
+    }
+    // Login aliases do not grant chat or couple membership. Password stays in Auth.
+    match /accountCodeAliases/{code} {
+      allow get: if girisYapti() && resource.data.owner == request.auth.uid;
+      allow create: if girisYapti() && code.matches('^[0-9]{12}$')
+        && request.resource.data.keys().hasOnly(['owner', 'email'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email.matches('^[a-f0-9]{32}@accounts[.]neural[.]invalid$')
+        && !exists(/databases/$(database)/documents/accountLoginCodes/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/accountLoginCodes/$(request.auth.uid)).data.code == code;
+    }
+    match /accountLoginCodes/{uid} {
+      allow get: if girisYapti() && uid == request.auth.uid;
+      allow create: if girisYapti() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['code'])
+        && request.resource.data.code is string
+        && request.resource.data.code.matches('^[0-9]{12}$')
+        && getAfter(/databases/$(database)/documents/accountCodeAliases/$(request.resource.data.code)).data.owner == uid;
+    }
+
+  }
+}
