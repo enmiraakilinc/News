@@ -55,3 +55,6 @@ photo/
 *.zip.enc
 Neural-Haber-restored.zip
 .backup-decrypt-*
+
+*.zip.enc.part*
+.backup-join-*
