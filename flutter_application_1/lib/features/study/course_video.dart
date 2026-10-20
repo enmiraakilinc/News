@@ -32,7 +32,7 @@ class CourseVideo {
       throw Exception('Ses dosyasının türü desteklenmiyor.');
     }
     if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
-      throw Exception('Video kaydı geçersiz.');
+      throw Exception('Dosya kaydı geçersiz.');
     }
     return File('${(await repo.directory()).path}/$id.$extension');
   }
@@ -71,7 +71,7 @@ class CourseVideo {
         id: id,
         kind: kind,
         audioExtension: extension,
-        text: 'Video yükleniyor…',
+        text: kind == 'audio' ? 'Ses yükleniyor…' : 'Video yükleniyor…',
         created: DateTime.now(),
       ),
     );
@@ -147,12 +147,15 @@ class CourseVideo {
         note.id,
         extension: note.kind == 'audio' ? note.audioExtension : 'mp4',
       );
-      if (!await file.exists()) throw Exception('Video artık bulunamıyor.');
+      if (!await file.exists()) throw Exception('Dosya artık bulunamıyor.');
       return file;
     }
     if (note.videoChunks < 1 ||
-        note.videoChunks > (maxChatVideoBytes / mediaChunkBytes).ceil()) {
-      throw Exception('Video kaydı geçersiz.');
+        note.videoChunks >
+            ((note.kind == 'audio' ? 20 * 1024 * 1024 : maxChatVideoBytes) /
+                    mediaChunkBytes)
+                .ceil()) {
+      throw Exception('Dosya kaydı geçersiz.');
     }
     final shared = repo as SharedCourseRepository;
     final output = destination.openWrite();
@@ -163,7 +166,7 @@ class CourseVideo {
           folder,
           note.id,
         ).collection('chunks').doc('$i').get()).data();
-        if (data == null) throw Exception('Video eksik veya silinmiş.');
+        if (data == null) throw Exception('Dosya eksik veya silinmiş.');
         final decoded = await compute(transformMediaChunk, {
           'bytes': (data['bytes'] as Blob).bytes,
           'iv': (data['iv'] as Blob).bytes,

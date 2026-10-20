@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
+import 'audio_file_types.dart';
 import '../location/location_share.dart';
 import 'media_viewer.dart';
 import 'photo_gallery.dart';
@@ -210,7 +211,10 @@ class MessageContent extends StatelessWidget {
         }
         return;
       }
-      final result = await OpenFilex.open(file.path);
+      final result = await OpenFilex.open(
+        file.path,
+        type: AudioFileTypes.mimeTypes[file.path.split('.').last.toLowerCase()],
+      );
       if (result.type != ResultType.done) {
         throw Exception('Bu dosyayı açabilecek bir uygulama bulunamadı.');
       }
@@ -499,7 +503,12 @@ class _RemoteMediaState extends State<_RemoteMedia> {
           await _viewVideo(file);
           return;
         }
-        if ((await OpenFilex.open(file.path)).type != ResultType.done) {
+        if ((await OpenFilex.open(
+              file.path,
+              type: AudioFileTypes
+                  .mimeTypes[file.path.split('.').last.toLowerCase()],
+            )).type !=
+            ResultType.done) {
           throw Exception('Dosya açılamadı.');
         }
       }
