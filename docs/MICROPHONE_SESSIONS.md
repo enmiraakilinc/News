@@ -26,4 +26,4 @@ Sesli mesajlarda da aynı kanal kullanılır. Kayıt uygulama açıkken başlat�
 - lib/features/voice_notes/voice_notes_screen.dart: mevcut sesli kayıtla servis bağlantısı.
 - test/microphone_session_test.dart ve test/voice_notes_test.dart: kullanıcı ayarı, ekran kilidi, sayfadan çıkış ve durdurma testleri.
 
-Uygulama yolları flutter_application_1/ altındadır. Kontroller: ilgili 16 Flutter testi başarılı; Dart analizi temiz; Android release Kotlin derlemesi başarılı. Fiziksel telefon testi yerine geçmez.
+Uygulama yolları flutter_application_1/ altındadır. Kontroller: ilgili 17 Flutter testi başarılı; Dart analizi temiz; Android release Kotlin derlemesi başarılı. Fiziksel telefon testi yerine geçmez.

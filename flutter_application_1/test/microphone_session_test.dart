@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:record_platform_interface/record_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/core/security/microphone_session.dart';
+import 'package:flutter_application_1/core/security/feature_access.dart';
 import 'package:flutter_application_1/features/voice_notes/microphone_session_screen.dart';
 import 'voice_notes_test.dart' show FakeRecorder;
 
@@ -33,6 +34,9 @@ void main() {
           return {'supported': nativeSupported, 'drawerHidden': hidden};
         }
         if (call.method == 'status') return {'mode': mode, 'silenced': false};
+        if (call.method == 'requestStop') {
+          mode = null;
+        }
         if (call.method == 'start') {
           mode = (call.arguments as Map)['mode'] as String;
         }
@@ -147,6 +151,27 @@ void main() {
       await tester.pumpAndSettle();
       expect(result, isTrue);
       expect(find.byType(AlertDialog), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Turning off microphone usage requests stop for an active session',
+    (tester) async {
+      mode = 'hold';
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: FeatureAccessSwitches())),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Mikrofon'));
+      await tester.pumpAndSettle();
+      expect(
+        (await SharedPreferences.getInstance()).getBool(
+          'feature_access_microphone',
+        ),
+        isFalse,
+      );
+      expect(calls.where((c) => c.method == 'requestStop'), hasLength(1));
+      expect(mode, isNull);
     },
   );
 
