@@ -50,3 +50,8 @@ coverage/
 .claude/
 .vscode/
 photo/
+
+# Encrypted archives and decrypted recovery files remain release/local assets.
+*.zip.enc
+Neural-Haber-restored.zip
+.backup-decrypt-*
