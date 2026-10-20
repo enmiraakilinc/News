@@ -29,7 +29,8 @@ Firebase'in herkese açık `config/app_version` kaydı bu geçiş adresini göst
 - Yeni repodan hem yetkili APK indirmesi hem açık geçiş dosyası SHA-256/boyut kontrolüyle doğrulandı.
 - Supabase istemcisi, yapılandırması veya uygulamayla bağlı Supabase repo kaydı bulunmadı; kullanılmayan bir servis eklenmedi.
 - Firebase projesi ve kullanıcı verileri değiştirilmedi; bu çalışma repo/yayın bağlantılarını taşır.
-- Önceki yayınların aktarım sonuçları yerelde artifacts/release-migration/migration-report.json içinde tutulur.
+- 11 eski uygulama sürümü yeni private deponun Releases bölümüne, dosya boyutu ve SHA-256 özeti korunarak kopyalandı. En güncel sürüm v1.14.32 olarak kaldı. Aktarım sonuçları artifacts/release-migration/migration-report.json içinde tutulur.
+- 34 sunucu testi geçti; Android imza dosyaları şifreli yedekten geri yüklendi ve Git dışında tutuldu.
 
 ## Yerel erişim ve güvenlik
 
