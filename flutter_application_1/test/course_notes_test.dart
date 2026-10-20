@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:flutter_application_1/features/media/audio_file_types.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/features/study/course_video.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,121 @@ void main() {
       await root.delete(recursive: true);
     }
   });
+  testWidgets(
+    'Topic header survives scrolling out of view and back on a single subscription stream',
+    (tester) async {
+      final repo = _ScrollingCourseRepository();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CourseNotesScreen(
+            repository: repo,
+            folder: const LessonFolder('course', 'Ödev kodları'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Tokenizer'), findsOneWidget);
+      final list = tester.widget<ListView>(find.byType(ListView).first);
+      expect(list.childrenDelegate.estimatedChildCount, 81);
+      final scroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(ListView).first,
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      for (var i = 0; i < 3; i++) {
+        scroll.position.jumpTo(scroll.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        scroll.position.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Tokenizer'), findsOneWidget);
+        expect(find.text('Not 0'), findsOneWidget);
+      }
+      expect(repo.topicSubscriptions, 1);
+    },
+  );
+
+  test(
+    'Course audio preserves extension, survives reopening and is removed with its note',
+    () async {
+      final repo = LocalCourseRepository('audio-course', root: root);
+      await repo.create('Sesli ders');
+      final folder = (await repo.folders().first).single;
+      const id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+      final source = File('${root.path}/lecture.mp3');
+      await source.writeAsBytes([73, 68, 51, 1, 2, 3]);
+      final chunks = await CourseVideo.save(
+        repo,
+        folder.id,
+        id,
+        XFile(source.path),
+        kind: 'audio',
+        extension: 'mp3',
+      );
+      final note = LessonNote(
+        id: id,
+        kind: 'audio',
+        text: 'Ders sesi',
+        audioExtension: 'mp3',
+        videoChunks: chunks,
+        created: DateTime.now(),
+      );
+      await repo.add(folder.id, note);
+      final reopened = LocalCourseRepository('audio-course', root: root);
+      final stored = (await reopened.notes(folder.id).first).single;
+      expect(stored.audioExtension, 'mp3');
+      expect(stored.kind, 'audio');
+      final file = await CourseVideo.load(
+        reopened,
+        folder.id,
+        stored,
+        File('${root.path}/unused.mp3'),
+      );
+      expect(await file.readAsBytes(), [73, 68, 51, 1, 2, 3]);
+      await reopened.removeNote(folder.id, id);
+      expect(await file.exists(), isFalse);
+      expect(AudioFileTypes.mime('lecture.MP3'), 'audio/mpeg');
+      expect(AudioFileTypes.extension('recording.3ga'), '3ga');
+      expect(AudioFileTypes.extension('title without extension'), 'm4a');
+    },
+  );
+
+  test(
+    'Course audio rejects oversized files and expires after one week',
+    () async {
+      final repo = LocalCourseRepository('audio-limits', root: root);
+      final source = File('${root.path}/large.m4a');
+      final handle = await source.open(mode: FileMode.write);
+      await handle.truncate(20 * 1024 * 1024 + 1);
+      await handle.close();
+      await expectLater(
+        CourseVideo.save(
+          repo,
+          'folder',
+          'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          XFile(source.path),
+          kind: 'audio',
+          extension: 'm4a',
+        ),
+        throwsException,
+      );
+      final expired = LessonNote(
+        id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        kind: 'audio',
+        text: 'old',
+        created: DateTime.now().subtract(const Duration(days: 8)),
+      );
+      await expectLater(
+        CourseVideo.load(repo, 'folder', expired, File('${root.path}/old.m4a')),
+        throwsException,
+      );
+    },
+  );
+
   testWidgets(
     'Announcement editing saves the existing note and keeps its position',
     (tester) async {
@@ -546,4 +662,26 @@ class _TopicCourseRepository extends _ReadOnlyCourseRepository {
   Stream<List<LessonFolder>> folders({String? parent}) => Stream.value(
     parent == 'course' ? [const LessonFolder('topic', 'Tokenizer')] : [],
   );
+}
+
+class _ScrollingCourseRepository extends _TopicCourseRepository {
+  int topicSubscriptions = 0;
+  late final Stream<List<LessonFolder>> _singleTopics = _loadTopics();
+  Stream<List<LessonFolder>> _loadTopics() async* {
+    topicSubscriptions++;
+    yield [const LessonFolder('topic', 'Tokenizer')];
+  }
+
+  @override
+  Stream<List<LessonFolder>> folders({String? parent}) => _singleTopics;
+  @override
+  Stream<List<LessonNote>> notes(String course) => Stream.value([
+    for (var i = 0; i < 80; i++)
+      LessonNote(
+        id: 'note-$i',
+        kind: i.isEven ? 'code' : 'text',
+        text: 'Not $i',
+        created: DateTime(2026).add(Duration(minutes: i)),
+      ),
+  ]);
 }

@@ -11,6 +11,8 @@ import 'course_folder_color.dart';
 import 'course_search_screen.dart';
 import 'course_note_text.dart';
 import 'course_video.dart';
+import '../media/audio_file_types.dart';
+import '../media/local_audio_dialog.dart';
 import '../../core/utils/search_text.dart';
 import '../pair/couple_service.dart';
 import '../pair/paired_gate.dart';
@@ -382,6 +384,130 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
   bool _showSearch = false;
   final _cleanedVideos = <String>{};
 
+  Future<void> _sendAudio() async {
+    if (_busy) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    LessonNote? pending;
+    File? pickedCopy;
+    try {
+      final selected = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: AudioFileTypes.mimeTypes.keys.toList(),
+      );
+      if (selected == null || !mounted) return;
+      final size = await selected.length();
+      if (size != null && (size < 1 || size > 20 * 1024 * 1024)) {
+        throw Exception('Ses dosyası en fazla 20 MB olabilir.');
+      }
+      final cache = await getTemporaryDirectory();
+      pickedCopy = File(
+        '${cache.path}/course_audio_import_${const Uuid().v4()}',
+      );
+      final sink = pickedCopy.openWrite();
+      var received = 0;
+      try {
+        await for (final bytes in selected.readAsByteStream()) {
+          received += bytes.length;
+          if (received > 20 * 1024 * 1024) {
+            throw Exception('Ses dosyası en fazla 20 MB olabilir.');
+          }
+          sink.add(bytes);
+        }
+      } finally {
+        await sink.close();
+      }
+      if (received == 0) {
+        throw Exception('Ses dosyası boş veya Drive üzerinden indirilemedi.');
+      }
+      final ext = AudioFileTypes.extension(selected.name);
+      pending = LessonNote(
+        id: const Uuid().v4(),
+        kind: 'audio',
+        text: _text.text.trim().isEmpty ? selected.name : _text.text.trim(),
+        audioExtension: ext,
+        created: DateTime.now(),
+      );
+      final chunks = await CourseVideo.save(
+        widget.repository,
+        widget.folder.id,
+        pending.id,
+        XFile(pickedCopy.path, name: selected.name),
+        kind: 'audio',
+        extension: ext,
+      );
+      await widget.repository.add(
+        widget.folder.id,
+        LessonNote.fromJson({...pending.toJson(), 'videoChunks': chunks}),
+      );
+      pending = null;
+      if (mounted) {
+        setState(() {
+          _text.clear();
+          _stream = widget.repository.notes(widget.folder.id);
+        });
+      }
+    } catch (error) {
+      if (pending != null) {
+        await CourseVideo.remove(
+          widget.repository,
+          widget.folder.id,
+          pending,
+        ).catchError((_) {});
+        await widget.repository
+            .removeNote(widget.folder.id, pending.id)
+            .catchError((_) {});
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (pickedCopy != null && await pickedCopy.exists()) {
+        await pickedCopy.delete();
+      }
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openAudio(LessonNote note) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    File? temporary;
+    try {
+      final directory = await Directory(
+        '${(await getTemporaryDirectory()).path}/course_audio',
+      ).create(recursive: true);
+      temporary = File(
+        '${directory.path}/${const Uuid().v4()}.${AudioFileTypes.extension('file.${note.audioExtension}')}',
+      );
+      final file = await CourseVideo.load(
+        widget.repository,
+        widget.folder.id,
+        note,
+        temporary,
+      );
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => LocalAudioDialog(file: file, title: note.text),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (temporary != null && await temporary.exists()) {
+        await temporary.delete();
+      }
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _sendVideo() async {
     if (_busy) return;
     FocusScope.of(context).unfocus();
@@ -521,68 +647,66 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
     }
   }
 
-  Widget _topicFolders() => StreamBuilder<List<LessonFolder>>(
-    stream: _topics,
-    builder: (context, snapshot) {
-      final folders = [...?snapshot.data]
-        ..sort((a, b) {
-          if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-          return searchText(a.title).compareTo(searchText(b.title));
-        });
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(child: Text('Konular')),
-                TextButton.icon(
-                  onPressed: _busy ? null : _createTopic,
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('Konu ekle'),
-                ),
-              ],
-            ),
-            if (snapshot.hasError)
-              const Text('Konular yüklenemedi. Yeniden açmayı dene.'),
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData)
-              const LinearProgressIndicator(),
-            for (final folder in folders)
-              ListTile(
-                dense: true,
-                leading: Icon(
-                  Icons.folder,
-                  color: courseFolderColors[folder.color],
-                ),
-                title: Text(folder.title),
-                trailing: CourseFolderColorButton(
-                  repository: widget.repository,
-                  folder: folder,
-                  enabled: !_busy,
-                  onChanged: () => setState(
-                    () => _topics = widget.repository.folders(
-                      parent: widget.folder.id,
-                    ),
-                  ),
-                ),
-                onTap: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CourseNotesScreen(
-                      repository: widget.repository,
-                      folder: folder,
-                    ),
+  Widget _topicFolders(AsyncSnapshot<List<LessonFolder>> snapshot) {
+    final folders = [...?snapshot.data]
+      ..sort((a, b) {
+        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+        return searchText(a.title).compareTo(searchText(b.title));
+      });
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('Konular')),
+              TextButton.icon(
+                onPressed: _busy ? null : _createTopic,
+                icon: const Icon(Icons.create_new_folder_outlined),
+                label: const Text('Konu ekle'),
+              ),
+            ],
+          ),
+          if (snapshot.hasError)
+            const Text('Konular yüklenemedi. Yeniden açmayı dene.'),
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData)
+            const LinearProgressIndicator(),
+          for (final folder in folders)
+            ListTile(
+              dense: true,
+              leading: Icon(
+                Icons.folder,
+                color: courseFolderColors[folder.color],
+              ),
+              title: Text(folder.title),
+              trailing: CourseFolderColorButton(
+                repository: widget.repository,
+                folder: folder,
+                enabled: !_busy,
+                onChanged: () => setState(
+                  () => _topics = widget.repository.folders(
+                    parent: widget.folder.id,
                   ),
                 ),
               ),
-            const Divider(),
-          ],
-        ),
-      );
-    },
-  );
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CourseNotesScreen(
+                    repository: widget.repository,
+                    folder: folder,
+                  ),
+                ),
+              ),
+            ),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _text.dispose();
@@ -934,312 +1058,361 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
         ),
       ],
     ),
-    body: Column(
-      children: [
-        if (_showSearch || _query.text.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: TextField(
-              controller: _query,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Bu klasördeki notlarda ara',
+    body: StreamBuilder<List<LessonFolder>>(
+      stream: _topics,
+      builder: (context, topicsSnapshot) => Column(
+        children: [
+          if (_showSearch || _query.text.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: TextField(
+                controller: _query,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Bu klasördeki notlarda ara',
+                ),
               ),
             ),
-          ),
-        Expanded(
-          child: StreamBuilder<List<LessonNote>>(
-            stream: _stream,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(
-                  child: Text('Notlar yüklenemedi. Yeniden açmayı dene.'),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final notes =
-                  snapshot.data!
-                      .where(
-                        (note) => searchText(
-                          note.text,
-                        ).contains(searchText(_query.text.trim())),
-                      )
-                      .toList()
-                    ..sort((a, b) {
-                      final order = a.created.compareTo(b.created);
-                      return order != 0 ? order : a.id.compareTo(b.id);
+          Expanded(
+            child: StreamBuilder<List<LessonNote>>(
+              stream: _stream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Notlar yüklenemedi. Yeniden açmayı dene.'),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final notes =
+                    snapshot.data!
+                        .where(
+                          (note) => searchText(
+                            note.text,
+                          ).contains(searchText(_query.text.trim())),
+                        )
+                        .toList()
+                      ..sort((a, b) {
+                        final order = a.created.compareTo(b.created);
+                        return order != 0 ? order : a.id.compareTo(b.id);
+                      });
+                for (final note in snapshot.data!) {
+                  if ((note.kind == 'video' || note.kind == 'audio') &&
+                      courseVideoExpired(note) &&
+                      _cleanedVideos.add(note.id)) {
+                    CourseVideo.remove(
+                      widget.repository,
+                      widget.folder.id,
+                      note,
+                    ).catchError((_) {
+                      _cleanedVideos.remove(note.id);
                     });
-              for (final note in snapshot.data!) {
-                if (note.kind == 'video' &&
-                    courseVideoExpired(note) &&
-                    _cleanedVideos.add(note.id)) {
-                  CourseVideo.remove(
-                    widget.repository,
-                    widget.folder.id,
-                    note,
-                  ).catchError((_) {
-                    _cleanedVideos.remove(note.id);
-                  });
+                  }
                 }
-              }
-              final groups = <List<LessonNote>>[];
-              for (final note in notes) {
-                if (note.kind == 'image' &&
-                    note.albumId != null &&
-                    groups.isNotEmpty &&
-                    groups.last.last.kind == 'image' &&
-                    groups.last.last.albumId == note.albumId) {
-                  groups.last.add(note);
-                } else {
-                  groups.add([note]);
+                final groups = <List<LessonNote>>[];
+                for (final note in notes) {
+                  if (note.kind == 'image' &&
+                      note.albumId != null &&
+                      groups.isNotEmpty &&
+                      groups.last.last.kind == 'image' &&
+                      groups.last.last.albumId == note.albumId) {
+                    groups.last.add(note);
+                  } else {
+                    groups.add([note]);
+                  }
                 }
-              }
-              return ListView.builder(
-                reverse: false,
-                padding: const EdgeInsets.all(12),
-                itemCount: groups.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) return _topicFolders();
-                  index--;
-                  if (groups[index].length > 1) return _album(groups[index]);
-                  final note = groups[index].first;
-                  final long =
-                      note.text.length > 700 ||
-                      '\n'.allMatches(note.text).length >= 10;
-                  final expanded = _expandedNotes.contains(note.id);
-                  final preview = note.text.split('\n').take(10).join('\n');
-                  final shown = long && !expanded
-                      ? '${preview.substring(0, preview.length > 700 ? 700 : preview.length)}…'
-                      : note.text;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 18),
-                    shape: note.kind == 'announcement'
-                        ? RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: Theme.of(context).colorScheme.tertiary,
-                              width: 2,
-                            ),
-                          )
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (note.kind == 'announcement')
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.campaign,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.tertiary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Önemli duyuru!',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
+                return ListView.builder(
+                  reverse: false,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: groups.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return KeyedSubtree(
+                        key: const ValueKey('topics'),
+                        child: _topicFolders(topicsSnapshot),
+                      );
+                    }
+                    index--;
+                    if (groups[index].length > 1) {
+                      return KeyedSubtree(
+                        key: ValueKey(groups[index].first.albumId),
+                        child: _album(groups[index]),
+                      );
+                    }
+                    final note = groups[index].first;
+                    final long =
+                        note.text.length > 700 ||
+                        '\n'.allMatches(note.text).length >= 10;
+                    final expanded = _expandedNotes.contains(note.id);
+                    final preview = note.text.split('\n').take(10).join('\n');
+                    final shown = long && !expanded
+                        ? '${preview.substring(0, preview.length > 700 ? 700 : preview.length)}…'
+                        : note.text;
+                    return Card(
+                      key: ValueKey(note.id),
+                      margin: const EdgeInsets.only(bottom: 18),
+                      shape: note.kind == 'announcement'
+                          ? RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.tertiary,
+                                width: 2,
+                              ),
+                            )
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (note.kind == 'announcement')
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.campaign,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.tertiary,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Text(
-                            note.kind == 'code'
-                                ? 'Kod'
-                                : note.kind == 'announcement'
-                                ? 'Ders duyurusu'
-                                : note.kind == 'image'
-                                ? 'Görsel not'
-                                : 'Not',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                          const SizedBox(height: 12),
-                          if (note.kind == 'video')
-                            TextButton.icon(
-                              onPressed:
-                                  _busy ||
-                                      courseVideoExpired(note) ||
-                                      (widget.repository.shared &&
-                                          note.videoChunks == 0)
-                                  ? null
-                                  : () => _openVideo(note),
-                              icon: const Icon(Icons.play_circle_outline),
-                              label: Text(
-                                courseVideoExpired(note)
-                                    ? 'Videonun bir haftalık süresi doldu'
-                                    : widget.repository.shared &&
-                                          note.videoChunks == 0
-                                    ? 'Video yükleniyor…'
-                                    : 'Videoyu izle · 1 hafta saklanır',
-                              ),
-                            ),
-                          if (note.image != null) _image(note),
-                          if (note.image != null) const SizedBox(height: 12),
-                          if (note.text.isNotEmpty)
-                            note.kind == 'code'
-                                ? SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: SelectableText(
-                                      shown,
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 14,
-                                        height: 1.5,
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Önemli duyuru!',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  )
-                                : CourseNoteText(shown),
-                          if (long)
-                            TextButton(
-                              onPressed: () => setState(() {
-                                if (expanded) {
-                                  _expandedNotes.remove(note.id);
-                                } else {
-                                  _expandedNotes.add(note.id);
-                                }
-                              }),
-                              child: Text(
-                                expanded ? 'Daha az göster' : 'Devamını oku',
+                                  ],
+                                ),
                               ),
+                            Text(
+                              note.kind == 'code'
+                                  ? 'Kod'
+                                  : note.kind == 'announcement'
+                                  ? 'Ders duyurusu'
+                                  : note.kind == 'image'
+                                  ? 'Görsel not'
+                                  : 'Not',
+                              style: Theme.of(context).textTheme.labelLarge,
                             ),
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          Wrap(
-                            children: [
+                            const SizedBox(height: 12),
+                            if (note.kind == 'audio')
                               TextButton.icon(
-                                onPressed: _busy ? null : () => _edit(note),
-                                icon: const Icon(Icons.edit_outlined, size: 16),
-                                label: const Text('Düzenle'),
-                              ),
-                              IconButton(
-                                tooltip: note.pinned
-                                    ? 'Sabitlemeyi kaldır'
-                                    : 'Notu sabitle',
-                                onPressed: _busy ? null : () => _pin(note),
-                                icon: Icon(
-                                  note.pinned
-                                      ? Icons.push_pin
-                                      : Icons.push_pin_outlined,
+                                onPressed:
+                                    _busy ||
+                                        courseVideoExpired(note) ||
+                                        (widget.repository.shared &&
+                                            note.videoChunks == 0)
+                                    ? null
+                                    : () => _openAudio(note),
+                                icon: const Icon(Icons.headphones),
+                                label: Text(
+                                  courseVideoExpired(note)
+                                      ? 'Ses dosyasının bir haftalık süresi doldu'
+                                      : widget.repository.shared &&
+                                            note.videoChunks == 0
+                                      ? 'Ses yükleniyor…'
+                                      : 'Sesi dinle · 1 hafta saklanır',
                                 ),
                               ),
-                              if (note.text.isNotEmpty)
+                            if (note.kind == 'video')
+                              TextButton.icon(
+                                onPressed:
+                                    _busy ||
+                                        courseVideoExpired(note) ||
+                                        (widget.repository.shared &&
+                                            note.videoChunks == 0)
+                                    ? null
+                                    : () => _openVideo(note),
+                                icon: const Icon(Icons.play_circle_outline),
+                                label: Text(
+                                  courseVideoExpired(note)
+                                      ? 'Videonun bir haftalık süresi doldu'
+                                      : widget.repository.shared &&
+                                            note.videoChunks == 0
+                                      ? 'Video yükleniyor…'
+                                      : 'Videoyu izle · 1 hafta saklanır',
+                                ),
+                              ),
+                            if (note.image != null) _image(note),
+                            if (note.image != null) const SizedBox(height: 12),
+                            if (note.text.isNotEmpty)
+                              note.kind == 'code'
+                                  ? SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: SelectableText(
+                                        shown,
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 14,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    )
+                                  : CourseNoteText(shown),
+                            if (long)
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  if (expanded) {
+                                    _expandedNotes.remove(note.id);
+                                  } else {
+                                    _expandedNotes.add(note.id);
+                                  }
+                                }),
+                                child: Text(
+                                  expanded ? 'Daha az göster' : 'Devamını oku',
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1),
+                            Wrap(
+                              children: [
                                 TextButton.icon(
-                                  onPressed: () async {
-                                    await Clipboard.setData(
-                                      ClipboardData(text: note.text),
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Kopyalandı.'),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.copy, size: 16),
-                                  label: const Text('Kopyala'),
+                                  onPressed: _busy ? null : () => _edit(note),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Düzenle'),
                                 ),
-                              if (!widget.repository.shared)
                                 IconButton(
-                                  tooltip: 'Hatırlatıcı kur',
-                                  onPressed: _busy
-                                      ? null
-                                      : () => ReminderService.pick(
-                                          context,
-                                          note.id,
-                                        ),
-                                  icon: const Icon(Icons.alarm_add),
+                                  tooltip: note.pinned
+                                      ? 'Sabitlemeyi kaldır'
+                                      : 'Notu sabitle',
+                                  onPressed: _busy ? null : () => _pin(note),
+                                  icon: Icon(
+                                    note.pinned
+                                        ? Icons.push_pin
+                                        : Icons.push_pin_outlined,
+                                  ),
                                 ),
-                              IconButton(
-                                tooltip: 'Notu sil',
-                                onPressed: _busy ? null : () => _delete(note),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
+                                if (note.text.isNotEmpty)
+                                  TextButton.icon(
+                                    onPressed: () async {
+                                      await Clipboard.setData(
+                                        ClipboardData(text: note.text),
+                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Kopyalandı.'),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.copy, size: 16),
+                                    label: const Text('Kopyala'),
+                                  ),
+                                if (!widget.repository.shared)
+                                  IconButton(
+                                    tooltip: 'Hatırlatıcı kur',
+                                    onPressed: _busy
+                                        ? null
+                                        : () => ReminderService.pick(
+                                            context,
+                                            note.id,
+                                          ),
+                                    icon: const Icon(Icons.alarm_add),
+                                  ),
+                                IconButton(
+                                  tooltip: 'Notu sil',
+                                  onPressed: _busy ? null : () => _delete(note),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DropdownButton<String>(
+                        isDense: true,
+                        value: _kind,
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() => _kind = v!),
+                        items: const [
+                          DropdownMenuItem(value: 'text', child: Text('Not')),
+                          DropdownMenuItem(value: 'code', child: Text('Kod')),
+                          DropdownMenuItem(
+                            value: 'announcement',
+                            child: Text('Duyuru'),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    DropdownButton<String>(
-                      value: _kind,
-                      onChanged: _busy
-                          ? null
-                          : (v) => setState(() => _kind = v!),
-                      items: const [
-                        DropdownMenuItem(value: 'text', child: Text('Not')),
-                        DropdownMenuItem(value: 'code', child: Text('Kod')),
-                        DropdownMenuItem(
-                          value: 'announcement',
-                          child: Text('Duyuru'),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      tooltip: 'Fotoğraflar ekle',
-                      onPressed: _busy ? null : () => _send(image: true),
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                    ),
-                    IconButton(
-                      tooltip: 'Ders videosu ekle',
-                      onPressed: _busy ? null : _sendVideo,
-                      icon: const Icon(Icons.video_library_outlined),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        enabled: !_busy,
-                        controller: _text,
-                        minLines: 1,
-                        maxLines: 4,
-                        maxLength: 50000,
-                        decoration: const InputDecoration(
-                          hintText: 'Notunu yaz…',
-                          counterText: '',
+                      IconButton(
+                        tooltip: 'Fotoğraflar ekle',
+                        onPressed: _busy ? null : () => _send(image: true),
+                        icon: const Icon(Icons.add_photo_alternate_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Ses dosyası ekle (Drive / cihaz)',
+                        onPressed: _busy ? null : _sendAudio,
+                        icon: const Icon(Icons.audio_file_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Ders videosu ekle',
+                        onPressed: _busy ? null : _sendVideo,
+                        icon: const Icon(Icons.video_library_outlined),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          enabled: !_busy,
+                          controller: _text,
+                          minLines: 1,
+                          maxLines: 4,
+                          maxLength: 50000,
+                          decoration: const InputDecoration(
+                            hintText: 'Notunu yaz…',
+                            counterText: '',
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Notu ekle',
-                      onPressed: _busy ? null : () => _send(),
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send),
-                    ),
-                  ],
-                ),
-              ],
+                      IconButton(
+                        tooltip: 'Notu ekle',
+                        onPressed: _busy ? null : () => _send(),
+                        icon: _busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

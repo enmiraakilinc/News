@@ -58,3 +58,6 @@ Neural-Haber-restored.zip
 
 *.zip.enc.part*
 .backup-join-*
+
+# Kotlin local build cache.
+.kotlin/

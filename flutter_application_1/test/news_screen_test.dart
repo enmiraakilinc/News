@@ -15,6 +15,53 @@ void main() {
     NewsThemes.selected.value = 'dark';
   });
   testWidgets(
+    'Dedicated voice notes show only audio without removing other personal notes',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'personal_media_notes': [
+          jsonEncode({
+            'id': 'audio',
+            'kind': 'audio',
+            'file': '123_0.m4a',
+            'title': 'Ders kaydım',
+          }),
+          jsonEncode({
+            'id': 'text',
+            'kind': 'text',
+            'text': 'Gizlenmez, sadece filtrelenir',
+            'title': 'Yazılı notum',
+          }),
+        ],
+      });
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: NewsNotes(article: 0, audioOnly: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sesli Notlarım'), findsOneWidget);
+      expect(find.text('Ders kaydım'), findsOneWidget);
+      expect(find.text('Yazılı notum'), findsNothing);
+      expect(find.text('Yazılı not'), findsNothing);
+      expect(find.text('Konum ekle'), findsNothing);
+      expect(
+        (await SharedPreferences.getInstance()).getStringList(
+          'personal_media_notes',
+        ),
+        hasLength(2),
+      );
+      expect(
+        ChatThemes.theme('orange').colorScheme.primary,
+        const Color(0xfffc9803),
+      );
+    },
+  );
+
+  testWidgets(
     'Personal text notes save, reload and edit without losing their reminder ID',
     (tester) async {
       Future<void> open() async {
