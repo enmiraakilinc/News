@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'microphone_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local usage switches, separate from Android's permission grants.
@@ -68,6 +69,9 @@ class _FeatureAccessSwitchesState extends State<FeatureAccessSwitches> {
                     'feature_access_${entry.key}',
                     value,
                   );
+                  if (entry.key == 'microphone' && !value) {
+                    await MicrophoneSession.requestStop();
+                  }
                   if (mounted) setState(() => _values[entry.key] = value);
                 },
         ),

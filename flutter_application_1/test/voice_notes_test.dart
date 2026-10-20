@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter_application_1/core/security/microphone_session.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_application_1/features/reminders/reminder_service.dart';
@@ -137,7 +138,18 @@ void main() {
     GlobalAudioplayersPlatformInterface.instance = FakeGlobalAudio();
     PathProviderPlatform.instance = FakePaths(dir.path);
     SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(MicrophoneSession.channel, (call) async {
+          if (call.method == 'prepare') {
+            return {'drawerHidden': true, 'supported': true};
+          }
+          return null;
+        });
+
     addTearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(MicrophoneSession.channel, null);
+
       await Future<void>.delayed(const Duration(milliseconds: 20));
       await audio.events.close();
       RecordPlatform.instance = oldRecorder;
@@ -159,6 +171,34 @@ void main() {
       });
     }
   }
+
+  testWidgets(
+    'Voice recording continues across screen lock and stays a draft until confirmed',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(home: VoiceNotesScreen(sendMessage: (_, _) async {})),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Kaydet'));
+      expect(recorder.calls, ['start']);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(seconds: 3));
+      expect(recorder.calls, ['start']);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      await tap(tester, find.textContaining('Bitir'));
+      expect(recorder.calls, ['start', 'stop']);
+      expect(find.text('Ön dinleme'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 80)),
+      );
+    },
+  );
 
   testWidgets(
     'Record pauses/resumes; preview and seek happen before explicit save',

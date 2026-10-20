@@ -18,6 +18,7 @@ import '../questions/question_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../voice_notes/voice_notes_screen.dart';
+import '../voice_notes/microphone_session_screen.dart';
 import '../wishes/wishes_screen.dart';
 import '../pair/badge_service.dart';
 import '../chat/chat_unread.dart';
@@ -1172,6 +1173,11 @@ class _CounterScreenState extends State<CounterScreen> {
                     "Sesli Notlar",
                     const VoiceNotesScreen(),
                     kNotifVoice,
+                  ),
+                  _ozellikKart(
+                    "MIC",
+                    "Mikrofon oturumu",
+                    const MicrophoneSessionScreen(),
                   ),
                   _ozellikKart(
                     "🌠",
