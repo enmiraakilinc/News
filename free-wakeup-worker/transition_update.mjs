@@ -1,4 +1,4 @@
-﻿import {streamReleaseAsset} from './release_asset.mjs';
+import {streamReleaseAsset} from './release_asset.mjs';
 const error = status => Response.json({message:'Geçiş güncellemesi şu anda kullanılamıyor.'},{status,headers:{'Cache-Control':'no-store'}});
 // Only the already-public, explicitly approved transition APK may use this route.
 const VERSION='1.14.32';
@@ -10,7 +10,7 @@ export async function transitionUpdate(request,env,{fetch:fetcher=fetch,token}={
     const response=await fetcher(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/config/transition_app_version`,{headers:{Authorization:`Bearer ${await token()}`}});
     if(!response.ok)return error(503);
     const f=(await response.json()).fields;
-    if(f?.enabled?.booleanValue!==true||f.name?.stringValue!==VERSION||f.sha256?.stringValue!==DIGEST||f.repository?.stringValue!==env.GITHUB_RELEASE_REPO) return error(404);
+    if(f?.enabled?.booleanValue!==true||f.name?.stringValue!==VERSION||f.sha256?.stringValue!==DIGEST||f.repository?.stringValue!==env.GITHUB_RELEASE_REPO||f.assetId?.integerValue!==env.UPDATE_BOOTSTRAP_ASSET_ID) return error(404);
     return streamReleaseAsset(env,fetcher,f.assetId?.integerValue,VERSION);
   }catch{return error(503);}
 }
