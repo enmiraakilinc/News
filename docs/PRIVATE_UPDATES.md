@@ -34,3 +34,5 @@ Firebase'in herkese açık `config/app_version` kaydı bu geçiş adresini göst
 ## Yerel erişim ve güvenlik
 
 Yayın araçları private/credentials altında yerel yönetim anahtarı varsa onu, yoksa mevcut yetkili Firebase CLI oturumunu kullanabilir. GitHub, Google veya Cloudflare erişim belirteçleri çıktılara veya kaynak kontrolüne yazılmaz. Eski config ve bot kayıtları private/migrations altında yedeklendi.
+
+Geçiş APK'sı ek olarak UPDATE_BOOTSTRAP_ASSET_ID ile GitHub'daki doğrulanmış ve değişmez dosya kimliğine sabitlenir. Metadata yanlışlıkla başka bir asset kimliği gösterirse açık indirme reddedilir.
