@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../media/chat_media.dart';
 import 'course_repository.dart';
+import '../media/audio_file_types.dart';
 
 const courseVideoLifetime = Duration(days: 7);
 bool courseVideoExpired(LessonNote note) =>
@@ -21,25 +22,45 @@ class CourseVideo {
       .doc(folder)
       .collection('entries')
       .doc(id);
-  static Future<File> localFile(LocalCourseRepository repo, String id) async {
+  static Future<File> localFile(
+    LocalCourseRepository repo,
+    String id, {
+    String extension = 'mp4',
+  }) async {
+    if (extension != 'mp4' &&
+        !AudioFileTypes.mimeTypes.containsKey(extension)) {
+      throw Exception('Ses dosyasının türü desteklenmiyor.');
+    }
     if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
       throw Exception('Video kaydı geçersiz.');
     }
-    return File('${(await repo.directory()).path}/$id.mp4');
+    return File('${(await repo.directory()).path}/$id.$extension');
   }
 
   static Future<int> save(
     CourseRepository repo,
     String folder,
     String id,
-    XFile source,
-  ) async {
+    XFile source, {
+    String kind = 'video',
+    String extension = 'mp4',
+  }) async {
     final size = await source.length();
-    if (size < 1 || size > maxChatVideoBytes) {
-      throw Exception('Ders videosu en fazla 100 MB olabilir.');
+    if (kind != 'video' && kind != 'audio') {
+      throw ArgumentError('Unsupported course media');
+    }
+    final limit = kind == 'audio' ? 20 * 1024 * 1024 : maxChatVideoBytes;
+    if (size < 1 || size > limit) {
+      throw Exception(
+        kind == 'audio'
+            ? 'Ses dosyası en fazla 20 MB olabilir.'
+            : 'Ders videosu en fazla 100 MB olabilir.',
+      );
     }
     if (repo is LocalCourseRepository) {
-      await File(source.path).copy((await localFile(repo, id)).path);
+      await File(
+        source.path,
+      ).copy((await localFile(repo, id, extension: extension)).path);
       return 0;
     }
     final shared = repo as SharedCourseRepository;
@@ -48,7 +69,8 @@ class CourseVideo {
       folder,
       LessonNote(
         id: id,
-        kind: 'video',
+        kind: kind,
+        audioExtension: extension,
         text: 'Video yükleniyor…',
         created: DateTime.now(),
       ),
@@ -92,7 +114,11 @@ class CourseVideo {
     LessonNote note,
   ) async {
     if (repo is LocalCourseRepository) {
-      final file = await localFile(repo, note.id);
+      final file = await localFile(
+        repo,
+        note.id,
+        extension: note.kind == 'audio' ? note.audioExtension : 'mp4',
+      );
       if (await file.exists()) await file.delete();
     } else {
       final rows = await _entry(
@@ -113,10 +139,14 @@ class CourseVideo {
     File destination,
   ) async {
     if (courseVideoExpired(note)) {
-      throw Exception('Videonun bir haftalık erişim süresi doldu.');
+      throw Exception('Dosyanın bir haftalık erişim süresi doldu.');
     }
     if (repo is LocalCourseRepository) {
-      final file = await localFile(repo, note.id);
+      final file = await localFile(
+        repo,
+        note.id,
+        extension: note.kind == 'audio' ? note.audioExtension : 'mp4',
+      );
       if (!await file.exists()) throw Exception('Video artık bulunamıyor.');
       return file;
     }

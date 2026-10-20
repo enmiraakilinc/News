@@ -165,6 +165,25 @@ class _NewsScreenState extends State<_NewsScreen> {
                   },
                 ),
                 ListTile(
+                  leading: const Icon(Icons.mic_none),
+                  title: const Text('Sesli Notlarım'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push<void>(
+                      context,
+                      _newsRoute(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Sesli Notlarım')),
+                          body: const SingleChildScrollView(
+                            padding: EdgeInsets.all(20),
+                            child: NewsNotes(article: 0, audioOnly: true),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.grid_on),
                   title: const Text('Sudoku'),
                   onTap: () {

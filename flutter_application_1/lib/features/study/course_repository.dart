@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/search_text.dart';
+import '../media/audio_file_types.dart';
 
 class LessonFolder {
   final String id, title;
@@ -20,6 +21,7 @@ class LessonNote {
   final String? image;
   final String? albumId;
   final int videoChunks;
+  final String audioExtension;
   final DateTime created;
   final bool pinned;
   const LessonNote({
@@ -29,6 +31,7 @@ class LessonNote {
     this.image,
     this.albumId,
     this.videoChunks = 0,
+    this.audioExtension = 'm4a',
     required this.created,
     this.pinned = false,
   });
@@ -38,7 +41,8 @@ class LessonNote {
     'text': text,
     if (image != null) 'image': image,
     if (albumId != null) 'albumId': albumId,
-    if (kind == 'video') 'videoChunks': videoChunks,
+    if (kind == 'video' || kind == 'audio') 'videoChunks': videoChunks,
+    if (kind == 'audio') 'audioExtension': audioExtension,
     'created': created.toIso8601String(),
     'pinned': pinned,
   };
@@ -49,6 +53,7 @@ class LessonNote {
     image: d['image'] as String?,
     albumId: d['albumId'] as String?,
     videoChunks: (d['videoChunks'] as num?)?.toInt() ?? 0,
+    audioExtension: d['audioExtension'] as String? ?? 'm4a',
     created: DateTime.parse(d['created'] as String),
     pinned: d['pinned'] == true,
   );
@@ -242,9 +247,14 @@ class LocalCourseRepository extends CourseRepository {
     (row['notes'] as List).removeWhere((e) => (e as Map)['id'] == note);
     await _write(data);
     for (final entry in old) {
-      if ((entry as Map)['kind'] == 'video' &&
+      if (['video', 'audio'].contains((entry as Map)['kind']) &&
           RegExp(r'^[a-f0-9-]{36}$').hasMatch(note)) {
-        final video = File('${(await directory()).path}/$note.mp4');
+        final ext = entry['kind'] == 'audio'
+            ? AudioFileTypes.extension(
+                'file.${entry['audioExtension'] ?? 'm4a'}',
+              )
+            : 'mp4';
+        final video = File('${(await directory()).path}/$note.$ext');
         if (await video.exists()) await video.delete();
       }
       final image = entry['image'];
@@ -273,9 +283,14 @@ class LocalCourseRepository extends CourseRepository {
     await _write(data);
     for (final old in removed) {
       for (final note in (old?['notes'] as List?) ?? []) {
-        if ((note as Map)['kind'] == 'video' &&
+        if (['video', 'audio'].contains((note as Map)['kind']) &&
             RegExp(r'^[a-f0-9-]{36}$').hasMatch(note['id'] as String)) {
-          final video = File('${(await directory()).path}/${note['id']}.mp4');
+          final ext = note['kind'] == 'audio'
+              ? AudioFileTypes.extension(
+                  'file.${note['audioExtension'] ?? 'm4a'}',
+                )
+              : 'mp4';
+          final video = File('${(await directory()).path}/${note['id']}.$ext');
           if (await video.exists()) await video.delete();
         }
         final image = note['image'];

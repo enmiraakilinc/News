@@ -1,2 +1,3 @@
-Görünüm ve kullanım kolaylığı iyileştirildi.
-Kararlılık düzenlemeleri yapıldı.
+Ders notlarına ses dosyası ekleme ve not düzeni geliştirildi.
+Turuncu tema güncellendi.
+Kararlılık iyileştirmeleri yapıldı.

@@ -11,6 +11,9 @@ $env:JAVA_HOME = 'C:/Users/mkund/jdk17'
 $flutterPath = 'C:/Users/mkund/flutter/bin/flutter.bat'
 $aaptPath = 'C:/Users/mkund/AppData/Local/Android/Sdk/build-tools/36.0.0/aapt.exe'
 $signerPath = 'C:/Users/mkund/AppData/Local/Android/Sdk/build-tools/36.0.0/apksigner.bat'
+# Build Android only, without unrelated desktop plugin symlinks.
+$previousWindowsFlag = [Environment]::GetEnvironmentVariable('FLUTTER_WINDOWS', 'Process')
+$env:FLUTTER_WINDOWS = 'false'
 Push-Location -LiteralPath $appPath
 try {
     & $flutterPath build apk --release --target-platform android-arm64 --tree-shake-icons
@@ -32,4 +35,7 @@ try {
     $report = [ordered]@{version=$releaseVersion;code=[int]$releaseCode;filename=$filename;bytes=$size;MB=[Math]::Round($size/1000000,2);sha256=(Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash.ToLower();abi=@('arm64-v8a');signingVerified=$true;debuggable=$false;published=$false;physicalDeviceTested=$false}
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputDir 'build-report.json') -Encoding UTF8
     Write-Output "Verified signed ARM64 release: $releaseVersion ($releaseCode), $($report.MB) MB. Publication pending."
-} finally { Pop-Location }
+} finally {
+    Pop-Location
+    [Environment]::SetEnvironmentVariable('FLUTTER_WINDOWS', $previousWindowsFlag, 'Process')
+}

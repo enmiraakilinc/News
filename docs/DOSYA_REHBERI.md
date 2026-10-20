@@ -350,3 +350,12 @@ Bu rehber şu anki düzeni anlatır. Yeni bir özellik veya dosya eklendiğinde 
 - `free-wakeup-worker/transition_update.mjs`: pinned 1.14.32-only legacy bootstrap, independently disableable.
 - `free-wakeup-worker/transition_update.test.mjs`: public-transition boundary tests.
 - `docs/PRIVATE_UPDATES.md`: live deployment and release workflow.
+
+## 1.14.33 ses dosyaları
+
+- lib/features/media/audio_file_types.dart: desteklenen ses uzantıları ve Android MIME türleri.
+- lib/features/media/local_audio_dialog.dart: cihazdaki ses dosyasını dinleme ve ileri/geri sarma penceresi; haber notları ve ders notları ortak kullanır.
+- lib/features/study/course_video.dart: mevcut şifreli parçalı ders videosu depolaması, artık ders ses dosyalarını da aynı erişim/süre modeliyle saklar.
+- docs/releases/1.14.33.md: bu sürümün uygulama ayrıntıları, sınırlamaları ve doğrulamaları.
+
+Bu listede lib/ yolları flutter_application_1/ klasörü içindedir.

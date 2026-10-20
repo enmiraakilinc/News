@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:audioplayers/audioplayers.dart';
+import '../media/local_audio_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../reminders/reminder_service.dart';
@@ -16,7 +16,8 @@ import '../../core/security/feature_access.dart';
 
 class NewsNotes extends StatefulWidget {
   final int article;
-  const NewsNotes({super.key, required this.article});
+  final bool audioOnly;
+  const NewsNotes({super.key, required this.article, this.audioOnly = false});
   @override
   State<NewsNotes> createState() => _NewsNotesState();
 }
@@ -396,7 +397,7 @@ class _NewsNotesState extends State<NewsNotes> {
         await showDialog<void>(
           context: context,
           builder: (_) =>
-              _NewsAudio(file: file, title: note['title'] as String),
+              LocalAudioDialog(file: file, title: note['title'] as String),
         );
       }
     } catch (error) {
@@ -408,40 +409,45 @@ class _NewsNotesState extends State<NewsNotes> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
-        'Kendime Notlar',
+      Text(
+        widget.audioOnly ? 'Sesli Notlarım' : 'Kendime Notlar',
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
       ),
       const Text('Yalnızca bu cihazda saklanır; başkalarına gönderilmez.'),
       Wrap(
         spacing: 12,
         children: [
-          TextButton.icon(
-            onPressed: !_ready || _busy ? null : () => _textNote(),
-            icon: const Icon(Icons.edit_note),
-            label: const Text('Yazılı not'),
-          ),
-          TextButton.icon(
-            onPressed: !_ready || _busy ? null : _image,
-            icon: const Icon(Icons.add_photo_alternate_outlined),
-            label: const Text('Görsel not'),
-          ),
+          if (!widget.audioOnly)
+            TextButton.icon(
+              onPressed: !_ready || _busy ? null : () => _textNote(),
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Yazılı not'),
+            ),
+          if (!widget.audioOnly)
+            TextButton.icon(
+              onPressed: !_ready || _busy ? null : _image,
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: const Text('Görsel not'),
+            ),
           TextButton.icon(
             onPressed: !_ready || _busy ? null : _audio,
             icon: const Icon(Icons.mic_none),
             label: const Text('Sesli not'),
           ),
-          TextButton.icon(
-            onPressed: !_ready || _busy ? null : _location,
-            icon: const Icon(Icons.location_on_outlined),
-            label: const Text('Konum ekle'),
-          ),
+          if (!widget.audioOnly)
+            TextButton.icon(
+              onPressed: !_ready || _busy ? null : _location,
+              icon: const Icon(Icons.location_on_outlined),
+              label: const Text('Konum ekle'),
+            ),
         ],
       ),
       const Text(
         'Not ekledikten sonra yanındaki Alarm kur ile gün ve saat seçebilirsin.',
       ),
-      for (final note in _notes)
+      for (final note in _notes.where(
+        (n) => !widget.audioOnly || n['kind'] == 'audio',
+      ))
         ListTile(
           leading: Icon(
             note['kind'] == 'text'
@@ -481,95 +487,6 @@ class _NewsNotesState extends State<NewsNotes> {
             ],
           ),
         ),
-    ],
-  );
-}
-
-class _NewsAudio extends StatefulWidget {
-  final File file;
-  final String title;
-  const _NewsAudio({required this.file, required this.title});
-  @override
-  State<_NewsAudio> createState() => _NewsAudioState();
-}
-
-class _NewsAudioState extends State<_NewsAudio> with WidgetsBindingObserver {
-  final _player = AudioPlayer();
-  Duration _position = Duration.zero, _duration = Duration.zero;
-  bool _playing = false, _started = false;
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _player.onPositionChanged.listen((v) {
-      if (mounted) setState(() => _position = v);
-    });
-    _player.onDurationChanged.listen((v) {
-      if (mounted) setState(() => _duration = v);
-    });
-    _player.onPlayerStateChanged.listen((v) {
-      if (mounted) setState(() => _playing = v == PlayerState.playing);
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _player.pause();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _player.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.title),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: _playing ? 'Duraklat' : 'Oynat',
-          icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
-          onPressed: () async {
-            try {
-              if (_playing) {
-                await _player.pause();
-              } else if (_started) {
-                await _player.resume();
-              } else {
-                await _player.play(DeviceFileSource(widget.file.path));
-                _started = true;
-              }
-            } catch (_) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sesli not oynatılamadı.')),
-                );
-              }
-            }
-          },
-        ),
-        Slider(
-          value: _position.inMilliseconds
-              .clamp(0, _duration.inMilliseconds)
-              .toDouble(),
-          max: _duration.inMilliseconds > 0
-              ? _duration.inMilliseconds.toDouble()
-              : 1,
-          onChanged: _duration > Duration.zero
-              ? (v) => _player.seek(Duration(milliseconds: v.round()))
-              : null,
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Kapat'),
-      ),
     ],
   );
 }

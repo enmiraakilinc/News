@@ -4,6 +4,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'chat_media.dart';
+import 'audio_file_types.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../core/utils/user_errors.dart';
 
 class ChatAudioPlayer extends StatefulWidget {
@@ -70,7 +72,7 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
         if (!mounted) return;
         final folder = await getTemporaryDirectory();
         _file = File(
-          '${folder.path}/neural_media_audio_${widget.id}_${DateTime.now().microsecondsSinceEpoch}.m4a',
+          '${folder.path}/neural_media_audio_${widget.id}_${DateTime.now().microsecondsSinceEpoch}.${AudioFileTypes.extension(widget.name)}',
         );
         await _file!.writeAsBytes(bytes);
         _fileScope = scope;
@@ -85,7 +87,11 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
         if (_duration > Duration.zero && _position >= _duration) {
           await _player.seek(Duration.zero);
         }
-        await _player.resume();
+        if (_duration == Duration.zero) {
+          await _player.play(DeviceFileSource(_file!.path));
+        } else {
+          await _player.resume();
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -95,6 +101,86 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
               userError(
                 error,
                 fallback: 'Sesli mesaj açılamadı. Yeniden dene.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openExternal() async {
+    if (_busy) return;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Başka uygulamada aç'),
+        content: const Text(
+          'Ses dosyası seçtiğin uygulamaya aktarılır. O uygulama dosyayı saklayabilir. Telefonun ses kaydedicisi bu dosya türünü destekliyorsa onunla da açabilirsin.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Aç'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _player.pause();
+      final scope = await ChatMedia.accessScope();
+      await ChatMedia.checkAccess(widget.id);
+      if (_file != null && (_fileScope != scope || !await _file!.exists())) {
+        await _remove();
+        _file = null;
+      }
+      if (_file == null) {
+        final bytes = await ChatMedia.download(
+          widget.id,
+          onProgress: (v) {
+            if (mounted) setState(() => _progress = v);
+          },
+        );
+        if (await ChatMedia.accessScope() != scope) {
+          throw Exception('Sohbet bağlantısı değişti. Yeniden dene.');
+        }
+        final folder = await getTemporaryDirectory();
+        _file = File(
+          '${folder.path}/neural_media_audio_${widget.id}_${DateTime.now().microsecondsSinceEpoch}.${AudioFileTypes.extension(widget.name)}',
+        );
+        await _file!.writeAsBytes(bytes);
+        _fileScope = scope;
+      }
+      if (!mounted) {
+        await _remove();
+        return;
+      }
+      final result = await OpenFilex.open(
+        _file!.path,
+        type: AudioFileTypes.mime(widget.name),
+      );
+      if (result.type != ResultType.done) {
+        throw Exception(
+          'Bu ses türünü açabilen bir uygulama bulunamadı. Sesi buradaki oynat düğmesinden dinleyebilirsin.',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              userError(
+                error,
+                fallback:
+                    'Ses başka uygulamada açılamadı. Buradaki oynat düğmesini kullanabilirsin.',
               ),
             ),
           ),
@@ -152,6 +238,14 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
             ),
           ),
         ],
+      ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: _busy ? null : _openExternal,
+          icon: const Icon(Icons.open_in_new, size: 16),
+          label: const Text('Başka uygulamada aç'),
+        ),
       ),
       if (_file != null) ...[
         Slider(
