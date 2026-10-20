@@ -359,3 +359,7 @@ Bu rehber şu anki düzeni anlatır. Yeni bir özellik veya dosya eklendiğinde 
 - docs/releases/1.14.33.md: bu sürümün uygulama ayrıntıları, sınırlamaları ve doğrulamaları.
 
 Bu listede lib/ yolları flutter_application_1/ klasörü içindedir.
+
+## Mikrofon oturumu
+
+Yeni mikrofon servisi, dosyaları, ayar davranışı ve doğrulama sınırları docs/MICROPHONE_SESSIONS.md içinde açıklanır. Bu özellik henüz APK olarak yayımlanmadı.

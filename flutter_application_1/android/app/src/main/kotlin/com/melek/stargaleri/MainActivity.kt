@@ -18,6 +18,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    var microphoneStartAllowed = false; private set
+    override fun onResume() { super.onResume(); microphoneStartAllowed = true }
+    override fun onPause() { microphoneStartAllowed = false; super.onPause() }
+
     private lateinit var videoParts: VideoParts
     private val secureChannel = "app/secure_screen"
     private var locationResult: MethodChannel.Result? = null
@@ -85,6 +89,9 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        if (MicrophoneSessionService.mode == "voice") stopService(android.content.Intent(this, MicrophoneSessionService::class.java))
+        MicrophoneSessionBridge.channel?.setMethodCallHandler(null)
+        MicrophoneSessionBridge.channel = null
         stopService(android.content.Intent(this, VoiceOngoingService::class.java))
         VoiceCallBridge.channel = null
         if (::videoParts.isInitialized) videoParts.close()
@@ -108,6 +115,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MicrophoneSessionBridge.attach(this, flutterEngine)
         val voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/voice_call")
         VoiceCallBridge.channel = voiceChannel
         voiceChannel.setMethodCallHandler { call, result ->

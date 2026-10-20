@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/security/feature_access.dart';
+import '../../core/security/microphone_session.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -132,6 +133,7 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
     try {
       await _recorder.dispose();
     } catch (_) {}
+    await MicrophoneSession.stop('voice').catchError((_) {});
     try {
       await _player.dispose();
     } catch (_) {}
@@ -197,12 +199,28 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
         );
         return;
       }
+      if (!mounted ||
+          !await MicrophoneSession.ensureDrawerHidden(
+            context,
+            allowLegacy: true,
+          )) {
+        return;
+      }
       final dir = await getApplicationDocumentsDirectory();
       if (!mounted) return;
       final path =
           '${dir.path}/ses_${DateTime.now().millisecondsSinceEpoch}.m4a';
       // Ses için düşük bit hızı: kalite fark etmez ama dosya küçük kalır →
       // paylaşımlı notlar ücretsiz Firestore sınırına (~1MB) sığar.
+      await MicrophoneSession.start(
+        'voice',
+        onVoiceStop: () async {
+          while (_busy && mounted) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          }
+          if (mounted && _recording) await _stopRecording();
+        },
+      );
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -215,6 +233,7 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
       _recordingPath = path;
       if (!mounted) {
         await _recorder.cancel();
+        await MicrophoneSession.stop('voice');
         return;
       }
       setState(() {
@@ -228,6 +247,7 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
         }
       });
     } catch (error) {
+      await MicrophoneSession.stop('voice').catchError((_) {});
       if (mounted) messenger.showSnackBar(SnackBar(content: Text(_msg(error))));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -258,6 +278,7 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
         ).showSnackBar(SnackBar(content: Text(_msg(error))));
       }
     } finally {
+      await MicrophoneSession.stop('voice').catchError((_) {});
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -359,6 +380,7 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
     try {
       await _stop();
       if (_recording) await _recorder.cancel();
+      await MicrophoneSession.stop('voice');
       _timer?.cancel();
       final path = _draftPath ?? _recordingPath;
       if (path != null) await _deleteFile(path);

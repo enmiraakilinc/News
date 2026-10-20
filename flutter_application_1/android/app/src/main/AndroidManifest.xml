@@ -30,6 +30,7 @@
         </receiver>
         <service android:name=".WakeAlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <activity android:name=".WakeAlarmActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <service android:name=".MicrophoneSessionService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".VoiceOngoingService" android:exported="false" android:foregroundServiceType="microphone|camera" />
         <activity android:name=".IncomingCallActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.NoActionBar" />
         <receiver android:name=".VoiceCallDeclineReceiver" android:exported="false" />
