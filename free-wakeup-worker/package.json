@@ -1,6 +1,6 @@
 {
   "private": true,
   "type": "module",
-  "scripts": {"test": "node --test worker.test.mjs updates.test.mjs", "test:rules": "node --test rules.test.mjs"},
+  "scripts": {"test": "node --test worker.test.mjs updates.test.mjs transition_update.test.mjs", "test:rules": "node --test rules.test.mjs"},
   "devDependencies": {"@firebase/rules-unit-testing": "^5.0.0", "firebase": "^12.0.0"}
 }

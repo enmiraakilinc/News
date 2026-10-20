@@ -1,3 +1,4 @@
+import {transitionUpdate} from './transition_update.mjs';
 import {checkStorage,storageStatus} from './storage.mjs';
 import {notifyCall} from './calls.mjs';
 import {resolveAccount} from './account_login.mjs';
@@ -19,6 +20,7 @@ async function accessToken(env, fetcher) {
 }
 export async function handle(request, env, deps={}) {
   const fetcher=deps.fetch??fetch, path=new URL(request.url).pathname;
+  if(path==='/updates/transition/1.14.32.apk') return transitionUpdate(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});
   if(path.startsWith('/updates/')) return privateUpdates(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});
   if(request.method==='GET'&&path==='/health') return Response.json({ok:true,ready:!!(env.SERVICE_ACCOUNT_JSON&&env.FIREBASE_API_KEY&&env.FIREBASE_PROJECT_ID)});
   if(request.method==='GET'&&path==='/storage/status') return storageStatus(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});

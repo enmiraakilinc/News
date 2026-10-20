@@ -342,3 +342,11 @@ flutter test test/course_notes_test.dart
 ```
 
 Bu rehber şu anki düzeni anlatır. Yeni bir özellik veya dosya eklendiğinde ilgili tabloya bir satır eklemek, rehberin güncel kalması için yeterlidir.
+
+## Private release repository migration
+
+- `tools/releases/repository.py`: canonical source/APK repository.
+- `free-wakeup-worker/release_asset.mjs`: credential-safe APK stream from private GitHub assets.
+- `free-wakeup-worker/transition_update.mjs`: pinned 1.14.32-only legacy bootstrap, independently disableable.
+- `free-wakeup-worker/transition_update.test.mjs`: public-transition boundary tests.
+- `docs/PRIVATE_UPDATES.md`: live deployment and release workflow.

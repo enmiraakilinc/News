@@ -27,3 +27,7 @@ Bu araç, yüklenen APK'nın hash/boyutunu doğrular ve uygulama içi güncellem
 Eski APK ve raporlar `artifacts/releases`, dahili sürüm notları `docs/releases`, eski betikler `archive`, yerel anahtarlar ve kullanıcı yedekleri `private` altındadır. `archive`, `artifacts` ve `private` Git'e dahil edilmez. Aktif yönetim araçları `tools/admin` altındadır ve çalışma alanı kökünden çalıştırılır.
 
 Taşıma kayıtları ve kaynak yedeğinin konumu: [Mimari](docs/ARCHITECTURE.md). Mevcut editör ayarları, geliştirme ortamları ve uygulamanın cihazdaki kayıtları korunmuştur.
+
+## APK releases
+
+Source and APK releases: https://github.com/enschumacher/Neural-Haber (private). Publishing configuration: tools/releases/repository.py. See [private update deployment](docs/PRIVATE_UPDATES.md) for Firebase/Cloudflare and legacy-client transition details.

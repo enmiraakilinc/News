@@ -13,7 +13,8 @@ from google.auth.transport.requests import AuthorizedSession
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from tools.admin.firebase_config import PROJECT_ID, admin_key_path
+from tools.admin.firebase_config import PROJECT_ID, admin_session
+from tools.releases.repository import RELEASE_REPOSITORY as REPO
 
 def main():
     parser = argparse.ArgumentParser()
@@ -28,11 +29,11 @@ def main():
     if not report['signingVerified'] or report['version'] != args.version:
         raise ValueError('Unverified build')
     gh = 'C:/Program Files/GitHub CLI/gh.exe'
-    release = json.loads(subprocess.check_output([gh,'api',f'repos/kunduracimelek/NeuralScope/releases/tags/v{args.version}'], encoding='utf-8'))
+    release = json.loads(subprocess.check_output([gh,'api',f'repos/{REPO}/releases/tags/v{args.version}'], encoding='utf-8'))
     asset = next(a for a in release['assets'] if a['name'] == report['filename'])
     if asset.get('digest') != 'sha256:'+report['sha256'] or asset['size'] != report['bytes']:
         raise ValueError('Release does not match build')
-    session = AuthorizedSession(service_account.Credentials.from_service_account_file(str(admin_key_path()), scopes=['https://www.googleapis.com/auth/cloud-platform']))
+    session = admin_session()
     base = f'https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents'
     members = set()
     for collection in ([] if args.metadata_only else ['couples','chats']):
@@ -49,7 +50,7 @@ def main():
             if not page: break
     print(f'Validated release {args.version}; {"metadata only, access grants unchanged" if args.metadata_only else str(len(members))+" existing conversation members eligible"}. Repository visibility unchanged.')
     if not args.apply: return
-    updates = {'config/private_app_version':{'code':{'integerValue':str(report['code'])},'name':{'stringValue':args.version},'notes':{'stringValue':'Genel iyileştirmeler.'},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}}
+    updates = {'config/private_app_version':{'code':{'integerValue':str(report['code'])},'name':{'stringValue':args.version},'notes':{'stringValue':'Genel iyileştirmeler.'},'repository':{'stringValue':REPO},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}}
     for uid in members:
         if not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',uid): raise ValueError('Invalid account ID')
         updates[f'updateAccess/{uid}'] = {'enabled':{'booleanValue':True}}
