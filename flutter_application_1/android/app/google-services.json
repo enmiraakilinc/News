@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "285635984218",
+    "project_id": "star-galeri",
+    "storage_bucket": "star-galeri.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:285635984218:android:fd1a96d40f286370f25163",
+        "android_client_info": {
+          "package_name": "com.melek.stargaleri"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADivGDDPrRNA72L9FkN356TuWe2ZcR4Xw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

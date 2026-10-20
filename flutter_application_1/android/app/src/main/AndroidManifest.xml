@@ -1,0 +1,82 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+<uses-permission android:name="android.permission.RECORD_AUDIO"/>
+<uses-permission android:name="android.permission.CAMERA"/>
+<uses-feature android:name="android.hardware.camera" android:required="false"/>
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+<!-- Requested only when a user chooses to share a one-time location in chat. -->
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+<!-- Fotoğrafı galeriye kaydetmek için (Android 9 ve altı; 10+ gerekmez) -->
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <application
+        android:label="Neural Haber"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_neural" android:roundIcon="@mipmap/ic_neural">
+        <receiver android:name=".NoteReminderReceiver" android:exported="false" />
+        <receiver android:name=".NoteReminderBootReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter>
+        </receiver>
+        <service android:name=".WakeAlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <activity android:name=".WakeAlarmActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <service android:name=".VoiceOngoingService" android:exported="false" android:foregroundServiceType="microphone|camera" />
+        <activity android:name=".IncomingCallActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <receiver android:name=".VoiceCallDeclineReceiver" android:exported="false" />
+        <receiver android:name=".VoiceMessageReceiver" android:exported="true" android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter><action android:name="com.google.android.c2dm.intent.RECEIVE" /></intent-filter>
+        </receiver>
+        <receiver android:name=".WakeMessageReceiver" android:exported="true" android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter><action android:name="com.google.android.c2dm.intent.RECEIVE" /></intent-filter>
+        </receiver>
+        <activity
+            android:name=".MainActivity"
+            android:icon="@mipmap/ic_neural"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

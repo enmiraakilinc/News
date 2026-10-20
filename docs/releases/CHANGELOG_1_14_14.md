@@ -1,0 +1,12 @@
+# 1.14.14 hazırlığı (2058)
+
+Kısa yayın notu: Görünüm ve kararlılık iyileştirmeleri.
+
+- Kullanıcı isteğiyle sohbet videoları yeniden 48 saatte sona erer; fotoğraf ve genel dosyalar da 48 saat olarak devam eder. Sunucu kuralı, uygulama süresi, zamanlama uyarısı ve ek açıklamaları güncellendi. Eski istemcilerde üç gün yazabilse de sunucu erişimi iki günle sınırlıdır; fiziksel temizlik uygulama/arka plan görevi çalışınca yapılır.
+- 13 Ekim 2026 00:32 videosunun mesaj referansı yeniden doğrulandı. Dosya kaydı 404; veri parçası yok. İçerik geri getirilemedi. Sadece bu dosya kimliğine ve orijinal sohbet üyelerine bağlı, belge mevcut değilken çalışan get kuralı eklendi: yanlış permission-denied yerine not-found döner. Mevcut dosyaların erişimi, üye olmayanlar, listeleme veya başka sohbetler için izin genişletilmedi.
+- Sesli not ön dinleme, sarma ve kayıt duraklatma özellikleri korunur.
+- Normal ve özel sohbetlere kişisel mesaj yıldızlama, kaldırma ve sohbet başlığından yıldızlı mesaj listesine erişim eklendi. Yıldızlar chatAccounts/{uid}/starredMessages altında yalnızca kaynak/mesaj referansı olarak saklanır ve aynı kişisel hesapla cihazlar arasında eşitlenir. Mesaj gövdesi kopyalanmaz; özel mektuplar mevcut gizli kelime ve üyelikle açılır, kilitli/silinmiş içerik yıldız üzerinden atlanamaz. Yıldızlanan ekler de 48 saatte sona erer.
+- Kamera kaydı sürerken geçici inactive odak kaybı oturumu kendiliğinden kapatmaz; resumed durumunda mevcut kayıt yeniden açılıp sıfırlanmaz. Tam arka plan veya kamera hatasında çekilmiş kısmı finalize etmek denenir; başarılıysa kullanma veya yeniden çekme seçeneği sunulur. Kamera donanımı sistem tarafından alınmış ve finalize başarısızsa kaydın kurtarıldığı iddia edilmez. Kamera/mikrofonu başka uygulamalara zorla kapatma veya AirDroid'e karşı kesin engel eklenmedi; Samsung/AirDroid üzerinde doğrudan denenmedi.
+- Görüntülü görüşme eklenmedi; kullanıcı yalnızca olanak ve gizlilik konusunda bilgi istedi.
+- Sunucu testleri kişisel yıldızların sahibine açık, diğer hesaplara kapalı olduğunu ve içerik kopyası eklenemediğini doğruladı. Geçici kayıtlar temizlendi. Flutter analizinde sorun yok.
+- 66 Flutter testi geçti. Kullanıcının yayın onayıyla 1.14.14 / 2058 APK oluşturuldu ve yayınlandı; sürüm ve önceki APK ile aynı imza doğrulandı. Yayındaki dosyanın SHA-256 ve boyutu yerel APK ile eşleşti; uygulama içi güncelleme kaydı etkinleştirildi ve oturum açmadan okunabildiği doğrulandı.

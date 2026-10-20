@@ -1,0 +1,3 @@
+Natural Earth, public domain. 1:110m countries and populated places.
+https://www.naturalearthdata.com/about/terms-of-use/
+Bundled offline; no location is sent to any map provider.
