@@ -34,7 +34,7 @@ class WakeMessageReceiver : BroadcastReceiver() {
         val sent = intent.getStringExtra("sentAt")?.toLongOrNull() ?: return
         val eventId = intent.getStringExtra("eventId") ?: return
         if (!Regex("^[a-fA-F0-9-]{36}$").matches(eventId)) return
-        if (System.currentTimeMillis() - sent !in 0..90000) return
+        if (System.currentTimeMillis() - sent !in -30000..90000) return
         if (!Regex("^(chat|couple)/[A-Za-z0-9_-]{1,200}$").matches(source)) return
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

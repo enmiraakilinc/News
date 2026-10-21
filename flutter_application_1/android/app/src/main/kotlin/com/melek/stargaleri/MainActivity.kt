@@ -115,6 +115,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AudioFilesBridge.attach(this, flutterEngine)
         MicrophoneSessionBridge.attach(this, flutterEngine)
         val voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/voice_call")
         VoiceCallBridge.channel = voiceChannel

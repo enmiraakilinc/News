@@ -8,6 +8,8 @@ import '../pair/couple_service.dart';
 import '../contacts/contact_names.dart';
 import '../../core/utils/user_errors.dart';
 import 'call_background.dart';
+import 'call_controls.dart';
+import 'call_audio.dart';
 import '../../core/security/feature_access.dart';
 import '../../core/notifications/incoming_call_settings.dart';
 import '../../core/security/secure_screen.dart';
@@ -346,6 +348,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     return elapsed < wall ? elapsed : wall;
   }
 
+  late bool _speakerOn = widget.video;
+  bool _receiveMuted = false, _audioBusy = false;
+  final _remoteAudioTracks = <String, MediaStreamTrack>{};
   bool _readyToSend = false,
       _remoteSet = false,
       _busy = false,
@@ -455,7 +460,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       return;
     }
     if (Platform.isAndroid || Platform.isIOS) {
-      await Helper.setSpeakerphoneOn(widget.video);
+      await Helper.setSpeakerphoneOn(_speakerOn);
     }
     if (widget.video) {
       _localVideo.srcObject = _microphone;
@@ -488,7 +493,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       await _peer!.addTrack(track, _microphone!);
     }
     _peer!.onTrack = (event) {
-      if (widget.video && !_closing && !_ended && event.streams.isNotEmpty) {
+      if (_closing || _ended) return;
+      if (event.track.kind == 'audio') {
+        _remoteAudioTracks[event.track.id!] = event.track;
+        setCallReceiveMuted([
+          event.track,
+        ], _receiveMuted).catchError(_audioError);
+      }
+      if (widget.video && event.streams.isNotEmpty) {
         _remoteVideo.srcObject = event.streams.first;
         if (mounted) setState(() {});
       }
@@ -515,6 +527,75 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       }
     };
     if (widget.incoming) _listenCandidates();
+  }
+
+  void _audioError(Object error) {
+    if (mounted && !_closing && !_ended) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            userError(
+              error,
+              fallback: 'Ses ayarı değiştirilemedi. Yeniden dene.',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleSpeaker() async {
+    if (_audioBusy || _microphone == null || _ended || _closing) return;
+    setState(() => _audioBusy = true);
+    try {
+      final next = !_speakerOn;
+      await Helper.setSpeakerphoneOn(next);
+      if (mounted && !_ended) setState(() => _speakerOn = next);
+    } catch (error) {
+      _audioError(error);
+    } finally {
+      if (mounted) setState(() => _audioBusy = false);
+    }
+  }
+
+  Future<void> _toggleReceive() async {
+    if (_audioBusy || _microphone == null || _ended || _closing) return;
+    final previous = _receiveMuted;
+    setState(() {
+      _audioBusy = true;
+      _receiveMuted = !previous;
+    });
+    try {
+      await setCallReceiveMuted(_remoteAudioTracks.values, _receiveMuted);
+    } catch (error) {
+      if (mounted) setState(() => _receiveMuted = previous);
+      await setCallReceiveMuted(
+        _remoteAudioTracks.values,
+        previous,
+      ).catchError((_) {});
+      _audioError(error);
+    } finally {
+      if (mounted) setState(() => _audioBusy = false);
+    }
+  }
+
+  void _toggleMicrophone() {
+    if (_microphone == null || _ended || _closing) return;
+    setState(() => _muted = !_muted);
+    for (final track in _microphone!.getAudioTracks()) {
+      track.enabled = !_muted;
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    try {
+      for (final track
+          in _microphone?.getVideoTracks() ?? <MediaStreamTrack>[]) {
+        await Helper.switchCamera(track);
+      }
+    } catch (error) {
+      _audioError(error);
+    }
   }
 
   void _listenCandidates() {
@@ -708,6 +789,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   Future<void> _release() async {
+    _remoteAudioTracks.clear();
     if (widget.video && !_videoDisposed) {
       _videoDisposed = true;
       await _videoSetup?.catchError((_) {});
@@ -797,6 +879,51 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   Widget build(BuildContext context) {
     final left = _started == null ? null : _remaining;
+    final time = left == null
+        ? null
+        : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';
+    final showVideo = widget.video && _renderersReady && !_closing && !_ended;
+    Widget identity({bool overlay = false}) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: overlay
+                ? const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  )
+                : Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _status,
+            textAlign: TextAlign.center,
+            style: overlay ? const TextStyle(color: Colors.white) : null,
+          ),
+          if (time != null && !_ended)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                time,
+                style: TextStyle(
+                  color: overlay
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
     return PopScope(
       canPop: _ended,
       onPopInvokedWithResult: (popped, _) async {
@@ -809,110 +936,142 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         appBar: AppBar(
           title: Text(widget.video ? 'Görüntülü arama' : 'Sesli arama'),
         ),
-        body: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.video && _renderersReady && !_closing && !_ended)
-                  SizedBox(
-                    width: double.infinity,
-                    height: MediaQuery.sizeOf(context).height * 0.52,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: RTCVideoView(
-                            _remoteVideo,
-                            objectFit: RTCVideoViewObjectFit
-                                .RTCVideoViewObjectFitCover,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: showVideo
+                    ? LayoutBuilder(
+                        builder: (context, constraints) => ClipRect(
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: RTCVideoView(
+                                  _remoteVideo,
+                                  objectFit: RTCVideoViewObjectFit
+                                      .RTCVideoViewObjectFitCover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                left: 12,
+                                right: 12,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.55),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: identity(overlay: true),
+                                ),
+                              ),
+                              Positioned(
+                                right: 12,
+                                bottom: 12,
+                                width: 82,
+                                height: (constraints.maxHeight * 0.35)
+                                    .clamp(0, 112)
+                                    .toDouble(),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: RTCVideoView(
+                                    _localVideo,
+                                    mirror: true,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Positioned(
-                          right: 8,
-                          bottom: 8,
-                          width: 80,
-                          height: 106,
-                          child: RTCVideoView(_localVideo, mirror: true),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  const Icon(Icons.call_outlined, size: 64),
-                const SizedBox(height: 24),
-                Text(
-                  widget.name,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(_status, textAlign: TextAlign.center),
-                ),
-                if (left != null && !_ended)
-                  Text(
-                    '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}',
-                  ),
-                if (widget.incoming && !_ended && _started == null)
-                  FilledButton(
-                    onPressed: _busy ? null : _accept,
-                    child: const Text('Aramayı kabul et'),
-                  ),
-                if (!_ended)
-                  IconButton(
-                    tooltip: _muted ? 'Mikrofonu aç' : 'Mikrofonu kapat',
-                    onPressed: _microphone == null
-                        ? null
-                        : () {
-                            setState(() => _muted = !_muted);
-                            for (final track in _microphone!.getAudioTracks()) {
-                              track.enabled = !_muted;
-                            }
-                          },
-                    icon: Icon(_muted ? Icons.mic_off : Icons.mic),
-                  ),
-                if (widget.video && _microphone != null && !_ended)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: _cameraOff ? 'Kamerayı aç' : 'Kamerayı kapat',
-                        onPressed: () {
-                          setState(() => _cameraOff = !_cameraOff);
-                          for (final track in _microphone!.getVideoTracks()) {
-                            track.enabled = !_cameraOff;
-                          }
-                        },
-                        icon: Icon(
-                          _cameraOff ? Icons.videocam_off : Icons.videocam,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Kamerayı değiştir',
-                        onPressed: () async {
-                          try {
-                            for (final track in _microphone!.getVideoTracks()) {
-                              await Helper.switchCamera(track);
-                            }
-                          } catch (_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Kamera değiştirilemedi.'),
+                      )
+                    : Center(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 44,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
+                                child: Icon(
+                                  widget.video ? Icons.videocam : Icons.person,
+                                  size: 44,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
                                 ),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.cameraswitch),
+                              ),
+                              identity(),
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
+              ),
+              if (widget.incoming && !_ended && _started == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xff247344),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _busy ? null : _accept,
+                    icon: const Icon(Icons.call),
+                    label: const Text('Aramayı kabul et'),
                   ),
-                FilledButton.tonal(
+                ),
+              if (!_ended && _microphone != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  child: CallControls(
+                    muted: _muted,
+                    speakerOn: _speakerOn,
+                    receiveMuted: _receiveMuted,
+                    video: widget.video,
+                    cameraOff: _cameraOff,
+                    audioBusy: _audioBusy,
+                    enabled: !_closing,
+                    onMicrophone: _toggleMicrophone,
+                    onSpeaker: _toggleSpeaker,
+                    onReceive: _toggleReceive,
+                    onCamera: () {
+                      setState(() => _cameraOff = !_cameraOff);
+                      for (final track in _microphone!.getVideoTracks()) {
+                        track.enabled = !_cameraOff;
+                      }
+                    },
+                    onSwitchCamera: _switchCamera,
+                  ),
+                ),
+              if (_receiveMuted && !_ended)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(
+                    'Karşı tarafın sesi bu telefonda kapalı.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ended ? null : const Color(0xffbf2c35),
+                    foregroundColor: _ended ? null : Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 18,
+                    ),
+                  ),
+                  icon: Icon(_ended ? Icons.close : Icons.call_end),
                   onPressed: () async {
                     await _finish('Arama sona erdi.');
                     if (context.mounted) Navigator.pop(context);
                   },
-                  child: Text(
+                  label: Text(
                     _ended
                         ? 'Kapat'
                         : widget.incoming && _started == null
@@ -920,8 +1079,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                         : 'Aramayı bitir',
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
