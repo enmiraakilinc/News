@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'notif_prefs.dart';
 import '../../features/calls/call_background.dart';
+import '../../features/calls/call_ringtone.dart';
 import 'notification_permission.dart';
 
 Future<bool> incomingCallsEnabled({bool video = false}) async {
@@ -169,6 +170,7 @@ class IncomingNotificationSettings extends StatelessWidget {
       ),
       BackgroundCallSwitch(),
       CallNotificationTextSetting(),
+      CallRingtoneSettings(),
       NotificationPreferenceSwitch(
         preference: 'call_fullscreen',
         title: 'Tam ekran gelen arama',

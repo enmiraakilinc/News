@@ -12,8 +12,13 @@ import io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService
  */
 class AppMessagingService : FlutterFirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
-        if (message.data["type"] == "wake") {
-            val wake = Intent(this, WakeMessageReceiver::class.java)
+        val receiver = when (message.data["type"]) {
+            "wake" -> WakeMessageReceiver::class.java
+            "voice_call", "voice_call_end" -> VoiceMessageReceiver::class.java
+            else -> null
+        }
+        if (receiver != null) {
+            val wake = Intent(this, receiver)
             message.data.forEach { (key, value) -> wake.putExtra(key, value) }
             // Explicit, same-UID broadcast; no public or unprotected entry point.
             sendBroadcast(wake)

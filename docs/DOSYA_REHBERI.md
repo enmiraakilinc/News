@@ -373,3 +373,13 @@ Yeni mikrofon servisi, dosyaları, ayar davranışı ve doğrulama sınırları 
 - flutter_application_1/android/app/src/main/kotlin/com/melek/stargaleri/AudioFilesBridge.kt: ders sesleri için Android Birlikte aç seçicisi; dosya alanı, türü ve boyutunu sınırlar.
 - flutter_application_1/lib/features/media/local_audio_dialog.dart: derslerde açıkça izin verilen dış oynatıcı seçeneği ve paylaşım onayı.
 - flutter_application_1/test/call_controls_test.dart ve test/local_audio_dialog_test.dart: bağımsız arama kontrolleri ve ses dosyası açma onayı testleri.
+
+## 1.15.0 arama sesi ve alarm güvenilirliği
+
+- flutter_application_1/lib/features/calls/call_ringtone.dart: arama zil sesi/titreşim/sessiz paneli ve native kanal köprüsü.
+- flutter_application_1/android/app/src/main/kotlin/com/melek/stargaleri/CallRingtone.kt: Samsung/Android zil sesi seçicisi, yerel ses dosyası okuma izni, ses tercihiyle uyumlu bildirim kanalları ve uygulama açıkken gelen aramanın sesi.
+- free-wakeup-worker/worker.mjs: zamanlı uyandırmada yeniden deneme, sabit olay kimliği ve yeni planı koruyan temizleme.
+- free-wakeup-worker/schedule.test.mjs: gerçek zamanlama alarmı geri çağrısı; geçici hata, onay iptali, erken/geç teslimat ve yeni plan kontrolleri.
+- flutter_application_1/test/call_ringtone_test.dart: zil sesi paneli ve arama kimliğine bağlı susturma.
+- flutter_application_1/test/reminder_permissions_test.dart: normal not alarmının izin, tarih seçimi, kurma ve iptal akışı.
+- docs/releases/1.15.0.md: kapsam, sistem gereksinimleri ve fiziksel cihaz doğrulama sınırları.

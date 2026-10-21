@@ -88,7 +88,14 @@ class MainActivity : FlutterActivity() {
         else finishLocation(null, "denied")
     }
 
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (!CallRingtone.activityResult(this, requestCode, resultCode, data))
+            super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun onDestroy() {
+        CallRingtone.detach()
         if (MicrophoneSessionService.mode == "voice") stopService(android.content.Intent(this, MicrophoneSessionService::class.java))
         MicrophoneSessionBridge.channel?.setMethodCallHandler(null)
         MicrophoneSessionBridge.channel = null
@@ -115,6 +122,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        CallRingtone.attach(this, flutterEngine)
         AudioFilesBridge.attach(this, flutterEngine)
         MicrophoneSessionBridge.attach(this, flutterEngine)
         val voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/voice_call")
@@ -125,7 +133,7 @@ class MainActivity : FlutterActivity() {
                 "disableIncoming" -> {
                     val manager=getSystemService(Context.NOTIFICATION_SERVICE)as android.app.NotificationManager
                     for(notification in manager.activeNotifications){
-                        val incoming=if(Build.VERSION.SDK_INT>=26)notification.notification.channelId=="incoming_calls" else notification.notification.category==android.app.Notification.CATEGORY_CALL
+                        val incoming=if(Build.VERSION.SDK_INT>=26)(notification.notification.channelId=="incoming_calls" || notification.notification.channelId.startsWith("incoming_calls_v2_")) else notification.notification.category==android.app.Notification.CATEGORY_CALL
                         if(incoming)manager.cancel(notification.id)
                     }
                     getSharedPreferences("call_notifications",Context.MODE_PRIVATE).edit().clear().apply()
