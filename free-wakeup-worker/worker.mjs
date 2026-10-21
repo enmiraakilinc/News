@@ -66,7 +66,7 @@ export async function handle(request, env, deps={}) {
       if(!saved.ok) throw Error('schedule');
       return reply(200,'Uyandırma zamanlandı. Bu kişi için önceki planın yerini alır; internet ve telefon izinleri gerekir.');
     }
-    let accepted=0;const eventId=crypto.randomUUID();
+    let accepted=0;const eventId=deps.scheduledUid && /^[a-f0-9-]{36}$/.test(body.eventId??'') ? body.eventId : crypto.randomUUID();
     for(const permission of permissions.slice(0,5)){
       const device=await get(`chatAccounts/${recipientUid}/wakeDevices/${permission.deviceId.stringValue}`), target=device?.fields?.token?.stringValue;
       if(!target)continue;
@@ -79,15 +79,32 @@ export async function handle(request, env, deps={}) {
 export default {fetch:handle, async scheduled(controller,env) { await checkStorage(env,{token:()=>accessToken(env,fetch)}); }};
 
 export class WakeRateLimiter {
-  constructor(state,env) { this.state=state; this.env=env; }
+  constructor(state,env,deps={}) { this.state=state; this.env=env; this.deps=deps; }
   async alarm() {
     const job=await this.state.storage.get('wake-job');
     if(!job) return;
     if(Date.now()<job.fireAt) {await this.state.storage.setAlarm(job.fireAt);return;}
-    await this.state.storage.delete('wake-job');
-    // No stored ID tokens, passwords or location. Revalidate membership and consent now.
-    if(Date.now()-job.fireAt>90000) return;
-    await handle(new Request('https://internal/nudge',{method:'POST',body:JSON.stringify(job)}),this.env,{scheduledUid:job.uid});
+    // Keep the plan until FCM accepts it. Durable Object alarms retry failures.
+    // A replacement/cancellation during delivery must not delete a newer plan.
+    const clear=()=>this.state.storage.transaction(async storage=>{
+      const current=await storage.get('wake-job');
+      if(current && current.scheduleId===job.scheduleId && current.fireAt===job.fireAt)
+        await storage.delete('wake-job');
+    });
+    if(Date.now()-job.fireAt>90000) {await clear();return;}
+    if(!job.eventId) {
+      job.eventId=crypto.randomUUID();
+      await this.state.storage.transaction(async storage=>{
+        const current=await storage.get('wake-job');
+        if(current && current.scheduleId===job.scheduleId && current.fireAt===job.fireAt)
+          await storage.put('wake-job',job);
+      });
+    }
+    const response=await handle(new Request('https://internal/nudge',{
+      method:'POST',body:JSON.stringify(job)
+    }),this.env,{...this.deps,scheduledUid:job.uid});
+    if(response.status>=500 || response.status===429) throw Error('wake_delivery_retry');
+    await clear();
   }
   async fetch(request) {
     const path=new URL(request.url).pathname;
@@ -104,7 +121,7 @@ export class WakeRateLimiter {
     if(path==='/wake-schedule') {
       if(request.method==='DELETE') {await this.state.storage.delete('wake-job');await this.state.storage.deleteAlarm();return new Response('',{status:200});}
       if(request.method==='PUT') {
-        const job=await request.json();
+        const job={...await request.json(),scheduleId:crypto.randomUUID()};
         await this.state.storage.put('wake-job',job);
         await this.state.storage.setAlarm(job.fireAt);
         return new Response('',{status:200});

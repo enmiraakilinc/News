@@ -94,14 +94,8 @@ class VoiceMessageReceiver : BroadcastReceiver() {
         if (prefs.getLong("seen_$id",0L) > System.currentTimeMillis()-45000) return
         val nonce = UUID.randomUUID().toString()
         prefs.edit().putLong("seen_$id",System.currentTimeMillis()).putString("nonce_$id",nonce).apply()
-        if (Build.VERSION.SDK_INT >= 26) {
-            val channel = NotificationChannel("incoming_calls", "Gelen aramalar", NotificationManager.IMPORTANCE_HIGH)
-            channel.lockscreenVisibility = Notification.VISIBILITY_SECRET
-            channel.setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE),
-                android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build())
-            manager.createNotificationChannel(channel)
-            if (manager.getNotificationChannel("incoming_calls").importance == NotificationManager.IMPORTANCE_NONE) return
-        }
+        val ringtoneChannel = CallRingtone.channel(context)
+        if (CallRingtone.blocked(context)) return
         val screenIntent=Intent(context,IncomingCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .putExtra("callId",id).putExtra("uid",uid).putExtra("nonce",nonce).putExtra("created",created).putExtra("video",video)
         val screen=PendingIntent.getActivity(context,VoiceCallBridge.notificationId(id)+1,screenIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -110,7 +104,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
         val local=context.getSharedPreferences("FlutterSharedPreferences",Context.MODE_PRIVATE)
         val title=local.getString("flutter.incoming_call_title",null)?.trim()?.take(80)?.takeIf { it.isNotEmpty() } ?: "Gelen arama"
         val text=local.getString("flutter.incoming_call_body",null)?.trim()?.take(160)?.takeIf { it.isNotEmpty() } ?: "Yanıtlamak için dokun."
-        val builder = if(Build.VERSION.SDK_INT>=26) Notification.Builder(context,"incoming_calls") else Notification.Builder(context)
+        val builder = if(Build.VERSION.SDK_INT>=26) Notification.Builder(context,ringtoneChannel) else Notification.Builder(context)
         builder.setSmallIcon(com.melek.stargaleri.R.mipmap.ic_neural).setContentTitle(title)
             .setContentText(text).setCategory(Notification.CATEGORY_CALL).setVisibility(Notification.VISIBILITY_SECRET)
             .setContentIntent(screen).setAutoCancel(true).setDeleteIntent(decline)
@@ -118,6 +112,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
             .addAction(Notification.Action.Builder(null,"Reddet",decline).build())
         if(local.getBoolean("flutter.call_fullscreen",true)&&(Build.VERSION.SDK_INT<34||manager.canUseFullScreenIntent()))builder.setFullScreenIntent(screen,true)
         if(Build.VERSION.SDK_INT>=26)builder.setTimeoutAfter((45000-(System.currentTimeMillis()-created)).coerceAtLeast(1))
+        CallRingtone.legacySound(context, builder)
         val notification=builder.build()
         notification.flags=notification.flags or Notification.FLAG_INSISTENT
         manager.notify(VoiceCallBridge.notificationId(id),notification)

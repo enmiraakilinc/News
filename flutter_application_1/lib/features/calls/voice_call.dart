@@ -10,6 +10,7 @@ import '../../core/utils/user_errors.dart';
 import 'call_background.dart';
 import 'call_controls.dart';
 import 'call_audio.dart';
+import 'call_ringtone.dart';
 import '../../core/security/feature_access.dart';
 import '../../core/notifications/incoming_call_settings.dart';
 import '../../core/security/secure_screen.dart';
@@ -373,6 +374,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     WidgetsBinding.instance.addObserver(this);
     if (widget.incoming) {
       _status = widget.video ? 'Gelen görüntülü arama' : 'Gelen sesli arama';
+      _ringIncoming();
     }
     CallBackground.initialize();
     _native = CallBackground.events.stream.listen((event) {
@@ -407,6 +409,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       }
     });
     if (!widget.incoming) _begin();
+  }
+
+  Future<void> _ringIncoming() async {
+    await CallBackground.cancelIncoming(widget.reference.id);
+    if (!mounted || _busy || _closing || _ended || _started != null) return;
+    await CallRingtone.ring(widget.reference.id).catchError((_) {});
   }
 
   void _answerFromNotification() {
@@ -685,6 +693,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   Future<void> _accept() async {
     if (_busy || _closing || _ended) return;
+    unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
+    unawaited(CallBackground.cancelIncoming(widget.reference.id));
     setState(() => _busy = true);
     try {
       final doc = await widget.reference.get(
@@ -767,6 +777,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           unawaited(CallBackground.connected(widget.reference.id, _remaining));
         }
         unawaited(CallBackground.cancelIncoming(widget.reference.id));
+        unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
       }
       if (!widget.incoming && _peer != null && !_remoteSet) {
         await _setRemote(data['answer'] as Map);
@@ -815,6 +826,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Future<void> _finish(String status, {bool notify = true}) async {
     if (_closing || _ended) return;
     _closing = true;
+    unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     if (mounted && !_disposing) setState(() {});
     _ticker?.cancel();
     try {
@@ -866,6 +878,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   void dispose() {
     _disposing = true;
+    unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _signaling?.cancel();
