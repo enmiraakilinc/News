@@ -491,7 +491,11 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
       if (mounted) {
         await showDialog<void>(
           context: context,
-          builder: (_) => LocalAudioDialog(file: file, title: note.text),
+          builder: (_) => LocalAudioDialog(
+            file: file,
+            title: note.text,
+            allowExternal: true,
+          ),
         );
       }
     } catch (error) {

@@ -363,3 +363,13 @@ Bu listede lib/ yolları flutter_application_1/ klasörü içindedir.
 ## Mikrofon oturumu
 
 Yeni mikrofon servisi, dosyaları, ayar davranışı ve doğrulama sınırları docs/MICROPHONE_SESSIONS.md içinde açıklanır. Bu özellik henüz APK olarak yayımlanmadı.
+
+## Arama kontrolleri ve ses dosyası seçicisi (1.14.34)
+
+- flutter_application_1/lib/features/calls/call_controls.dart: etiketli mikrofon, hoparlör, karşı ses ve kamera düğmeleri.
+- flutter_application_1/lib/features/calls/call_audio.dart: yalnızca uzak ses izlerinin sesini açar/kapatır.
+- flutter_application_1/lib/features/calls/voice_call.dart: bu kontrollerin WebRTC aramasına bağlanması ve arama ekranı.
+- flutter_application_1/android/app/src/main/kotlin/com/melek/stargaleri/AppMessagingService.kt: uyandırma veri mesajını izin denetimleri yapan WakeMessageReceiver alıcısına iletir.
+- flutter_application_1/android/app/src/main/kotlin/com/melek/stargaleri/AudioFilesBridge.kt: ders sesleri için Android Birlikte aç seçicisi; dosya alanı, türü ve boyutunu sınırlar.
+- flutter_application_1/lib/features/media/local_audio_dialog.dart: derslerde açıkça izin verilen dış oynatıcı seçeneği ve paylaşım onayı.
+- flutter_application_1/test/call_controls_test.dart ve test/local_audio_dialog_test.dart: bağımsız arama kontrolleri ve ses dosyası açma onayı testleri.

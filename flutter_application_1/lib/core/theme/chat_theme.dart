@@ -52,7 +52,7 @@ class ChatThemes {
     final seed = value == 'love'
         ? const Color(0xff420303)
         : value == 'orange'
-        ? const Color(0xfffc9803)
+        ? const Color(0xffcb5c0c)
         : accent != null
         ? Color(accent!)
         : value == 'pastel'
@@ -87,9 +87,9 @@ class ChatThemes {
     }
     if (value == 'orange') {
       scheme = scheme.copyWith(
-        primary: const Color(0xfffc9803),
+        primary: const Color(0xffffb77f),
         onPrimary: const Color(0xff402000),
-        primaryContainer: const Color(0xfffc9803),
+        primaryContainer: const Color(0xffcb5c0c),
         onPrimaryContainer: Colors.black,
         surface: const Color(0xff211911),
         onSurface: const Color(0xffffeadb),
