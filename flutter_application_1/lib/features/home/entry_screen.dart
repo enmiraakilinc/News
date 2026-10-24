@@ -4,8 +4,6 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
 import '../../core/theme/chat_theme.dart';
-import '../updates/update_service.dart';
-import '../updates/update_dialog.dart';
 
 import '../../app/app_runtime.dart';
 import 'private_home.dart';
@@ -32,28 +30,6 @@ class _FakeGalleryPageState extends State<FakeGalleryPage> {
     super.initState();
     _loadData();
     ChatThemes.load();
-    // Firebase'in açılışta hazır olması için biraz bekleyip güncelleme kontrolü.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
-  }
-
-  Future<void> _checkUpdate() async {
-    await Future.delayed(const Duration(seconds: 3));
-    final info = await UpdateService.checkForUpdate();
-    if (info == null || !mounted) return;
-
-    // "Sonra" denen sürümü tekrar tekrar sorma; daha yeni sürüm gelince sor.
-    final prefs = await SharedPreferences.getInstance();
-    final int skip = prefs.getInt('skip_update_code') ?? 0;
-    if (info.code <= skip) return;
-
-    if (!mounted) return;
-    final bool? res = await showDialog<bool>(
-      context: context,
-      builder: (_) => UpdateDialog(info: info),
-    );
-    if (res == false) {
-      await prefs.setInt('skip_update_code', info.code);
-    }
   }
 
   Future<void> _loadData() async {

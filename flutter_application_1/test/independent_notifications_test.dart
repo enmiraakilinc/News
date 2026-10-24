@@ -6,6 +6,23 @@ import 'package:flutter_application_1/core/notifications/notif_prefs.dart';
 import 'package:flutter_application_1/core/notifications/incoming_call_settings.dart';
 
 void main() {
+  test(
+    'Private defaults hide ordinary content once and retain later choices',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'content_notification_chats': true,
+        'alarm_notifications_enabled': true,
+      });
+      final preferences = await SharedPreferences.getInstance();
+      await applyPrivateContentDefaults(preferences);
+      expect(await chatNotificationsEnabled(), false);
+      expect(await contentNotificationEnabled(kNotifNews), false);
+      expect(preferences.getBool('alarm_notifications_enabled'), true);
+      await preferences.setBool('content_notification_chats', true);
+      await applyPrivateContentDefaults(preferences);
+      expect(await chatNotificationsEnabled(), true);
+    },
+  );
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -33,8 +50,12 @@ void main() {
       expect(await incomingCallsEnabled(video: true), isFalse);
     },
   );
-  testWidgets('Background call notification text persists after editing', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: CallNotificationTextSetting())));
+  testWidgets('Background call notification text persists after editing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: CallNotificationTextSetting())),
+    );
     await tester.tap(find.byType(ListTile));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'Benim başlığım');

@@ -52,6 +52,9 @@ const kChatNotificationsKey = 'chat_notifications_enabled';
 Future<void> migrateNotificationPreferences() async {
   final p = await SharedPreferences.getInstance();
   await p.reload();
+  if (const bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY')) {
+    await applyPrivateContentDefaults(p);
+  }
   final legacy = p.getBool(kPushBarKey) ?? false;
   final chats = p.getBool(kChatNotificationsKey) ?? legacy;
   for (final kind in [
@@ -69,6 +72,26 @@ Future<void> migrateNotificationPreferences() async {
       );
     }
   }
+}
+
+/// One-time requested privacy default; explicit later choices remain intact.
+/// Call/alarm OS notices are separate from ordinary content notifications.
+Future<void> applyPrivateContentDefaults(SharedPreferences p) async {
+  const marker = 'private_content_defaults_v2';
+  if (p.getBool(marker) == true) return;
+  for (final kind in [
+    kNotifChats,
+    ...kAllContentNotifs,
+    kNotifNews,
+    kNotifUpdates,
+    kNotifStorage,
+  ]) {
+    await p.setBool('content_notification_${kind.collection}', false);
+  }
+  await p.setBool(kChatNotificationsKey, false);
+  await p.setBool(kPushBarKey, false);
+  await p.setBool('notif_active', false);
+  await p.setBool(marker, true);
 }
 
 Future<bool> chatNotificationsEnabled() async {

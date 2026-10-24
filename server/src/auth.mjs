@@ -7,6 +7,6 @@ export async function authenticate(request) {
  const token=header.slice(7);
  try {
   const claims=await getAuth().verifyIdToken(token);
-  return {uid:claims.uid,token,expires:claims.exp*1000};
+  return {uid:claims.uid,email:claims.email,token,expires:claims.exp*1000};
  }catch{throw new ApiError(401,'unauthenticated','Oturumun doğrulanamadı. Yeniden giriş yap.');}
 }

@@ -112,27 +112,15 @@ void main() {
       expect(cache.get('first'), isNull);
     },
   );
-  test('Call deadline never exceeds fifteen minutes or becomes negative', () {
+  test('Call duration keeps increasing beyond fifteen minutes', () {
     final start = DateTime(2026, 10, 15);
     expect(
-      voiceCallRemaining(start, start.add(const Duration(minutes: 3))),
-      const Duration(minutes: 12),
+      voiceCallElapsed(start, start.add(const Duration(hours: 2))),
+      const Duration(hours: 2),
     );
     expect(
-      voiceCallRemaining(start, start.add(const Duration(seconds: 899))),
-      const Duration(seconds: 1),
-    );
-    expect(
-      voiceCallRemaining(start, start.add(const Duration(minutes: 15))),
+      voiceCallElapsed(start, start.subtract(const Duration(hours: 1))),
       Duration.zero,
-    );
-    expect(
-      voiceCallRemaining(start, start.add(const Duration(minutes: 16))),
-      Duration.zero,
-    );
-    expect(
-      voiceCallRemaining(start, start.subtract(const Duration(hours: 1))),
-      maxVoiceCallDuration,
     );
   });
   test(

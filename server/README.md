@@ -129,3 +129,24 @@ Telefonların yeni sürüme geçmesi izlenmeden Firebase yazma ve canlı dinleme
 bağlantıları kesilmez. Sonrasında bağımsız PostgreSQL yazma işlemleri,
 işlem/çevrimdışı davranış ve Android/Worker servisleri birlikte geçirilip
 doğrulanır. Son aktarım ve geri dönüş planı olmadan Firestore verileri silinmez.
+# 1.16.0 birincil sunucu hazırlığı
+
+API artık okuma yanında yetkilendirilmiş yazma, canlı fark güncellemeleri,
+işlem tekrarı koruması, kişisel alan, zamanlı uyandırma ve özel APK indirmesi
+içerir. `primary_writes=false` iken eski eşitleme davranışı sürer; yeni yazmalar
+kapalıdır. Aşağıdaki eski okuma köprüsü açıklamaları bu uyumluluk modu içindir.
+Canlı geçiş planı: `docs/releases/1.16.0_MIGRATION_REVIEW.md`.
+
+- `sql/003_primary_writes.sql`: ayrı yazıcı rolü, işlem makbuzları ve eşitlemenin
+  yeni sunucu kayıtlarını ezmesini engelleyen koruma.
+- `sql/004_retention.sql`: birincil modda süreli eklerin temizlenmesi.
+- `sql/005_services.sql`: sınırlı servis rolü, deneme sayacı ve zamanlı işler.
+- `src/commit.mjs`, `write_policy.mjs`, `write_codec.mjs`: atomik işlemler,
+  erişim kuralları ve şifreli/binary değerlerin kayıpsız taşınması.
+- `src/service_store.mjs`, `services.mjs`: hesap kodu, arama ve uyandırmanın
+  PostgreSQL üzerinden kontrolü. Başka kullanıcının gizli verisi döndürülmez.
+- `src/push_transport.mjs`: mevcut Worker'a imzalı FCM taşıma isteği; Google
+  yönetim anahtarı VPS'e aktarılmaz.
+- `src/legacy_wake.mjs`: eski sürümde zamanlanmış isteklerin geçişten sonra da
+  güncel üyelik ve izinlerle yeniden kontrol edilmesi.
+- `src/updates.mjs`: hesap erişimi doğrulanarak özel yerel APK dosyasını sunar.

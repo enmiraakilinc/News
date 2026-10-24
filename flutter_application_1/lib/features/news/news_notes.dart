@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import '../../core/data/personal_cloud.dart';
+import '../pair/couple_service.dart';
 import 'dart:io';
 import '../media/local_audio_dialog.dart';
 import 'package:flutter/material.dart';
@@ -25,22 +28,37 @@ class NewsNotes extends StatefulWidget {
 class _NewsNotesState extends State<NewsNotes> {
   List<Map<String, dynamic>> _notes = [];
   bool _busy = false, _ready = false;
-  String get _key => 'personal_media_notes';
+  PersonalCloud? _cloud;
+  String get _key => _cloud == null
+      ? 'personal_media_notes'
+      : 'personal_media_notes_${_cloud!.owner}';
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().catchError((Object error) {
+      _error(error);
+    });
   }
 
   Future<void> _load() async {
+    if (PersonalCloud.enabled) {
+      await CoupleService.ensureReady();
+      _cloud = PersonalCloud(CoupleService.uid!);
+    }
     final prefs = await SharedPreferences.getInstance();
     final notes = <Map<String, dynamic>>[];
+    final canImportLegacy =
+        _cloud == null ||
+        prefs.getString('personal_notes_legacy_owner') == null ||
+        prefs.getString('personal_notes_legacy_owner') == _cloud!.owner;
     final legacyKeys = prefs
         .getKeys()
-        .where((key) => key.startsWith('news_media_notes_'))
+        .where((key) => canImportLegacy && key.startsWith('news_media_notes_'))
         .toList();
     for (final raw in [
       ...?prefs.getStringList(_key),
+      if (_cloud != null && canImportLegacy)
+        ...?prefs.getStringList('personal_media_notes'),
       for (final key in legacyKeys) ...?prefs.getStringList(key),
     ]) {
       try {
@@ -60,6 +78,32 @@ class _NewsNotesState extends State<NewsNotes> {
         await prefs.remove(key);
       }
     }
+    if (_cloud != null) {
+      final remote = await _cloud!.records('news');
+      final migrated =
+          prefs.getBool('personal_notes_migrated_${_cloud!.owner}') == true;
+      _notes = remote.values.toList();
+      if (!migrated) {
+        final ids = remote.keys.toSet();
+        final merged = [
+          ..._notes,
+          for (final note in notes)
+            if (!ids.contains('news_${note['id']}')) note,
+        ];
+        await _persist(merged);
+        await prefs.setBool('personal_notes_migrated_${_cloud!.owner}', true);
+        if (canImportLegacy) {
+          await prefs.setString('personal_notes_legacy_owner', _cloud!.owner);
+        }
+        notes
+          ..clear()
+          ..addAll(merged);
+      } else {
+        notes
+          ..clear()
+          ..addAll(_notes);
+      }
+    }
     if (mounted) {
       setState(() {
         _notes = notes;
@@ -70,14 +114,66 @@ class _NewsNotesState extends State<NewsNotes> {
 
   Future<Directory> _folder() async {
     final app = await getApplicationSupportDirectory();
-    return Directory('${app.path}/news_notes').create(recursive: true);
+    final scope = _cloud == null
+        ? ''
+        : '/${sha256.convert(utf8.encode(_cloud!.owner))}';
+    return Directory('${app.path}/news_notes$scope').create(recursive: true);
   }
 
-  Future<File?> _owned(String filename) async {
+  Future<File?> _owned(String filename, {bool restore = true}) async {
     if (!RegExp(r'^[0-9]+_[0-9]+\.(image|m4a)$').hasMatch(filename)) {
       return null;
     }
-    return File('${(await _folder()).path}/$filename');
+    final file = File('${(await _folder()).path}/$filename');
+    if (restore && _cloud != null && !await file.exists()) {
+      await _cloud!.restoreFile(_fileKey(filename), file);
+    }
+    return file;
+  }
+
+  String _fileKey(String filename) =>
+      'news_${sha256.convert(utf8.encode(filename))}';
+  Future<void> _persist(List<Map<String, dynamic>> next) async {
+    if (_cloud != null) {
+      for (final note in next) {
+        final filename = note['file'];
+        if (filename is String &&
+            !_notes.any((old) => old['id'] == note['id'])) {
+          final file = File('${(await _folder()).path}/$filename');
+          if (!await file.exists()) {
+            final prefs = await SharedPreferences.getInstance();
+            final claim = prefs.getString('personal_notes_legacy_owner');
+            if (claim == null || claim == _cloud!.owner) {
+              final app = await getApplicationSupportDirectory(),
+                  old = File('${app.path}/news_notes/$filename');
+              if (await old.exists()) await old.copy(file.path);
+            }
+          }
+          if (!await file.exists()) {
+            throw StateError(
+              'Notun dosyası bulunamadı; aktarım tamamlanamadı.',
+            );
+          }
+          await _cloud!.saveFile(_fileKey(filename), file);
+        }
+      }
+      await _cloud!.reconcile(
+        'news',
+        {for (final note in _notes) 'news_${note['id']}': note},
+        {for (final note in next) 'news_${note['id']}': note},
+      );
+      for (final note in _notes.where(
+        (old) => !next.any((n) => n['id'] == old['id']),
+      )) {
+        if (note['file'] is String) {
+          await _cloud!.removeFile(_fileKey(note['file'] as String));
+        }
+      }
+    }
+    await (await SharedPreferences.getInstance()).setStringList(
+      _key,
+      next.map(jsonEncode).toList(),
+    );
   }
 
   Future<void> _save(String source, String kind, String title) async {
@@ -103,10 +199,7 @@ class _NewsNotesState extends State<NewsNotes> {
           'title': title,
         },
       ];
-      await (await SharedPreferences.getInstance()).setStringList(
-        _key,
-        next.map(jsonEncode).toList(),
-      );
+      await _persist(next);
       if (mounted) setState(() => _notes = next);
     } catch (_) {
       await saved.delete();
@@ -220,10 +313,7 @@ class _NewsNotesState extends State<NewsNotes> {
       } else {
         next[next.indexOf(existing)] = note;
       }
-      await (await SharedPreferences.getInstance()).setStringList(
-        _key,
-        next.map(jsonEncode).toList(),
-      );
+      await _persist(next);
       if (mounted) setState(() => _notes = next);
     } catch (error) {
       _error(error);
@@ -326,10 +416,7 @@ class _NewsNotesState extends State<NewsNotes> {
           'longitude': point['longitude'],
         },
       ];
-      await (await SharedPreferences.getInstance()).setStringList(
-        _key,
-        next.map(jsonEncode).toList(),
-      );
+      await _persist(next);
       if (mounted) setState(() => _notes = next);
     } catch (error) {
       await channel.invokeMethod<void>('cancel').catchError((_) {});
@@ -348,12 +435,9 @@ class _NewsNotesState extends State<NewsNotes> {
         await ReminderService.cancel(note['id'] as String);
       }
       final file = note['file'] is String
-          ? await _owned(note['file'] as String)
+          ? await _owned(note['file'] as String, restore: false)
           : null;
-      await (await SharedPreferences.getInstance()).setStringList(
-        _key,
-        next.map(jsonEncode).toList(),
-      );
+      await _persist(next);
       if (mounted) setState(() => _notes = next);
       if (file != null && await file.exists()) await file.delete();
     } catch (error) {
@@ -413,7 +497,11 @@ class _NewsNotesState extends State<NewsNotes> {
         widget.audioOnly ? 'Sesli Notlarım' : 'Kendime Notlar',
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
       ),
-      const Text('Yalnızca bu cihazda saklanır; başkalarına gönderilmez.'),
+      const Text(
+        PersonalCloud.enabled
+            ? 'Kişisel hesabında saklanır; sohbet kişilerin göremez.'
+            : 'Yalnızca bu cihazda saklanır; başkalarına gönderilmez.',
+      ),
       Wrap(
         spacing: 12,
         children: [

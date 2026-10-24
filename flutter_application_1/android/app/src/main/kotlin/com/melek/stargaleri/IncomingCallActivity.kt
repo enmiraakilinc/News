@@ -10,13 +10,12 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.widget.*
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
+import com.melek.stargaleri.NativeDocuments.Registration
 
 /** Only opens a private ringing UI. Camera/microphone never start here. */
 class IncomingCallActivity : Activity() {
     private val handler=Handler(Looper.getMainLooper())
-    private var listener:ListenerRegistration?=null
+    private var listener:Registration?=null
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -46,7 +45,7 @@ class IncomingCallActivity : Activity() {
             sendBroadcast(Intent(this,VoiceCallDeclineReceiver::class.java).putExtra("callId",id).putExtra("uid",uid))
             finish()
         }
-        listener=FirebaseFirestore.getInstance().document("voiceCalls/$id").addSnapshotListener{doc,_ ->
+        listener=NativeDocuments.document("voiceCalls/$id").addSnapshotListener{doc,_ ->
             if(doc!=null&&(!doc.exists()||doc.getString("state")!="ringing"))finish()
         }
         handler.postDelayed({finish()},(created+45000-System.currentTimeMillis()).coerceIn(1,45000))

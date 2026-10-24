@@ -24,6 +24,7 @@ export function queryAllowed(q,uid) {
   p[0]==='couples'&&p.length>=3 ||
   p[0]==='chats'&&p.length===3&&p[2]==='messages' ||
   p[0]==='chatAccounts'&&p.length===3&&p[1]===uid&&['contacts','starredMessages','callDevices','wakeDevices','wakePermissions'].includes(p[2]) ||
+  p[0]==='chatAccounts'&&p[1]===uid&&((p.length===3&&['personalData','personalFiles'].includes(p[2]))||(p.length===5&&p[2]==='personalFiles'&&p[4]==='chunks')) ||
   ['chatContactLabels','coupleContactLabels'].includes(p[0])&&p.length===3&&p[2]==='names' ||
   p[0]==='voiceCalls'&&p.length===3&&p[2]==='candidates';
  if(!uid||!okay)throw new ApiError(403,'permission-denied','Bu listeye erişim iznin yok.');
@@ -39,4 +40,23 @@ export function validateCommit(body,project) {
   docPath(name.slice(prefix.length));
   if(Object.keys(w).some(k=>!['update','delete','transform','updateMask','updateTransforms','currentDocument'].includes(k)))throw new ApiError(400,'invalid-argument','İşlem biçimi geçersiz.');
  }
+}
+
+export function mediaPaths(paths) {
+ if(!Array.isArray(paths)||paths.length<1||paths.length>16||new Set(paths).size!==paths.length)
+  throw new ApiError(400,'invalid-argument','Dosya parçaları geçersiz.');
+ let parent;
+ for(const path of paths){
+  docPath(path);
+  const parts=path.split('/');
+  const chat=parts.length===4&&parts[0]==='chatMedia'&&parts[2]==='chunks';
+  const course=parts.length===8&&parts[0]==='couples'&&parts[2]==='courses'&&parts[4]==='entries'&&parts[6]==='chunks';
+  const personal=parts.length===6&&parts[0]==='chatAccounts'&&parts[2]==='personalFiles'&&parts[4]==='chunks';
+  if(!(chat||course||personal)||!/^\d{1,3}$/.test(parts.at(-1))||Number(parts.at(-1))>227)
+   throw new ApiError(400,'invalid-argument','Dosya parçası yolu geçersiz.');
+  const current=parts.slice(0,-1).join('/');
+  if(parent&&current!==parent)throw new ApiError(400,'invalid-argument','Tek dosya seçmelisin.');
+  parent=current;
+ }
+ return paths;
 }

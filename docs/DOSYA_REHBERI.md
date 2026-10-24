@@ -1,5 +1,33 @@
 # Neural Haber — dosya ve klasör rehberi
 
+## 24 Ekim 2026: sunucu geçişi için eklenen dosyalar
+
+1.16.0 hazırlanmıştır; canlı veri geçişi ve uygulama yayını onay bekler.
+Yalnızca derlemek birincil sunucu modunu açmaz.
+
+| Yer | Görevi |
+|---|---|
+| `server/src/` | VPS'te çalışan API, erişim kuralları, işlemler, canlı güncellemeler, arama/uyandırma ve güncelleme indirmesi |
+| `server/sql/` | Veritabanı tabloları, hesap sınırları, sınırlı servis rolleri ve süreli dosya temizliği |
+| `lib/core/data/oracle_firestore_bridge.dart` | Mevcut ekranların veri arayüzünü yeni VPS moduna bağlar; eski uyumluluk modu ayrı tutulur |
+| `lib/core/data/oracle_primary_store.dart` | Hesaba özel önbellek, bekleyen değişikliklerin ekrana yansıması ve canlı sorgular |
+| `lib/core/data/oracle_outbox.dart` | Diske kaydedilen gönderim kuyruğu; bağlantı kopunca aynı işlem kimliğiyle tekrar dener |
+| `lib/core/data/oracle_primary_transport.dart` | Kimlik doğrulamalı HTTPS ve canlı olay bağlantısı; anahtarları URL'ye koymaz |
+| `lib/core/data/oracle_write_codec.dart`, `oracle_codec.dart` | Tarih, sayı, binary ve alan işlemlerini sunucunun anlayacağı biçime dönüştürür |
+| `lib/core/data/oracle_local_values.dart`, `oracle_local_query.dart` | Sunucu onayını bekleyen değişiklikleri yerel listelerde doğru sıraya koyar |
+| `lib/core/data/oracle_primary_snapshots.dart`, `oracle_primary_transaction.dart` | Ekranların kullandığı belge/listeler ve karşılaştırmalı işlemler için uyarlayıcılar |
+| `lib/core/data/personal_cloud.dart`, `oracle_personal_store.dart` | Kişisel not/ders ve dosyaları doğrudan VPS'e taşır; sohbet veya ortak alan üyeliği bu verilere erişim vermez |
+| `lib/core/data/oracle_media_batch.dart` | Dosya parçalarını tek tek bağlantı açmadan gruplar halinde okur |
+| `android/.../NativeDocuments.kt` | Uygulama arka plandayken arama/alarm izinlerini aynı VPS üzerinden kontrol eder |
+| `lib/features/updates/update_check_tile.dart` | Güncellemeler düğmesi ve kontrol/indirme durumu |
+| `tools/server/` | Sunucu kurulumu, izole testler ve kontrollü geçiş hazırlıkları; telefonda çalışmaz |
+| `tools/releases/stage_vps.py` | İmzalı APK'yı özel sunucu dizinine kopyalar; sürümü yayımlamaz |
+| `docs/releases/1.16.0_MIGRATION_REVIEW.md` | Yayın öncesi inceleme, geçiş sırası ve fiziksel telefonda denenmesi gerekenler |
+
+Tablodaki `lib/` yolları `flutter_application_1/` içindedir. Testler canlı
+kullanıcılara mesaj/arama göndermek yerine geçici hesap ve izole veritabanı
+kullanır. `private/` ile `artifacts/` yine Git dışında tutulur.
+
 Bu belge uygulamayı kod yazarak geliştirmeye yeni başlayan biri için hazırlanmıştır. Dosya adlarını VS Code'da `Ctrl+P` ile aratabilirsin. Buradaki yollar, aksi söylenmedikçe `cosok` klasörüne göredir. Son kontrol: 17 Ekim 2026.
 
 ## 1. Düzen nasıl? Önce burayı oku

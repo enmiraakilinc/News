@@ -1,19 +1,34 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+Map<String, dynamic> decodeOracleResponse(Uint8List bytes) {
+  final value = jsonDecode(utf8.decode(bytes));
+  if (value is! Map) throw const FormatException('Sunucu yanıtı okunamadı.');
+  return Map<String, dynamic>.from(value);
+}
+
+Future<Map<String, dynamic>> decodeOracleResponseAsync(Uint8List bytes) async =>
+    bytes.length > 65536
+    ? await compute(decodeOracleResponse, bytes)
+    : decodeOracleResponse(bytes);
+
 class OracleApiException implements Exception {
   final int status;
   final String code;
-  OracleApiException(this.status, this.code);
+  final String? message;
+  OracleApiException(this.status, this.code, [this.message]);
   bool get canFallback =>
       status >= 500 || status == 429 || code == 'invalid-argument';
   @override
-  String toString() => switch (code) {
-    'permission-denied' => 'Bu alana erişim iznin yok.',
-    'unauthenticated' => 'Oturumunu yenilemek için tekrar giriş yap.',
-    _ => 'Bağlantı şu anda kurulamıyor. Biraz sonra tekrar dene.',
-  };
+  String toString() =>
+      message ??
+      switch (code) {
+        'permission-denied' => 'Bu alana erişim iznin yok.',
+        'unauthenticated' => 'Oturumunu yenilemek için tekrar giriş yap.',
+        _ => 'Bağlantı şu anda kurulamıyor. Biraz sonra tekrar dene.',
+      };
 }
 
 /// Credentials stay in memory and never enter URLs. A brief circuit breaker
@@ -38,7 +53,10 @@ class OracleDataClient {
       throw ArgumentError('Sunucu bağlantısı HTTPS olmalı.');
     }
   }
-  Future<Map<String, dynamic>> read(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> read(
+    Map<String, dynamic> body, {
+    Duration? requestTimeout,
+  }) async {
     if (DateTime.now().isBefore(_retryAt)) {
       throw OracleApiException(503, 'unavailable');
     }
@@ -54,7 +72,7 @@ class OracleDataClient {
             },
             body: jsonEncode(body),
           )
-          .timeout(timeout);
+          .timeout(requestTimeout ?? timeout);
     } on TimeoutException {
       _retryAt = DateTime.now().add(const Duration(seconds: 30));
       rethrow;
@@ -65,14 +83,13 @@ class OracleDataClient {
     if (response.statusCode >= 500 || response.statusCode == 429) {
       _retryAt = DateTime.now().add(const Duration(seconds: 30));
     }
-    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    final data = await decodeOracleResponseAsync(response.bodyBytes);
     if (response.statusCode != 200) {
       throw OracleApiException(
         response.statusCode,
         (data as Map?)?['error']?['code'] as String? ?? 'unavailable',
       );
     }
-    if (data is! Map) throw const FormatException('Sunucu yanıtı okunamadı.');
     return Map<String, dynamic>.from(data);
   }
 

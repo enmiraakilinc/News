@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../core/data/oracle_media_batch.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -147,6 +148,7 @@ class CourseVideo {
         note.id,
         extension: note.kind == 'audio' ? note.audioExtension : 'mp4',
       );
+      await repo.restoreMedia(note, file);
       if (!await file.exists()) throw Exception('Dosya artık bulunamıyor.');
       return file;
     }
@@ -160,20 +162,24 @@ class CourseVideo {
     final shared = repo as SharedCourseRepository;
     final output = destination.openWrite();
     try {
-      for (var i = 0; i < note.videoChunks; i++) {
-        final data = (await _entry(
-          shared,
-          folder,
-          note.id,
-        ).collection('chunks').doc('$i').get()).data();
-        if (data == null) throw Exception('Dosya eksik veya silinmiş.');
-        final decoded = await compute(transformMediaChunk, {
-          'bytes': (data['bytes'] as Blob).bytes,
-          'iv': (data['iv'] as Blob).bytes,
-          'secret': shared.secret,
-          'decrypt': true,
-        });
-        output.add(decoded['bytes'] as Uint8List);
+      final chunks = _entry(shared, folder, note.id).collection('chunks');
+      for (var start = 0; start < note.videoChunks; start += 16) {
+        final end = (start + 16).clamp(0, note.videoChunks);
+        final paths = [for (var i = start; i < end; i++) chunks.doc('$i').path];
+        final batch = await readOracleMediaChunks(paths);
+        for (var i = start; i < end; i++) {
+          final data = batch == null
+              ? (await chunks.doc('$i').get()).data()
+              : batch[i - start];
+          if (data == null) throw Exception('Dosya eksik veya silinmiş.');
+          final decoded = await compute(transformMediaChunk, {
+            'bytes': (data['bytes'] as Blob).bytes,
+            'iv': (data['iv'] as Blob).bytes,
+            'secret': shared.secret,
+            'decrypt': true,
+          });
+          output.add(decoded['bytes'] as Uint8List);
+        }
       }
     } finally {
       await output.close();

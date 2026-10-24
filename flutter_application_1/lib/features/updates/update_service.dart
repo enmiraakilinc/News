@@ -37,23 +37,37 @@ class UpdateInfo {
 
 class UpdateService {
   /// Yeni sürüm varsa bilgisini döndürür, yoksa null.
-  static Future<UpdateInfo?> checkForUpdate() async {
+  static Future<UpdateInfo?> checkForUpdate({bool silent = true}) async {
     try {
       final info = await PackageInfo.fromPlatform();
       final int currentCode = int.tryParse(info.buildNumber) ?? 0;
 
       await CoupleService.ensureReady().timeout(const Duration(seconds: 20));
       final endpoint = await WakeupService.endpoint();
-      if (endpoint == null) return null;
+      if (endpoint == null) {
+        throw const UpdateCheckException(
+          'Güncelleme sunucusuna şu anda ulaşılamıyor.',
+        );
+      }
       final uri = Uri.parse(
         endpoint,
       ).replace(path: '/updates/latest', query: null, fragment: null);
       final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-      if (token == null) return null;
+      if (token == null) {
+        throw const UpdateCheckException(
+          'Güncellemeyi kontrol etmek için tekrar giriş yap.',
+        );
+      }
       final response = await http
           .get(uri, headers: {'Authorization': 'Bearer $token'})
           .timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        throw UpdateCheckException(
+          response.statusCode == 403
+              ? 'Bu hesabın güncelleme erişimi doğrulanamadı.'
+              : 'Güncelleme kontrol edilemedi. İnternet bağlantını kontrol edip tekrar dene.',
+        );
+      }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final int code = (data['code'] as num?)?.toInt() ?? 0;
       String? abi;
@@ -63,14 +77,24 @@ class UpdateService {
         ).invokeMethod<String>('abi').timeout(const Duration(seconds: 2));
       } catch (_) {}
       final String url = updateUrlForAbi(data, abi);
-      if (code <= currentCode || url.isEmpty) return null;
+      if (code < 1) {
+        throw const UpdateCheckException('Sürüm bilgisi okunamadı.');
+      }
+      if (code <= currentCode) return null;
+      if (url.isEmpty) {
+        throw const UpdateCheckException(
+          'Güncelleme bağlantısı henüz hazır değil.',
+        );
+      }
       final download = Uri.parse(url);
       if (download.origin != uri.origin || download.path != '/updates/apk') {
-        return null;
+        throw const UpdateCheckException(
+          'Güncelleme bağlantısı doğrulanamadı.',
+        );
       }
       final digest = data['sha256'] as String?;
       if (digest == null || !RegExp(r'^[a-f0-9]{64}$').hasMatch(digest)) {
-        return null;
+        throw const UpdateCheckException('Güncelleme dosyası doğrulanamadı.');
       }
 
       return UpdateInfo(
@@ -81,8 +105,19 @@ class UpdateService {
         authenticated: true,
         sha256: digest,
       );
-    } catch (_) {
-      return null; // internet yok / hata — sessizce geç
+    } catch (error) {
+      if (silent) return null;
+      if (error is UpdateCheckException) rethrow;
+      throw const UpdateCheckException(
+        'Güncelleme kontrol edilemedi. Bağlantını kontrol edip tekrar dene.',
+      );
     }
   }
+}
+
+class UpdateCheckException implements Exception {
+  final String message;
+  const UpdateCheckException(this.message);
+  @override
+  String toString() => message;
 }

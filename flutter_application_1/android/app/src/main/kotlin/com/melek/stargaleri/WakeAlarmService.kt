@@ -17,8 +17,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Source
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -51,8 +49,8 @@ class WakeMessageReceiver : BroadcastReceiver() {
         val handler = Handler(Looper.getMainLooper())
         val timeout = Runnable { if (finished.compareAndSet(false, true)) pending.finish() }
         handler.postDelayed(timeout, 8000)
-        val db = FirebaseFirestore.getInstance()
-        db.document("chatAccounts/$uid/wakePermissions/$hash").get(Source.SERVER).addOnCompleteListener { consent ->
+        val db = NativeDocuments
+        db.document("chatAccounts/$uid/wakePermissions/$hash").get().addOnCompleteListener { consent ->
             if (finished.get()) return@addOnCompleteListener
             val settings = if (consent.isSuccessful) consent.result?.data else null
             if (!consent.isSuccessful || settings?.get("enabled") != true || settings?.get("sourceKey") != source || settings?.get("deviceId") != device) {
@@ -60,7 +58,7 @@ class WakeMessageReceiver : BroadcastReceiver() {
                 return@addOnCompleteListener
             }
             val parts = source.split('/')
-            db.document("${if (parts[0] == "chat") "chats" else "couples"}/${parts[1]}").get(Source.SERVER).addOnCompleteListener chatResult@ { chat ->
+            db.document("${if (parts[0] == "chat") "chats" else "couples"}/${parts[1]}").get().addOnCompleteListener chatResult@ { chat ->
                 if (!finished.compareAndSet(false, true)) return@chatResult
                 handler.removeCallbacks(timeout)
                 try {

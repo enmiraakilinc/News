@@ -624,8 +624,9 @@ class CoupleService {
   /// Çiftin anılarını canlı dinler (yeni eklenince iki telefonda da belirir).
   static Stream<List<TimelineMemory>> timelineStream(
     String coupleId,
-    String secret,
-  ) {
+    String secret, {
+    int limit = 12,
+  }) {
     // Önbelleğe ALINMAZ: her anı çözülmüş bir fotoğraf taşır. Bellekte tutmak
     // onlarca MB'ı kalıcı olarak canlı tutar ve çöp toplayıcıyı sürekli
     // çalıştırıp tüm uygulamayı yavaşlatır.
@@ -636,6 +637,7 @@ class CoupleService {
           .doc(coupleId)
           .collection('timeline')
           .orderBy('date', descending: true)
+          .limit(limit)
           .snapshots()
           .asyncMap((snap) async {
             final decoded = await _decodeImages(snap, secret);

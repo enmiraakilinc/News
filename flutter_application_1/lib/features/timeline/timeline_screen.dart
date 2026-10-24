@@ -51,11 +51,27 @@ class _TimelineScreenState extends State<TimelineScreen> {
   String? _secret;
   bool get _paired => _coupleId != null && _secret != null;
   Stream<List<TimelineMemory>>? _sharedStream;
+  int _sharedLimit = 12;
+
+  void _loadMoreShared() {
+    setState(() {
+      _sharedLimit += 12;
+      _sharedStream = CoupleService.timelineStream(
+        _coupleId!,
+        _secret!,
+        limit: _sharedLimit,
+      );
+    });
+  }
 
   void _retryShared() {
     CoupleService.resetConnection();
     setState(() {
-      _sharedStream = CoupleService.timelineStream(_coupleId!, _secret!);
+      _sharedStream = CoupleService.timelineStream(
+        _coupleId!,
+        _secret!,
+        limit: _sharedLimit,
+      );
     });
   }
 
@@ -614,10 +630,19 @@ class _TimelineScreenState extends State<TimelineScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
           itemCount:
               shared.length +
+              (shared.length >= _sharedLimit ? 1 : 0) +
               (_localItems.isEmpty ? 0 : _localItems.length + 1),
           itemBuilder: (context, index) {
             if (index < shared.length) return _sharedTile(shared[index]);
-            final localIndex = index - shared.length;
+            if (shared.length >= _sharedLimit && index == shared.length) {
+              return TextButton.icon(
+                onPressed: _loadMoreShared,
+                icon: const Icon(Icons.expand_more),
+                label: const Text('Önceki anıları göster'),
+              );
+            }
+            final localIndex =
+                index - shared.length - (shared.length >= _sharedLimit ? 1 : 0);
             if (localIndex == 0) {
               return const ListTile(
                 leading: Icon(Icons.phone_iphone),

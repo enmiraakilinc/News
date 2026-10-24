@@ -134,7 +134,6 @@ class CallBackground {
 
   static Future<bool> start(String id, {bool video = false}) async {
     try {
-      if (!await notificationAllowed()) return false;
       return await channel.invokeMethod<bool>('start', {
             'id': id,
             'video': video,
@@ -145,12 +144,9 @@ class CallBackground {
     }
   }
 
-  static Future<void> connected(String id, Duration remaining) async {
+  static Future<void> connected(String id) async {
     try {
-      await channel.invokeMethod('connected', {
-        'id': id,
-        'remaining': remaining.inMilliseconds,
-      });
+      await channel.invokeMethod('connected', {'id': id});
     } catch (_) {}
   }
 

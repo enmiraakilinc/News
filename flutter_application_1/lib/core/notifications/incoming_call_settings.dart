@@ -156,43 +156,55 @@ class IncomingNotificationSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Column(
     children: [
-      Divider(),
-      ListTile(title: Text('Aramalar')),
-      NotificationPreferenceSwitch(
-        preference: 'voice_call_notifications_enabled',
-        title: 'Sesli arama bildirimleri',
-        description: 'Mesaj ve diğer içerik bildirimlerinden bağımsızdır.',
-      ),
-      NotificationPreferenceSwitch(
-        preference: 'video_call_notifications_enabled',
-        title: 'Görüntülü arama bildirimleri',
-        description: 'Sesli aramalardan bağımsız açılıp kapatılır.',
-      ),
-      BackgroundCallSwitch(),
-      CallNotificationTextSetting(),
-      CallRingtoneSettings(),
-      NotificationPreferenceSwitch(
-        preference: 'call_fullscreen',
-        title: 'Tam ekran gelen arama',
-        description:
-            'Android özel erişim izni gerekir. Sistem tam ekranı göstermiyorsa bildirime dokunarak açılır.',
-        fullScreen: true,
-      ),
-      ListTile(
-        leading: Icon(Icons.lock_outline),
-        title: Text('Arama ekranı görüntü koruması'),
+      ExpansionTile(
+        leading: Icon(Icons.phone_outlined),
+        title: Text('Aramalar'),
         subtitle: Text(
-          'Sesli ve görüntülü aramalarda her zaman açık. Normal ekran görüntüsü ve ekran kaydı engellenir.',
+          'Sesli, görüntülü ve uygulama dışındayken gelen aramalar',
         ),
-        trailing: Icon(Icons.check_circle_outline),
+        children: [
+          NotificationPreferenceSwitch(
+            preference: 'voice_call_notifications_enabled',
+            title: 'Sesli arama bildirimleri',
+            description: 'Mesaj ve diğer içerik bildirimlerinden bağımsızdır.',
+          ),
+          NotificationPreferenceSwitch(
+            preference: 'video_call_notifications_enabled',
+            title: 'Görüntülü arama bildirimleri',
+            description: 'Sesli aramalardan bağımsız açılıp kapatılır.',
+          ),
+          BackgroundCallSwitch(),
+          CallNotificationTextSetting(),
+          CallRingtoneSettings(),
+          NotificationPreferenceSwitch(
+            preference: 'call_fullscreen',
+            title: 'Tam ekran gelen arama',
+            description:
+                'Android özel erişim izni gerekir. Sistem tam ekranı göstermiyorsa bildirime dokunarak açılır.',
+            fullScreen: true,
+          ),
+          ListTile(
+            leading: Icon(Icons.lock_outline),
+            title: Text('Arama ekranı görüntü koruması'),
+            subtitle: Text(
+              'Sesli ve görüntülü aramalarda her zaman açık. Normal ekran görüntüsü ve ekran kaydı engellenir.',
+            ),
+            trailing: Icon(Icons.check_circle_outline),
+          ),
+        ],
       ),
-      Divider(),
-      ListTile(title: Text('Alarm / uyandırma')),
-      NotificationPreferenceSwitch(
-        preference: 'alarm_notifications_enabled',
-        title: 'Uyandırma alarmları',
-        description:
-            'Yalnızca kişi ayrıntılarında izin verdiğin kişiler. Mesaj, anı ve soru bildirimlerini açmaz.',
+      ExpansionTile(
+        leading: Icon(Icons.alarm_outlined),
+        title: Text('Alarm / uyandırma'),
+        subtitle: Text('Arama ve mesaj ayarlarından bağımsızdır.'),
+        children: [
+          NotificationPreferenceSwitch(
+            preference: 'alarm_notifications_enabled',
+            title: 'Uyandırma alarmları',
+            description:
+                'Yalnızca kişi ayrıntılarında izin verdiğin kişiler. Mesaj, anı ve soru bildirimlerini açmaz.',
+          ),
+        ],
       ),
     ],
   );
@@ -341,7 +353,7 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
       const ListTile(
         title: Text('Bildirim tercihleri'),
         subtitle: Text(
-          'Android bildirim izni yalnızca izin verir; hangi özelliğin bildireceğini buradan seçersin.',
+          'Mesaj ve içerikler varsayılan olarak yalnızca uygulama içinde görünür. Telefon bildirimi istersen ilgili özelliği aç. Arama ve alarm ayarları ayrıdır.',
         ),
       ),
       TextButton.icon(
@@ -353,7 +365,12 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
         key: ValueKey(_revision),
         child: const Column(
           children: [
-            ContentNotificationSettings(),
+            ExpansionTile(
+              leading: Icon(Icons.notifications_outlined),
+              title: Text('Mesajlar ve içerikler'),
+              subtitle: Text('Her özelliği ayrı aç veya kapat.'),
+              children: [ContentNotificationSettings()],
+            ),
             IncomingNotificationSettings(),
           ],
         ),

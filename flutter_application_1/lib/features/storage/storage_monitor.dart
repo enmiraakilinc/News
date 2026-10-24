@@ -4,15 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
-import '../wakeup/wakeup_service.dart';
 
 class StorageMonitor {
   static final warning = ValueNotifier<bool>(false);
   static Future<Map<String, dynamic>?> check() async {
     await CoupleService.ensureReady();
     final uid = CoupleService.uid;
-    final endpoint = await WakeupService.endpoint();
-    if (endpoint == null) return null;
+    const endpoint = 'https://138.2.185.151';
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (token == null) return null;
     final response = await http
@@ -29,7 +27,7 @@ class StorageMonitor {
       return null;
     }
     await (await SharedPreferences.getInstance()).setString(
-      'storage_last_report',
+      'storage_last_report_oracle',
       jsonEncode(report),
     );
     warning.value = report['warning'] == true;
@@ -56,7 +54,7 @@ class _StorageStatusCardState extends State<StorageStatusCard> {
     if (mounted) setState(() => _busy = true);
     try {
       final raw = (await SharedPreferences.getInstance()).getString(
-        'storage_last_report',
+        'storage_last_report_oracle',
       );
       if (raw != null && mounted) {
         setState(
@@ -113,7 +111,7 @@ class _StorageStatusCardState extends State<StorageStatusCard> {
               ),
               if (warning)
                 const Text(
-                  'Ücretsiz alan dolmaya yaklaşıyor. Süresi dolan sohbet eklerinin temizliğini kontrol et.',
+                  'Sunucu diski dolmaya yaklaşıyor. Süresi dolan dosyaların temizliğini kontrol et.',
                 ),
               if (observed != null)
                 Text(
@@ -130,7 +128,7 @@ class _StorageStatusCardState extends State<StorageStatusCard> {
                     : 'Depolama ölçümü şu anda alınamadı.',
               ),
             const Text(
-              'Uygulamanın toplam alanı. %80’de uyarı gösterilir. Her ayın ilk günü otomatik kontrol; uygulamada açıldığında en fazla günde bir yeni ölçüm alınır.',
+              'Sunucunun uygulama bölümündeki toplam disk kullanımıdır; sistem ve yedekler de dahildir. %80 dolulukta uyarı gösterilir. Ekran açılınca güncellenir.',
             ),
           ],
         ),

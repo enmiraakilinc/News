@@ -1,3 +1,4 @@
+import '../updates/update_check_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/notifications/incoming_call_settings.dart';
@@ -13,6 +14,7 @@ class AppSettingsScreen extends StatelessWidget {
       children: [
         const NotificationsPanel(),
         const StorageStatusCard(),
+        const UpdateCheckTile(),
         ListTile(
           leading: const Icon(Icons.verified_user_outlined),
           title: const Text('İzinler'),

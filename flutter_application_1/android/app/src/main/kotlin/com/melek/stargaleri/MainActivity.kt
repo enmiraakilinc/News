@@ -147,7 +147,7 @@ class MainActivity : FlutterActivity() {
                     if(id==null||!Regex("^[A-Za-z0-9]{20}$").matches(id)||uid==null){result.error("invalid","Arama bulunamadı.",null);return@setMethodCallHandler}
                     try {
                         val service=android.content.Intent(this,VoiceOngoingService::class.java).setAction(call.method)
-                            .putExtra("callId",id).putExtra("uid",uid).putExtra("video",call.argument<Boolean>("video")?:false).putExtra("remaining",call.argument<Number>("remaining")?.toLong()?:900000)
+                            .putExtra("callId",id).putExtra("uid",uid).putExtra("video",call.argument<Boolean>("video")?:false)
                         if(call.method=="connected"){
                             if(VoiceOngoingService.activeId!=id){result.error("not_active","Arama sona erdi.",null);return@setMethodCallHandler}
                             startService(service)

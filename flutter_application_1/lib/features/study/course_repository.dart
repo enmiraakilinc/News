@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/search_text.dart';
 import '../media/audio_file_types.dart';
+import '../../core/data/personal_cloud.dart';
 
 class LessonFolder {
   final String id, title;
@@ -109,11 +110,19 @@ class LocalCourseRepository extends CourseRepository {
   final String owner;
   final Directory? root;
   LocalCourseRepository(this.owner, {this.root});
+  late final PersonalCloud? _cloud = PersonalCloud.enabled && root == null
+      ? PersonalCloud(owner)
+      : null;
+  Map<String, Map<String, dynamic>> _baseFolders = {}, _baseNotes = {};
   Future<File> imageFile(String id) async {
     if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
       throw Exception('Geçersiz görsel.');
     }
-    return File('${(await directory()).path}/$id.jpg');
+    final file = File('${(await directory()).path}/$id.jpg');
+    if (_cloud != null && !await file.exists()) {
+      await _cloud.restoreFile('course_image_$id', file);
+    }
+    return file;
   }
 
   @override
@@ -128,15 +137,117 @@ class LocalCourseRepository extends CourseRepository {
 
   Future<Map<String, dynamic>> _read() async {
     final file = File('${(await directory()).path}/courses.json');
-    if (!await file.exists()) return {};
-    return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    final local = await file.exists()
+        ? jsonDecode(await file.readAsString()) as Map<String, dynamic>
+        : <String, dynamic>{};
+    if (_cloud == null) return local;
+    _baseFolders = await _cloud.records('courseFolder');
+    _baseNotes = await _cloud.records('courseNote');
+    final data = <String, dynamic>{};
+    for (final entry in _baseFolders.entries) {
+      data[entry.key.substring('courseFolder_'.length)] = {
+        ...entry.value,
+        'notes': <dynamic>[],
+      };
+    }
+    for (final entry in _baseNotes.entries) {
+      final parent = data[entry.value['folderId']] as Map?;
+      if (parent != null) {
+        (parent['notes'] as List).add({...entry.value}..remove('folderId'));
+      }
+    }
+    final marker = File('${(await directory()).path}/cloud-migrated');
+    if (!await marker.exists()) {
+      for (final entry in local.entries) {
+        if (!data.containsKey(entry.key)) {
+          data[entry.key] = entry.value;
+          continue;
+        }
+        final notes = (data[entry.key] as Map)['notes'] as List;
+        for (final note in (entry.value as Map)['notes'] as List) {
+          if (!notes.any((n) => (n as Map)['id'] == (note as Map)['id'])) {
+            notes.add(note);
+          }
+        }
+      }
+      await _write(data);
+      await marker.writeAsString('1', flush: true);
+    }
+    return data;
   }
 
   Future<void> _write(Map<String, dynamic> data) async {
+    if (_cloud != null) {
+      final folders = <String, Map<String, dynamic>>{},
+          notes = <String, Map<String, dynamic>>{};
+      for (final folder in data.entries) {
+        final value = Map<String, dynamic>.from(folder.value as Map),
+            children = value.remove('notes') as List? ?? [];
+        folders['courseFolder_${folder.key}'] = value;
+        for (final raw in children) {
+          final note = Map<String, dynamic>.from(raw as Map),
+              id = note['id'] as String;
+          notes['courseNote_$id'] = {...note, 'folderId': folder.key};
+          if (!_baseNotes.containsKey('courseNote_$id')) {
+            await _uploadMedia(note);
+          }
+        }
+      }
+      await _cloud.reconcile('courseFolder', _baseFolders, folders);
+      await _cloud.reconcile('courseNote', _baseNotes, notes);
+      for (final removed in _baseNotes.entries.where(
+        (entry) => !notes.containsKey(entry.key),
+      )) {
+        final note = removed.value;
+        if (note['image'] is String) {
+          await _cloud.removeFile('course_image_${note['image']}');
+        }
+        if (['video', 'audio'].contains(note['kind'])) {
+          await _cloud.removeFile('course_media_${note['id']}');
+        }
+      }
+      _baseFolders = folders;
+      _baseNotes = notes;
+    }
     final target = File('${(await directory()).path}/courses.json');
     final temp = File('${target.path}.tmp');
     await temp.writeAsString(jsonEncode(data), flush: true);
     await temp.rename(target.path);
+  }
+
+  Future<void> _uploadMedia(Map<String, dynamic> note) async {
+    final image = note['image'];
+    if (image is String) {
+      final file = File('${(await directory()).path}/$image.jpg');
+      if (!await file.exists()) {
+        throw StateError('Ders görseli bulunamadı; aktarım tamamlanamadı.');
+      }
+      await _cloud!.saveFile('course_image_$image', file);
+    }
+    if (['video', 'audio'].contains(note['kind'])) {
+      final expiry = DateTime.parse(
+        note['created'] as String,
+      ).add(const Duration(days: 7));
+      if (!expiry.isAfter(DateTime.now())) return;
+      final extension = note['kind'] == 'audio'
+          ? AudioFileTypes.extension('file.${note['audioExtension'] ?? 'm4a'}')
+          : 'mp4';
+      final file = File('${(await directory()).path}/${note['id']}.$extension');
+      if (!await file.exists()) {
+        throw StateError('Ders dosyası bulunamadı; aktarım tamamlanamadı.');
+      }
+      await _cloud!.saveFile(
+        'course_media_${note['id']}',
+        file,
+        expiresAt: expiry,
+      );
+    }
+  }
+
+  Future<void> restoreMedia(LessonNote note, File file) async {
+    if (_cloud != null && !await file.exists()) {
+      await _cloud.restoreFile('course_media_${note.id}', file);
+    }
   }
 
   @override
@@ -231,10 +342,20 @@ class LocalCourseRepository extends CourseRepository {
     await _write(data);
   }
 
-  Future<Uint8List> exportBackup() async => compute(_personalBackup, {
-    'data': await _read(),
-    'directory': (await directory()).path,
-  });
+  Future<Uint8List> exportBackup() async {
+    final data = await _read();
+    for (final folder in data.values) {
+      for (final note in (folder as Map)['notes'] as List) {
+        if ((note as Map)['image'] is String) {
+          await imageFile(note['image'] as String);
+        }
+      }
+    }
+    return compute(_personalBackup, {
+      'data': data,
+      'directory': (await directory()).path,
+    });
+  }
 
   @override
   Future<void> removeNote(String course, String note) async {

@@ -5,6 +5,8 @@ import {snapshotDocument} from './firestore_codec.mjs';
 const project=process.env.FIREBASE_PROJECT_ID;
 initializeApp({projectId:project,credential:applicationDefault()});
 const pool=new pg.Pool({host:'/var/run/postgresql',database:'neural_haber',user:'neural_sync',max:2,statement_timeout:30000});
+const mode=await pool.query("SELECT value FROM neural.settings WHERE key='primary_writes'");
+if(mode.rows[0]?.value===true){await pool.end();process.exit(0);}
 const firestore=getFirestore();
 firestore.settings({useBigInt:true});
 const extra=['accountCodeAliases','accountLoginCodes','chatInvites','chatMedia','chatProfiles','chats','config','couples','invites','updateAccess','voiceCalls','contacts','callDevices','starredMessages','wakeDevices','wakePermissions','names','chunks','preview','messages','courses','hiddenimages','letters','notes','questions','timeline','voicenotes','wishes','candidates','entries','downloadRequests','recipes','sharedLocations','mediaDownloadRequests'];
@@ -22,15 +24,15 @@ for(const group of groups) {
     await client.query('BEGIN');
     for(const change of snap.docChanges()) {
      const path=change.doc.ref.path;
-     if(change.type==='removed') {await client.query('DELETE FROM neural.documents WHERE path=$1',[path]);continue;}
+     if(change.type==='removed') {await client.query('DELETE FROM neural.documents WHERE origin=\'firebase\' AND path=$1',[path]);continue;}
      const document=snapshotDocument(change.doc,project);
      await client.query(
-      'INSERT INTO neural.documents(path,parent_path,collection_id,document_id,document) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(path) DO UPDATE SET document=EXCLUDED.document,changed_at=now(),revision=DEFAULT WHERE (EXCLUDED.document->>\'updateTime\')::timestamptz > (neural.documents.document->>\'updateTime\')::timestamptz',
+      'INSERT INTO neural.documents(path,parent_path,collection_id,document_id,document) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(path) DO UPDATE SET document=EXCLUDED.document,changed_at=now(),revision=DEFAULT WHERE neural.documents.origin=\'firebase\' AND (EXCLUDED.document->>\'updateTime\')::timestamptz > (neural.documents.document->>\'updateTime\')::timestamptz',
       [path,path.split('/').slice(0,-1).join('/'),group,change.doc.id,JSON.stringify(document)]);
     }
     if(initial) {
      // Only the destination copy is reconciled; Firebase is never mutated.
-     await client.query('DELETE FROM neural.documents WHERE collection_id=$1 AND NOT(path=ANY($2::text[]))',[group,snap.docs.map(d=>d.ref.path)]);
+     await client.query('DELETE FROM neural.documents WHERE origin=\'firebase\' AND collection_id=$1 AND NOT(path=ANY($2::text[]))',[group,snap.docs.map(d=>d.ref.path)]);
     }
     await client.query('INSERT INTO neural.sync_state(collection_id,ready,updated_at,error_code) VALUES($1,true,now(),NULL) ON CONFLICT(collection_id) DO UPDATE SET ready=true,updated_at=now(),error_code=NULL',[group]);
     await client.query('COMMIT');initial=false;
