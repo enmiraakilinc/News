@@ -1,6 +1,6 @@
 """Validate the current private VPS download with a disposable identity only."""
 from pathlib import Path
-import hashlib,json,subprocess,sys
+import argparse,hashlib,json,subprocess,sys
 import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
@@ -20,6 +20,9 @@ def change(uid,remove):
     execute(script+'\nchange('+repr(uid)+','+repr(remove)+')\n')
 
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--version',default='1.15.1')
+    args=parser.parse_args()
     config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
     key=config['client'][0]['api_key'][0]['current_key']
     base='https://identitytoolkit.googleapis.com/v1/'
@@ -32,8 +35,8 @@ def main():
         assert requests.get(endpoint,headers=headers,timeout=20).status_code==403
         fixture(uid);created=True
         response=requests.get(endpoint,headers=headers,timeout=20);response.raise_for_status();metadata=response.json()
-        assert metadata['name']=='1.15.1','Staged new version must not be published before approval'
-        report=json.loads((ROOT/'artifacts/releases/1.15.1/build-report.json').read_text(encoding='utf-8-sig'))
+        assert metadata['name']==args.version,'Unexpected live update version'
+        report=json.loads((ROOT/'artifacts/releases'/args.version/'build-report.json').read_text(encoding='utf-8-sig'))
         assert metadata['sha256']==report['sha256']
         assert 'github' not in json.dumps(metadata).lower()
         digest=hashlib.sha256()
@@ -41,7 +44,7 @@ def main():
             download.raise_for_status()
             for block in download.iter_content(1024*1024):digest.update(block)
         assert digest.hexdigest()==report['sha256']
-        print(json.dumps({'vpsPrivateUpdatesVerified':True,'authenticatedDownloadHashVerified':True,'stagedNewVersionNotPublished':True,'realUserDataModified':False}))
+        print(json.dumps({'vpsPrivateUpdatesVerified':True,'authenticatedDownloadHashVerified':True,'version':args.version,'realUserDataModified':False}))
     finally:
         if created:fixture(uid,True)
         response=requests.post(base+'accounts:delete',params={'key':key},json={'idToken':token},timeout=20)

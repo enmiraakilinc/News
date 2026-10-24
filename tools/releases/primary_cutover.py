@@ -127,8 +127,12 @@ def activate():
     remote("import subprocess\nsubprocess.run(['sudo','systemctl','disable','--now','neural-sync'],check=True)\n")
     assert destination()==source, 'Mirror changed during stop; primary remains disabled'
     sql("BEGIN; UPDATE neural.settings SET value='true' WHERE key='primary_writes'; COMMIT;")
-    result=requests.get('https://138.2.185.151/v1/capabilities',timeout=20)
-    result.raise_for_status();assert result.json()['primaryWrites'] is True
+    for attempt in range(5):
+        result=requests.get('https://138.2.185.151/v1/capabilities',timeout=20)
+        result.raise_for_status()
+        if result.json()['primaryWrites'] is True:break
+        time.sleep(1)
+    assert result.json()['primaryWrites'] is True
     current=json.loads(sql("SELECT document->'fields' FROM neural.documents WHERE path='config/private_app_version'"))
     assert current['name']['stringValue']==VERSION and current['sha256']['stringValue']==data['sha256']
     (PRIVATE/'activation.json').write_text(json.dumps({'matchedDocumentVersions':len(source),
