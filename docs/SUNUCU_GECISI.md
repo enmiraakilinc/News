@@ -1,5 +1,10 @@
 # Oracle sunucusu ve PostgreSQL geçişi
 
+**24 Ekim 2026 son durum:** 1.16.0 APK hazırdır; son kaynak karşılaştırması
+Firestore okuma kotasına takıldığı için yayın taslakta tutuldu. Birincil mod
+açılmadı, eski kurallar ve 1.15.1 güncelleme bilgisi geri yüklendi. Ayrıntılar:
+[1.16.0 yayın durumu](releases/1.16.0_RELEASE_STATUS.md).
+
 Ayrıntılı dosya görevleri, servisler, API ve yedekleme bilgileri
 [server/README.md](../server/README.md) içindedir.
 
