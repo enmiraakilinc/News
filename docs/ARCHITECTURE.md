@@ -36,3 +36,16 @@ Sohbet araması `lib/features/chat/search/message_search.dart` içindedir. Yaln�
 Ders araması klasör ve alt klasörlerdeki başlık/not/kodları kapsar. Klasör sabitlemesi `pinned`, not sabitlemesi yerel not JSON'u veya ortak notun şifreli içeriği içinde tutulur. Kişisel ders yedeği JSON biçiminde dışa aktarılır; klasör ağacı, notlar, sabitlemeler ve base64 görseller aynı dosyadadır. Görseller toplamı için 50 MiB bellek sınırı vardır. Yedek şifreli değildir; dışa aktarım ekranı bunu açıklar. Ortak derslere yedek dışa aktarma eklenmedi.
 
 Ön kamera flaşı ekran ışığı kullanır; Android pencere parlaklığı kamera kapanınca geri bırakılır. Kayıtta lens değiştirmek `CameraController.setDescription` ve persistent recording üzerinden yapılır; cihaz desteği başarısızsa kayıt korunmaya çalışılarak anlaşılır uyarı verilir. Fiziksel cihaz doğrulaması ayrıca gereklidir.
+
+## Oracle sunucu geçişi
+
+| Yol | Sorumluluk |
+|---|---|
+| server/ | PostgreSQL şeması, erişim kuralları, okuma API ve eşitleme |
+| tools/server/ | SSH kurulumu, aktarım, doğrulama ve sunucu bakımı |
+| docs/SUNUCU_GECISI.md | Gerçek geçiş durumu, kapasite ve kalan işler |
+
+1.15.1, tek seferlik okumalar için PostgreSQL köprüsü içerir. Firebase yazma ve
+canlı dinleme uyumluluğu sürer. Kullanıcının hedefi PostgreSQL'i ana veri
+kaynağı yapmaktır; yazma geçişi henüz tamamlanmadı. Ayrıntılar
+[sunucu rehberinde](../server/README.md).
