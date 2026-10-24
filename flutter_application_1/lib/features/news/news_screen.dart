@@ -1,3 +1,4 @@
+import '../updates/update_check_tile.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/news_theme.dart';
 import 'package:flutter/material.dart';
@@ -134,9 +135,11 @@ class _NewsScreenState extends State<_NewsScreen> {
           child: SafeArea(
             child: ListView(
               children: [
-                const DrawerHeader(
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
                   child: Text('Neural Haber', style: TextStyle(fontSize: 24)),
                 ),
+                const UpdateCheckTile(),
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
                   title: const Text('Tema'),

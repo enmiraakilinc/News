@@ -5,7 +5,12 @@
     const repo=env.GITHUB_RELEASE_REPO;
     if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo??'')||!/^\d+$/.test(asset??'')||!/^\d+\.\d+\.\d+$/.test(version??''))return fail('invalid-release');
     const headers={Authorization:`Bearer ${env.GITHUB_RELEASE_TOKEN.trim()}`,Accept:'application/octet-stream','User-Agent':'private-app-updater','X-GitHub-Api-Version':'2022-11-28'};
-    let apk=await fetcher(`https://api.github.com/repos/${repo}/releases/assets/${asset}`,{headers,redirect:'manual'});
+    const repositoryId=env.GITHUB_RELEASE_REPOSITORY_ID;
+    if(repositoryId!==undefined&&!/^\d{1,20}$/.test(repositoryId))return fail('invalid-repository');
+    // A repository rename returns a 301 to its numeric API URL. Starting with
+    // that stable URL avoids forwarding credentials through arbitrary redirects.
+    const root=repositoryId?`https://api.github.com/repositories/${repositoryId}`:`https://api.github.com/repos/${repo}`;
+    let apk=await fetcher(`${root}/releases/assets/${asset}`,{headers,redirect:'manual'});
     if(apk.status===302){
       stage='asset-redirect';
       const location=new URL(apk.headers.get('Location'));

@@ -1,3 +1,5 @@
+import {internalPush} from './internal_push.mjs';
+import {oracleMode,proxyOracle} from './oracle_proxy.mjs';
 import {transitionUpdate} from './transition_update.mjs';
 import {checkStorage,storageStatus} from './storage.mjs';
 import {notifyCall} from './calls.mjs';
@@ -20,6 +22,11 @@ async function accessToken(env, fetcher) {
 }
 export async function handle(request, env, deps={}) {
   const fetcher=deps.fetch??fetch, path=new URL(request.url).pathname;
+  if(path==='/internal/push') return internalPush(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});
+  if(request.method==='POST'&&['/call','/account/resolve','/nudge','/nudge/schedule','/nudge/cancel'].includes(path)){
+    const proxied=await proxyOracle(request.clone(),env,{fetch:fetcher,scheduledUid:deps.scheduledUid});
+    if(proxied)return proxied;
+  }
   if(path==='/updates/transition/1.14.32.apk') return transitionUpdate(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});
   if(path.startsWith('/updates/')) return privateUpdates(request,env,{fetch:fetcher,token:deps.token??(()=>accessToken(env,fetcher))});
   if(request.method==='GET'&&path==='/health') return Response.json({ok:true,ready:!!(env.SERVICE_ACCOUNT_JSON&&env.FIREBASE_API_KEY&&env.FIREBASE_PROJECT_ID)});
@@ -76,7 +83,10 @@ export async function handle(request, env, deps={}) {
     return accepted?reply(200,'Uyandırma isteği iletildi. Telefonun bağlantısı ve izinlerine bağlı olarak çalacaktır.'):reply(503,'İstek iletilemedi. Bu kişinin uygulamayı açıp uyandırma ayarını kontrol etmesi gerekiyor.');
   }catch{return reply(503,'Uyandırma hizmetine şu anda ulaşılamıyor. Daha sonra yeniden dene.');}
 }
-export default {fetch:handle, async scheduled(controller,env) { await checkStorage(env,{token:()=>accessToken(env,fetch)}); }};
+export default {fetch:handle, async scheduled(controller,env) {
+  if(env.NEURAL_PUSH_SECRET && await oracleMode()!==false)return;
+  await checkStorage(env,{token:()=>accessToken(env,fetch)});
+}};
 
 export class WakeRateLimiter {
   constructor(state,env,deps={}) { this.state=state; this.env=env; this.deps=deps; }

@@ -19,5 +19,7 @@ crons = ["0 6 1 * *"]
 UPDATE_BOOTSTRAP_ENABLED = "true"
 UPDATE_BOOTSTRAP_ASSET_ID = "660006773"
 GITHUB_RELEASE_REPO = "enschumacher/Neural-Haber"
+# The same private repository was renamed; numeric ID remains stable.
+GITHUB_RELEASE_REPOSITORY_ID = "1426918054"
 FIREBASE_PROJECT_ID = "star-galeri"
 FIREBASE_API_KEY = "AIzaSyADivGDDPrRNA72L9FkN356TuWe2ZcR4Xw"

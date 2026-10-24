@@ -15,13 +15,10 @@ import '../../core/security/feature_access.dart';
 import '../../core/notifications/incoming_call_settings.dart';
 import '../../core/security/secure_screen.dart';
 
-const maxVoiceCallDuration = Duration(minutes: 15);
 const voiceCallRingDuration = Duration(seconds: 45);
-Duration voiceCallRemaining(DateTime started, DateTime now) {
+Duration voiceCallElapsed(DateTime started, DateTime now) {
   final elapsed = now.difference(started);
-  if (elapsed.isNegative) return maxVoiceCallDuration;
-  final left = maxVoiceCallDuration - elapsed;
-  return left.isNegative ? Duration.zero : left;
+  return elapsed.isNegative ? Duration.zero : elapsed;
 }
 
 class VoiceCalls {
@@ -73,7 +70,7 @@ class VoiceCalls {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(
-            '${video ? 'Görüntülü' : 'Sesli'} arama · En fazla 15 dakika',
+            '${video ? 'Görüntülü' : 'Sesli'} arama · S?re s?n?r? yok',
           ),
           content: const Text(
             'Karşı taraf Ayarlar’dan uygulama kapalıyken arama almayı açabilir. Görüşme bildirim izniyle arka planda sürer. Ses kaydı tutulmaz. Bağlantı için Google STUN sunucusuyla ağ adresi bilgisi paylaşılır; farklı ağlarda bağlantı kurulamayabilir.',
@@ -339,15 +336,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Timer? _ticker;
   DateTime? _started;
   final _elapsed = Stopwatch();
-  Duration _timeBudget = maxVoiceCallDuration;
-  Duration get _remaining {
-    final elapsed = _timeBudget - _elapsed.elapsed;
-    if (elapsed.isNegative) return Duration.zero;
-    final wall = _started == null
-        ? maxVoiceCallDuration
-        : voiceCallRemaining(_started!, DateTime.now());
-    return elapsed < wall ? elapsed : wall;
-  }
 
   late bool _speakerOn = widget.video;
   bool _receiveMuted = false, _audioBusy = false;
@@ -380,11 +368,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _native = CallBackground.events.stream.listen((event) {
       if (event.id == widget.reference.id &&
           ['stop', 'stopped', 'timeout'].contains(event.method)) {
-        _finish(
-          event.method == 'timeout'
-              ? '15 dakikalık görüşme sona erdi.'
-              : 'Arama sona erdi.',
-        );
+        _finish('Arama sona erdi.');
       }
     });
     VoiceCalls.answerRequested.addListener(_answerFromNotification);
@@ -400,9 +384,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         _finish('Hesabın değiştiği için arama sona erdi.');
         return;
       }
-      if (_started != null && _remaining == Duration.zero) {
-        _finish('15 dakikalık görüşme sona erdi.');
-      } else if (_started == null && DateTime.now().isAfter(_ringUntil)) {
+      if (_started == null && DateTime.now().isAfter(_ringUntil)) {
         _finish('Yanıt alınamadı.');
       } else if (mounted) {
         setState(() {});
@@ -771,10 +753,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           ? started.toDate()
           : (_started ?? DateTime.now());
       if (!_elapsed.isRunning) {
-        _timeBudget = voiceCallRemaining(_started!, DateTime.now());
         _elapsed.start();
         if (_backgroundStarted) {
-          unawaited(CallBackground.connected(widget.reference.id, _remaining));
+          unawaited(CallBackground.connected(widget.reference.id));
         }
         unawaited(CallBackground.cancelIncoming(widget.reference.id));
         unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
@@ -891,7 +872,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   @override
   Widget build(BuildContext context) {
-    final left = _started == null ? null : _remaining;
+    final left = _started == null ? null : _elapsed.elapsed;
     final time = left == null
         ? null
         : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';

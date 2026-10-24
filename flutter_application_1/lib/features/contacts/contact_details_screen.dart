@@ -65,15 +65,9 @@ class ContactChatHeader extends StatelessWidget {
           ),
           PopupMenuItem(value: 'details', child: Text('Tüm kişi ayarları')),
           if (members == null)
-            const PopupMenuItem(
-              value: 'call',
-              child: Text('Sesli ara · 15 dakika'),
-            ),
+            const PopupMenuItem(value: 'call', child: Text('Sesli ara')),
           if (members == null)
-            const PopupMenuItem(
-              value: 'video',
-              child: Text('Görüntülü ara · 15 dakika'),
-            ),
+            const PopupMenuItem(value: 'video', child: Text('Görüntülü ara')),
         ],
       );
       if (!context.mounted || action == null) return;
@@ -225,7 +219,7 @@ class ContactDetailsScreen extends StatelessWidget {
           if (members == null) ...[
             ListTile(
               leading: const Icon(Icons.videocam_outlined),
-              title: const Text('Görüntülü ara · 15 dakika'),
+              title: const Text('Görüntülü ara'),
               onTap: () => VoiceCalls.start(
                 context,
                 sourceKey,
@@ -235,7 +229,7 @@ class ContactDetailsScreen extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.call_outlined),
-              title: const Text('Sesli ara · 15 dakika'),
+              title: const Text('Sesli ara'),
               onTap: () => VoiceCalls.start(
                 context,
                 sourceKey,

@@ -59,14 +59,36 @@ UMask=0077
 [Install]
 WantedBy=multi-user.target
 """
-    api=common.replace('[Service]','[Service]\nUser=neural_api\nGroup=neural_api\nMemoryMax=700M\nExecStart=/usr/bin/node /opt/neural/server/src/main.mjs')
+    api=common.replace('[Service]','[Service]\nUser=neural_api\nGroup=neural_api\nMemoryMax=700M\nEnvironmentFile=-/etc/neural-api.env\nExecStart=/usr/bin/node /opt/neural/server/src/main.mjs')
     sync=common.replace('[Service]','[Service]\nUser=neural_sync\nGroup=neural_sync\nMemoryMax=2500M\nEnvironment=GOOGLE_APPLICATION_CREDENTIALS=/etc/neural/firebase-admin.json\nExecStart=/usr/bin/node /opt/neural/server/src/mirror.mjs')
     root_file('/etc/systemd/system/neural-api.service',api)
     root_file('/etc/systemd/system/neural-sync.service',sync)
+    root_file('/etc/systemd/system/neural-retention.service', '''[Unit]
+Description=Prune expired application attachments after primary cutover
+After=postgresql.service
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/usr/bin/psql -Xqt -v ON_ERROR_STOP=1 -d neural_haber -c "SELECT neural.prune_expired(1000)"
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+''')
+    root_file('/etc/systemd/system/neural-retention.timer', '''[Unit]
+Description=Check expired attachments every fifteen minutes
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+[Install]
+WantedBy=timers.target
+''')
     root_file('/etc/nginx/nginx.conf',options['nginx'])
     run('sudo','-n','nginx','-t')
     run('sudo','-n','systemctl','daemon-reload')
     run('sudo','-n','systemctl','enable','neural-api')
+    run('sudo','-n','systemctl','enable','--now','neural-retention.timer')
     run('sudo','-n','systemctl','restart','neural-api')
     if options.get('credential'):
         run('sudo','-n','systemctl','enable','neural-sync')

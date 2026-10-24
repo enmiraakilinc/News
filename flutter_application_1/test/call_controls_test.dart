@@ -1,3 +1,4 @@
+import 'package:flutter_application_1/features/calls/call_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -144,6 +145,26 @@ void main() {
             .every((c) => c.arguments['trackId'] == 'remote-audio'),
         isTrue,
       );
+    },
+  );
+  test(
+    'An active call starts its foreground service without requesting notification permission',
+    () async {
+      const channel = MethodChannel('app/voice_call');
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return true;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+      expect(await CallBackground.start('active-call', video: true), isTrue);
+      await CallBackground.connected('active-call');
+      expect(calls.map((c) => c.method), ['start', 'connected']);
+      expect(calls.last.arguments, {'id': 'active-call'});
     },
   );
 }

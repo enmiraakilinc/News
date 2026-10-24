@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 import java.io.FileInputStream
 
 plugins {
@@ -33,7 +34,12 @@ android {
         jvmTarget = "1.8"
     }
 
+    buildFeatures { buildConfig = true }
     defaultConfig {
+        val postgresPrimary = (project.findProperty("dart-defines") as String?)?.split(',')?.any {
+            runCatching { String(Base64.getDecoder().decode(it)) == "NEURAL_POSTGRES_PRIMARY=true" }.getOrDefault(false)
+        } ?: false
+        buildConfigField("boolean", "POSTGRES_PRIMARY", postgresPrimary.toString())
         applicationId = "com.melek.stargaleri"
         minSdk = flutter.minSdkVersion
         targetSdk = 36

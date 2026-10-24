@@ -20,7 +20,7 @@
 ## Veri sınırları
 
 - Ortak dersler mevcut `couples/<çift>/courses/<ders>/entries/` altında saklanır. Başlık ve içerik mevcut gizli kelime şifrelemesini kullanır. Kodla eklenen sohbet üyeliği bu alana erişim vermez.
-- Kişisel dersler uygulamanın özel cihaz dizininde hesap kimliğinin özetiyle ayrılır; sunucuya gönderilmez ve başka cihazlara senkronlanmaz. Metin/kodlar JSON, görseller ayrı dosyalardır.
+- 1.16.0 birincil sunucu sürümünde kişisel ders ve haber notları hesabın `chatAccounts/<uid>/personalData` alanına senkronlanır; dosyalar `personalFiles` altında parçalı saklanır. `personal_cloud.dart` doğrudan VPS kuyruğunu kullanır; Firebase veri SDK'sına göndermez. Eski yerel kayıtlar ilk kullanımda birleştirilir. Telefon önbellekleri hesap kimliğinin özetiyle ayrılır. Eski uyumluluk sürümünde cihazdaki davranış korunur.
 - Haber medyalı notlarının mevcut anahtarları korunur; hatırlatıcılar için yalnızca kararlı kimlik eklenir. Eski veriler silinmez.
 - Yerel hatırlatıcılar cihaz AlarmManager'ı ile çalışır; internet gerekmez. Uyandırma hâlâ mevcut sunucudan gelir. Sistem bildirim, tam ekran ve kesin alarm izinleri ilgili işlemde açıklanır; Android kararları aşılmaz.
 - Haber ve kişisel hatırlatıcı bildirimleri haber menüsündedir. Özel alan bildirim ayarları haber tercihlerini değiştirmez.

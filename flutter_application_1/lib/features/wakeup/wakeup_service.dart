@@ -41,6 +41,9 @@ class WakeupService {
       .collection('wakePermissions')
       .doc(permissionId(sourceKey, device));
   static Future<String?> endpoint() async {
+    if (const bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY')) {
+      return 'https://138.2.185.151';
+    }
     try {
       final data =
           (await FirebaseFirestore.instance
@@ -135,7 +138,8 @@ class WakeupService {
           }),
         )
         .timeout(const Duration(seconds: 20));
-    final message = (jsonDecode(response.body) as Map)['message'];
+    final result = jsonDecode(response.body) as Map;
+    final message = result['message'] ?? (result['error'] as Map?)?['message'];
     if (message is! String || message.length > 250) {
       throw Exception('Uyandırma isteği gönderilemedi. Yeniden dene.');
     }

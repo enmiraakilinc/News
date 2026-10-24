@@ -40,9 +40,23 @@ DECLARE parts text[]:=string_to_array(p,'/'); n integer:=cardinality(parts); med
 BEGIN
  IF n=2 AND parts[1]='config' AND parts[2] IN ('app_version','wakeup','voice_calls') THEN RETURN true; END IF;
  IF uid IS NULL OR uid='' THEN RETURN false; END IF;
- IF parts[1]='couples' THEN RETURN neural.member('couples',parts[2],uid); END IF;
+ IF parts[1]='couples' THEN
+  IF n=8 AND parts[3]='courses' AND parts[5]='entries' AND parts[7]='chunks' THEN
+   RETURN neural.member('couples',parts[2],uid) AND now()<
+    (neural.raw_document(array_to_string(parts[1:6],'/')) #>> '{fields,createdAt,timestampValue}')::timestamptz+interval '7 days';
+  END IF;
+  RETURN neural.member('couples',parts[2],uid);
+ END IF;
  IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3]='messages')) AND neural.member('chats',parts[2],uid); END IF;
- IF parts[1]='chatAccounts' THEN RETURN n=4 AND parts[2]=uid AND parts[3] IN ('contacts','starredMessages','callDevices','wakeDevices','wakePermissions'); END IF;
+ IF parts[1]='chatAccounts' THEN
+  IF parts[2]<>uid THEN RETURN false; END IF;
+  IF n=6 AND parts[3]='personalFiles' AND parts[5]='chunks' THEN
+   media:=neural.raw_document(array_to_string(parts[1:4],'/'));
+   RETURN media #>> '{fields,ready,booleanValue}'='true' AND
+    (media #>> '{fields,expiresAt,timestampValue}' IS NULL OR now()<(media #>> '{fields,expiresAt,timestampValue}')::timestamptz);
+  END IF;
+  RETURN n=4 AND parts[3] IN ('contacts','starredMessages','callDevices','wakeDevices','wakePermissions','personalData','personalFiles','personalConfig');
+ END IF;
  IF n=2 AND parts[1] IN ('invites','chatInvites','chatProfiles') THEN RETURN true; END IF;
  IF n=4 AND parts[3]='names' AND parts[1] IN ('chatContactLabels','coupleContactLabels') THEN
   RETURN neural.member(CASE parts[1] WHEN 'chatContactLabels' THEN 'chats' ELSE 'couples' END,parts[2],uid);

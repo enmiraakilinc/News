@@ -1,3 +1,9 @@
+import 'dart:io';
+import 'oracle_primary_store.dart';
+import 'oracle_primary_transport.dart';
+import 'oracle_primary_snapshots.dart';
+import 'oracle_primary_transaction.dart';
+import 'oracle_write_codec.dart';
 import 'dart:async';
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,19 +11,27 @@ import 'package:firebase_core/firebase_core.dart';
 import 'oracle_client.dart';
 import 'oracle_codec.dart';
 
-/// Staged rollout: native listeners, offline queues, transactions and Android
-/// call/wake services stay intact while one-shot reads prefer PostgreSQL.
+/// The compatibility build prefers mirrored reads. A primary build routes
+/// documents, live queries, writes and transactions to the authenticated VPS.
 void installOracleReadBridge() {
-  const enabled = bool.fromEnvironment('NEURAL_POSTGRES_READS');
+  const primary = bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY');
+  const enabled = bool.fromEnvironment('NEURAL_POSTGRES_READS') || primary;
   if (!enabled || FirebaseFirestorePlatform.instance is OracleFirestoreBridge) {
     return;
   }
-  FirebaseFirestorePlatform.instance = OracleFirestoreBridge(
+  final bridge = OracleFirestoreBridge(
     FirebaseFirestorePlatform.instance,
     OracleDataClient(
       token: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     ),
+    primary: primary,
   );
+  FirebaseFirestorePlatform.instance = bridge;
+  if (primary) {
+    bridge.bindAccounts(
+      FirebaseAuth.instance.authStateChanges().map((u) => u?.uid),
+    );
+  }
 }
 
 class OracleFirestoreBridge extends FirebaseFirestorePlatform {
@@ -30,9 +44,64 @@ class OracleFirestoreBridge extends FirebaseFirestorePlatform {
   int _pending = 0;
   bool _networkDisabled = false;
   DateTime _nativeUntil = DateTime.fromMillisecondsSinceEpoch(0);
-  OracleFirestoreBridge(this.native, this.client);
+  final bool primary;
+  final String? Function() _uidProvider;
+  final OraclePrimaryTransport? _providedTransport;
+  final Future<Directory> Function()? rootDirectory;
+  final Map<String, OraclePrimaryStore> _stores;
+  StreamSubscription<String?>? _accounts;
+  OracleFirestoreBridge(
+    this.native,
+    this.client, {
+    this.primary = false,
+    String? Function()? uidProvider,
+    OraclePrimaryTransport? transport,
+    this.rootDirectory,
+    Map<String, OraclePrimaryStore>? sharedStores,
+  }) : _uidProvider =
+           uidProvider ?? (() => FirebaseAuth.instance.currentUser?.uid),
+       _providedTransport = transport,
+       _stores = sharedStores ?? {};
+  late final primaryTransport =
+      _providedTransport ?? OraclePrimaryTransport(client);
+  late final writes = OracleWriteCodec(codec);
+  OraclePrimaryStore get store {
+    final uid = _uidProvider();
+    if (uid == null) throw OracleApiException(401, 'unauthenticated');
+    return _stores.putIfAbsent(uid, () {
+      final value = OraclePrimaryStore(
+        uid: uid,
+        isCurrent: () => _uidProvider() == uid,
+        codec: codec,
+        transport: primaryTransport,
+        rootDirectory: rootDirectory,
+      );
+      value.networkEnabled = !_networkDisabled;
+      value.outbox.enabled = !_networkDisabled;
+      return value;
+    });
+  }
+
+  void bindAccounts(Stream<String?> accounts) {
+    unawaited(_accounts?.cancel());
+    _accounts = accounts.listen((uid) {
+      if (uid != _uidProvider()) return;
+      for (final entry in _stores.entries.toList()) {
+        if (entry.key != uid) {
+          _stores.remove(entry.key);
+          unawaited(
+            entry.value.close().catchError((Object error, StackTrace stack) {
+              /* Optional old cache cleanup. */
+            }),
+          );
+        }
+      }
+    });
+  }
+
   bool get preferNative =>
-      _networkDisabled || _pending > 0 || DateTime.now().isBefore(_nativeUntil);
+      _networkDisabled ||
+      !primary && (_pending > 0 || DateTime.now().isBefore(_nativeUntil));
   Future<T> mutate<T>(Future<T> Function() work) async {
     _pending++;
     try {
@@ -57,6 +126,11 @@ class OracleFirestoreBridge extends FirebaseFirestorePlatform {
     return OracleFirestoreBridge(
       native.delegateFor(app: app, databaseId: databaseId),
       client,
+      primary: primary,
+      uidProvider: _uidProvider,
+      transport: primary ? primaryTransport : null,
+      rootDirectory: rootDirectory,
+      sharedStores: _stores,
     );
   }
 
@@ -96,8 +170,11 @@ class OracleFirestoreBridge extends FirebaseFirestorePlatform {
   CollectionReferencePlatform collection(String collectionPath) =>
       _OracleCollection(this, native.collection(collectionPath));
   @override
-  QueryPlatform collectionGroup(String collectionPath) =>
-      native.collectionGroup(collectionPath);
+  QueryPlatform collectionGroup(String collectionPath) {
+    if (primary) throw UnsupportedError('Bu liste türü desteklenmiyor.');
+    return native.collectionGroup(collectionPath);
+  }
+
   @override
   WriteBatchPlatform batch() => _OracleBatch(this, native.batch());
   @override
@@ -105,37 +182,115 @@ class OracleFirestoreBridge extends FirebaseFirestorePlatform {
     TransactionHandler<T> transactionHandler, {
     Duration timeout = const Duration(seconds: 30),
     int maxAttempts = 5,
-  }) => mutate(
-    () => native.runTransaction(
-      transactionHandler,
-      timeout: timeout,
-      maxAttempts: maxAttempts,
-    ),
-  );
+  }) {
+    if (!primary) {
+      return mutate(
+        () => native.runTransaction(
+          transactionHandler,
+          timeout: timeout,
+          maxAttempts: maxAttempts,
+        ),
+      );
+    }
+    var active = true;
+    Future<T?> execute() async {
+      final current = store;
+      await current.outbox.waitForPendingWrites();
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!active) throw TimeoutException('İşlem zamanında tamamlanamadı.');
+        final transaction = OraclePrimaryTransaction(
+          current,
+          this,
+          codec,
+          isActive: () => active,
+        );
+        try {
+          final result = await transactionHandler(transaction);
+          if (!active) throw TimeoutException('İşlem zamanında tamamlanamadı.');
+          await transaction.commit();
+          return result;
+        } catch (error) {
+          if (error is! OracleApiException ||
+              error.code != 'aborted' ||
+              attempt + 1 >= maxAttempts) {
+            rethrow;
+          }
+        }
+      }
+      throw OracleApiException(409, 'aborted');
+    }
+
+    return execute()
+        .timeout(
+          timeout,
+          onTimeout: () {
+            active = false;
+            throw TimeoutException('İşlem zamanında tamamlanamadı.');
+          },
+        )
+        .whenComplete(() => active = false);
+  }
+
   @override
   Settings get settings => native.settings;
   @override
   set settings(Settings value) => native.settings = value;
   @override
-  Future<void> clearPersistence() => native.clearPersistence();
+  Future<void> clearPersistence() async {
+    if (!primary) {
+      await native.clearPersistence();
+      return;
+    }
+    for (final value in _stores.values) {
+      await value.clearCache();
+    }
+  }
+
   @override
   Future<void> disableNetwork() async {
     _networkDisabled = true;
-    await native.disableNetwork();
+    if (primary) {
+      for (final value in _stores.values) {
+        await value.setNetwork(false);
+      }
+    } else {
+      await native.disableNetwork();
+    }
   }
 
   @override
   Future<void> enableNetwork() async {
-    await native.enableNetwork();
     _networkDisabled = false;
+    if (primary) {
+      for (final value in _stores.values) {
+        await value.setNetwork(true);
+      }
+    } else {
+      await native.enableNetwork();
+    }
   }
 
   @override
-  Future<void> terminate() => native.terminate();
+  Future<void> terminate() async {
+    if (!primary) {
+      await native.terminate();
+      return;
+    }
+    await _accounts?.cancel();
+    for (final value in _stores.values.toList()) {
+      await value.close();
+    }
+    _stores.clear();
+    primaryTransport.close();
+  }
+
   @override
-  Future<void> waitForPendingWrites() => native.waitForPendingWrites();
+  Future<void> waitForPendingWrites() => primary
+      ? store.outbox.waitForPendingWrites()
+      : native.waitForPendingWrites();
   @override
-  Stream<void> snapshotsInSync() => native.snapshotsInSync();
+  Stream<void> snapshotsInSync() =>
+      primary ? store.changes : native.snapshotsInSync();
   @override
   Future<void> setLoggingEnabled(bool enabled) =>
       native.setLoggingEnabled(enabled);
@@ -149,6 +304,14 @@ class _OracleDocument extends DocumentReferencePlatform {
   Future<DocumentSnapshotPlatform> get([
     GetOptions options = const GetOptions(),
   ]) async {
+    if (bridge.primary) {
+      final view = await bridge.store.get(
+        {'kind': 'document', 'path': path},
+        cacheOnly: options.source == Source.cache,
+        serverOnly: options.source == Source.server,
+      );
+      return oraclePrimaryDocument(bridge, bridge.codec, path, view);
+    }
     if (options.source == Source.cache || bridge.preferNative) {
       return bridge.rebindDoc(await native.get(options));
     }
@@ -172,20 +335,55 @@ class _OracleDocument extends DocumentReferencePlatform {
   Stream<DocumentSnapshotPlatform> snapshots({
     bool includeMetadataChanges = false,
     required ListenSource listenSource,
-  }) => native
-      .snapshots(
-        includeMetadataChanges: includeMetadataChanges,
-        listenSource: listenSource,
-      )
-      .map(bridge.rebindDoc);
+  }) {
+    if (bridge.primary) {
+      return bridge.store
+          .watch({
+            'kind': 'document',
+            'path': path,
+          }, cacheOnly: listenSource == ListenSource.cache)
+          .map(
+            (view) => oraclePrimaryDocument(bridge, bridge.codec, path, view),
+          );
+    }
+    return native
+        .snapshots(
+          includeMetadataChanges: includeMetadataChanges,
+          listenSource: listenSource,
+        )
+        .map(bridge.rebindDoc);
+  }
+
   @override
-  Future<void> set(Map<String, dynamic> data, [SetOptions? options]) =>
-      bridge.mutate(() => native.set(data, options));
+  Future<void> set(Map<String, dynamic> data, [SetOptions? options]) async {
+    if (bridge.primary) {
+      await bridge.store.outbox.enqueue([
+        bridge.writes.set(path, data, options),
+      ]);
+      return;
+    }
+    await bridge.mutate(() => native.set(data, options));
+  }
+
   @override
-  Future<void> update(Map<FieldPath, dynamic> data) =>
-      bridge.mutate(() => native.update(data));
+  Future<void> update(Map<FieldPath, dynamic> data) async {
+    if (bridge.primary) {
+      await bridge.store.outbox.enqueue([bridge.writes.update(path, data)]);
+      return;
+    }
+    await bridge.mutate(() => native.update(data));
+  }
+
   @override
-  Future<void> delete() => bridge.mutate(native.delete);
+  Future<void> delete() async {
+    if (bridge.primary) {
+      await bridge.store.outbox.enqueue([
+        {'type': 'delete', 'path': path},
+      ]);
+      return;
+    }
+    await bridge.mutate(native.delete);
+  }
 }
 
 mixin _OracleQueryReads on QueryPlatform {
@@ -257,6 +455,14 @@ mixin _OracleQueryReads on QueryPlatform {
   Future<QuerySnapshotPlatform> get([
     GetOptions options = const GetOptions(),
   ]) async {
+    if (bridge.primary) {
+      final view = await bridge.store.get(
+        {'kind': 'query', 'query': request()},
+        cacheOnly: options.source == Source.cache,
+        serverOnly: options.source == Source.server,
+      );
+      return oraclePrimaryQuery(bridge, bridge.codec, view);
+    }
     if (options.source == Source.cache || bridge.preferNative) {
       return bridge.rebindQuery(await native.get(options));
     }
@@ -286,12 +492,33 @@ mixin _OracleQueryReads on QueryPlatform {
   Stream<QuerySnapshotPlatform> snapshots({
     bool includeMetadataChanges = false,
     required ListenSource listenSource,
-  }) => native
-      .snapshots(
-        includeMetadataChanges: includeMetadataChanges,
-        listenSource: listenSource,
-      )
-      .map(bridge.rebindQuery);
+  }) {
+    if (bridge.primary) {
+      var previous = <Map<String, dynamic>>[];
+      return bridge.store
+          .watch({
+            'kind': 'query',
+            'query': request(),
+          }, cacheOnly: listenSource == ListenSource.cache)
+          .map((view) {
+            final snapshot = oraclePrimaryQuery(
+              bridge,
+              bridge.codec,
+              view,
+              previous,
+            );
+            previous = view.rows;
+            return snapshot;
+          });
+    }
+    return native
+        .snapshots(
+          includeMetadataChanges: includeMetadataChanges,
+          listenSource: listenSource,
+        )
+        .map(bridge.rebindQuery);
+  }
+
   @override
   QueryPlatform where(List<List<dynamic>> conditions) =>
       wrap(native.where(conditions));
@@ -373,6 +600,11 @@ class _OracleCount extends AggregateQueryPlatform {
   Future<AggregateQuerySnapshotPlatform> get({
     required AggregateSource source,
   }) async {
+    if (bridge.primary) {
+      if (bridge._networkDisabled) throw OracleApiException(503, 'unavailable');
+      final count = await bridge.store.count(sourceQuery.request());
+      return AggregateQuerySnapshotPlatform(count: count, sum: [], average: []);
+    }
     if (bridge.preferNative) {
       return sourceQuery.native.count().get(source: source);
     }
@@ -396,15 +628,51 @@ class _OracleCount extends AggregateQueryPlatform {
 class _OracleBatch extends WriteBatchPlatform {
   final OracleFirestoreBridge bridge;
   final WriteBatchPlatform native;
+  final _operations = <Map<String, dynamic>>[];
+  bool _committed = false;
   _OracleBatch(this.bridge, this.native);
+  void _check() {
+    if (_committed) throw StateError('Bu işlem grubu zaten gönderildi.');
+  }
+
   @override
-  void set(String path, Map<String, dynamic> data, [SetOptions? options]) =>
+  void set(String path, Map<String, dynamic> data, [SetOptions? options]) {
+    if (!bridge.primary) {
       native.set(path, data, options);
+      return;
+    }
+    _check();
+    _operations.add(bridge.writes.set(path, data, options));
+  }
+
   @override
-  void update(String path, Map<FieldPath, dynamic> data) =>
+  void update(String path, Map<FieldPath, dynamic> data) {
+    if (!bridge.primary) {
       native.update(path, data);
+      return;
+    }
+    _check();
+    _operations.add(bridge.writes.update(path, data));
+  }
+
   @override
-  void delete(String path) => native.delete(path);
+  void delete(String path) {
+    if (!bridge.primary) {
+      native.delete(path);
+      return;
+    }
+    _check();
+    _operations.add({'type': 'delete', 'path': path});
+  }
+
   @override
-  Future<void> commit() => bridge.mutate(native.commit);
+  Future<void> commit() async {
+    if (!bridge.primary) {
+      await bridge.mutate(native.commit);
+      return;
+    }
+    _check();
+    _committed = true;
+    if (_operations.isNotEmpty) await bridge.store.outbox.enqueue(_operations);
+  }
 }

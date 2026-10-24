@@ -1,3 +1,10 @@
+import 'dart:io';
+import 'package:flutter_application_1/core/data/oracle_personal_store.dart';
+import 'package:flutter_application_1/core/data/personal_cloud.dart';
+import 'package:flutter_application_1/core/data/oracle_local_values.dart';
+import 'package:flutter_application_1/core/data/oracle_primary_transport.dart';
+import 'package:flutter_application_1/core/data/oracle_write_codec.dart';
+import 'package:flutter_application_1/core/data/oracle_media_batch.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -10,6 +17,20 @@ import 'package:http/testing.dart';
 import 'package:flutter_application_1/core/data/oracle_client.dart';
 import 'package:flutter_application_1/core/data/oracle_codec.dart';
 import 'package:flutter_application_1/core/data/oracle_firestore_bridge.dart';
+
+Future<void> _removeTestDirectory(Directory directory) async {
+  final resolved = await directory.resolveSymbolicLinks(),
+      root = await Directory.systemTemp.resolveSymbolicLinks();
+  expect(resolved.startsWith(root + Platform.pathSeparator), true);
+  expect(
+    directory.uri.pathSegments
+        .where((s) => s.isNotEmpty)
+        .last
+        .startsWith('neural_'),
+    true,
+  );
+  await directory.delete(recursive: true);
+}
 
 class _App implements FirebaseApp {
   @override
@@ -514,4 +535,385 @@ void main() {
     expect(native.sets, 1);
     expect(bridge.preferNative, true);
   });
+  test(
+    'Media batch preserves requested order, bytes and incomplete fallback',
+    () async {
+      final previous = FirebaseFirestorePlatform.instance;
+      addTearDown(() => FirebaseFirestorePlatform.instance = previous);
+      var complete = true;
+      final client = OracleDataClient(
+        token: () async => 'test',
+        client: MockClient((request) async {
+          final body = jsonDecode(request.body);
+          expect(body['kind'], 'documents');
+          return http.Response(
+            jsonEncode({
+              'rows': [
+                {
+                  'path': 'chatMedia/a/chunks/1',
+                  'document': {
+                    'fields': {
+                      'bytes': {'bytesValue': 'AgM='},
+                    },
+                  },
+                },
+                if (complete)
+                  {
+                    'path': 'chatMedia/a/chunks/0',
+                    'document': {
+                      'fields': {
+                        'bytes': {'bytesValue': 'AQ=='},
+                      },
+                    },
+                  },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      addTearDown(client.close);
+      FirebaseFirestorePlatform.instance = OracleFirestoreBridge(
+        _Native(),
+        client,
+      );
+      final paths = ['chatMedia/a/chunks/0', 'chatMedia/a/chunks/1'];
+      final parts = await readOracleMediaChunks(paths);
+      expect((parts![0]['bytes'] as Blob).bytes, [1]);
+      expect((parts[1]['bytes'] as Blob).bytes, [2, 3]);
+      complete = false;
+      expect(await readOracleMediaChunks(paths), isNull);
+    },
+  );
+  test(
+    'Primary write codec keeps SDK sentinels separate from ordinary maps',
+    () {
+      final codec = OracleWriteCodec(
+        OracleCodec(reference: _Native().doc, project: 'star-galeri'),
+      );
+      expect(codec.encode(sdk.FieldValue.serverTimestamp()), {
+        'transformValue': {'operation': 'serverTimestamp'},
+      });
+      expect(codec.encode(sdk.FieldValue.increment(2)), {
+        'transformValue': {
+          'operation': 'increment',
+          'value': {'integerValue': '2'},
+        },
+      });
+      expect(codec.encode(sdk.FieldValue.arrayUnion(['alice'])), {
+        'transformValue': {
+          'operation': 'arrayUnion',
+          'value': {
+            'arrayValue': {
+              'values': [
+                {'stringValue': 'alice'},
+              ],
+            },
+          },
+        },
+      });
+      expect(codec.encode(Uint8List.fromList([0, 255])), {
+        'bytesValue': 'AP8=',
+      });
+      expect(
+        codec
+            .encode({
+              'transformValue': {'operation': 'delete'},
+            })
+            .containsKey('mapValue'),
+        true,
+      );
+      final op = codec.update('chats/a/messages/b', {
+        FieldPath(['reactions', 'uid.with.dot']): 'heart',
+      });
+      expect((op['fields'] as List).single['field'], [
+        'reactions',
+        'uid.with.dot',
+      ]);
+      final set = codec.set(
+        'couples/a/notes/b',
+        {'a.b': 'text'},
+        SetOptions(
+          mergeFields: [
+            FieldPath(['a.b']),
+          ],
+        ),
+      );
+      expect(set['mergeFields'], [
+        ['a.b'],
+      ]);
+    },
+  );
+
+  test('Primary SDK never falls back to Firebase data operations', () async {
+    final directory = await Directory.systemTemp.createTemp('neural_bridge_');
+    addTearDown(() => _removeTestDirectory(directory));
+    final native = _Native();
+    var unavailable = false;
+    var commits = 0;
+    final mock = MockClient((request) async {
+      if (unavailable) {
+        return http.Response('{"error":{"code":"unavailable"}}', 503);
+      }
+      if (request.url.path.endsWith('/commit')) {
+        commits++;
+        return http.Response(
+          jsonEncode({
+            'requestId': (jsonDecode(request.body) as Map)['requestId'],
+            'versions': {'chatProfiles/owner': '3'},
+            'commitTime': '2026-10-24T18:00:00.000000000Z',
+            'documents': [],
+          }),
+          200,
+        );
+      }
+      final body = jsonDecode(request.body) as Map;
+      if (body['kind'] == 'count') return http.Response('{"count":7}', 200);
+      return http.Response(
+        jsonEncode({
+          'row': {
+            'path': 'chatProfiles/owner',
+            'version': '1',
+            'document': {
+              'fields': {
+                'value': {'stringValue': 'postgres'},
+              },
+            },
+          },
+        }),
+        200,
+      );
+    });
+    final api = OracleDataClient(token: () async => 'token', client: mock);
+    final bridge = OracleFirestoreBridge(
+      native,
+      api,
+      primary: true,
+      uidProvider: () => 'owner',
+      rootDirectory: () async => directory,
+      transport: OraclePrimaryTransport(api, client: mock),
+    );
+    addTearDown(bridge.terminate);
+    final document = bridge.doc('chatProfiles/owner');
+    expect(
+      (await document.get(
+        const GetOptions(source: Source.server),
+      )).data()?['value'],
+      'postgres',
+    );
+    await document.set({
+      'value': 'new',
+      'changed': sdk.FieldValue.serverTimestamp(),
+    });
+    final batch = bridge.batch()..set('chatProfiles/owner', {'value': 'batch'});
+    await batch.commit();
+    expect(
+      (await bridge
+              .collection('chatProfiles')
+              .count()
+              .get(source: AggregateSource.server))
+          .count,
+      7,
+    );
+    unavailable = true;
+    await expectLater(
+      document.get(const GetOptions(source: Source.server)),
+      throwsA(isA<OracleApiException>()),
+    );
+    expect(commits, 2);
+    expect([native.gets, native.sets, native.batches], [0, 0, 0]);
+  });
+
+  test(
+    'Primary transaction retries stale server versions without Firebase',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('neural_tx_');
+      addTearDown(() => _removeTestDirectory(directory));
+      final native = _Native();
+      var reads = 0;
+      var commits = 0;
+      final versions = <String>[];
+      final mock = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        if (request.url.path.endsWith('/commit')) {
+          commits++;
+          versions.add(
+            (body['conditions'] as List).single['version'] as String,
+          );
+          return commits == 1
+              ? http.Response('{"error":{"code":"aborted"}}', 409)
+              : http.Response(
+                  jsonEncode({
+                    'requestId': body['requestId'],
+                    'versions': {'chatProfiles/owner': '3'},
+                    'commitTime': '2026-10-24T18:00:00.000000000Z',
+                    'documents': [],
+                  }),
+                  200,
+                );
+        }
+        reads++;
+        return http.Response(
+          jsonEncode({
+            'row': {
+              'path': 'chatProfiles/owner',
+              'version': '$reads',
+              'document': {
+                'fields': {
+                  'value': {'integerValue': '$reads'},
+                },
+              },
+            },
+          }),
+          200,
+        );
+      });
+      final api = OracleDataClient(token: () async => 'token', client: mock);
+      final bridge = OracleFirestoreBridge(
+        native,
+        api,
+        primary: true,
+        uidProvider: () => 'owner',
+        rootDirectory: () async => directory,
+        transport: OraclePrimaryTransport(api, client: mock),
+      );
+      addTearDown(bridge.terminate);
+      final result = await bridge.runTransaction<int>((transaction) async {
+        final snapshot = await transaction.get('chatProfiles/owner');
+        final next = (snapshot.data()?['value'] as int) + 1;
+        transaction.update('chatProfiles/owner', {
+          FieldPath(['value']): next,
+        });
+        return next;
+      });
+      expect(result, 3);
+      expect(versions, ['1', '2']);
+      expect([native.gets, native.sets, native.batches], [0, 0, 0]);
+    },
+  );
+  test(
+    'Personal notes and files round trip through the VPS without native data calls',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'neural_personal_',
+      );
+      addTearDown(() => _removeTestDirectory(directory));
+      final native = _Native(), rows = <String, Map<String, dynamic>>{};
+      var uid = 'owner', revision = 0;
+      late OracleFirestoreBridge bridge;
+      final clock = Timestamp.fromDate(DateTime.utc(2026, 10, 24));
+      const time = '2026-10-24T00:00:00.000000000Z';
+      final mock = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        Map<String, dynamic> result;
+        if (request.url.path == '/v1/commit') {
+          final versions = <String, dynamic>{},
+              documents = <Map<String, dynamic>>[];
+          for (final raw in body['operations'] as List) {
+            final operation = Map<String, dynamic>.from(raw as Map),
+                path = operation['path'] as String;
+            final previous = rows[path];
+            final data = applyOracleLocalWrite(
+              previous == null
+                  ? null
+                  : bridge.codec.fields(previous['document']['fields'] as Map),
+              operation,
+              bridge.codec,
+              clock,
+            );
+            if (data == null) {
+              rows.remove(path);
+              versions[path] = null;
+              continue;
+            }
+            final row = <String, dynamic>{
+              'path': path,
+              'version': '${++revision}',
+              'document': {
+                'fields': data.map(
+                  (k, v) => MapEntry(k, bridge.codec.encode(v)),
+                ),
+                'updateTime': time,
+              },
+            };
+            rows[path] = row;
+            versions[path] = row['version'];
+            if (!path.contains('/chunks/')) documents.add(row);
+          }
+          result = {
+            'requestId': body['requestId'],
+            'versions': versions,
+            'documents': documents,
+            'commitTime': time,
+          };
+        } else if (body['kind'] == 'document') {
+          result = {'row': rows[body['path']]};
+        } else if (body['kind'] == 'documents') {
+          result = {
+            'rows': [
+              for (final path in body['paths'] as List)
+                if (rows[path] != null) rows[path],
+            ],
+          };
+        } else {
+          final query = body['query'] as Map;
+          result = {
+            'rows': [
+              for (final row in rows.values)
+                if ((row['path'] as String).substring(
+                      0,
+                      (row['path'] as String).lastIndexOf('/'),
+                    ) ==
+                    query['path'])
+                  row,
+            ],
+          };
+        }
+        return http.Response(
+          jsonEncode(result),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final api = OracleDataClient(token: () async => 'token', client: mock);
+      bridge = OracleFirestoreBridge(
+        native,
+        api,
+        primary: true,
+        uidProvider: () => uid,
+        rootDirectory: () async => directory,
+        transport: OraclePrimaryTransport(api, client: mock),
+      );
+      final previous = FirebaseFirestorePlatform.instance;
+      FirebaseFirestorePlatform.instance = bridge;
+      addTearDown(() async {
+        await bridge.terminate();
+        FirebaseFirestorePlatform.instance = previous;
+      });
+      final direct = DirectPersonalDb('owner', connection: bridge),
+          personal = PersonalCloud('owner', store: direct);
+      await personal.reconcile('news', {}, {
+        'news_test': {'id': 'test', 'text': 'Private note'},
+      });
+      final remote = await personal.records('news');
+      expect(remote['news_test']?['text'], 'Private note');
+      final source = File('${directory.path}/source.bin'),
+          destination = File('${directory.path}/restored.bin');
+      final bytes = List<int>.generate(2000, (i) => i % 256);
+      await source.writeAsBytes(bytes);
+      await personal.saveFile('file_test', source);
+      expect(await personal.restoreFile('file_test', destination), true);
+      expect(await destination.readAsBytes(), bytes);
+      expect(
+        rows['chatAccounts/owner/personalFiles/file_test/chunks/0']?['document']['fields']['bytes']['bytesValue'],
+        isNot(base64Encode(bytes)),
+      );
+      uid = 'other';
+      await expectLater(personal.records('news'), throwsA(isA<StateError>()));
+      uid = 'owner';
+      await personal.removeFile('file_test');
+      expect(rows.keys.where((p) => p.contains('/personalFiles/')), isEmpty);
+      expect([native.gets, native.sets, native.batches], [0, 0, 0]);
+    },
+  );
 }

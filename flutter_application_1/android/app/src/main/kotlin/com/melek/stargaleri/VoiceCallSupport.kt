@@ -6,9 +6,7 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.os.*
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.Source
 import io.flutter.plugin.common.MethodChannel
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,8 +59,8 @@ class VoiceMessageReceiver : BroadcastReceiver() {
         val handler = Handler(Looper.getMainLooper())
         val timeout = Runnable { if (finished.compareAndSet(false, true)) pending.finish() }
         handler.postDelayed(timeout, 8000)
-        val db = FirebaseFirestore.getInstance()
-        db.document("voiceCalls/$id").get(Source.SERVER).addOnCompleteListener { result ->
+        val db = NativeDocuments
+        db.document("voiceCalls/$id").get().addOnCompleteListener { result ->
             val call = if (result.isSuccessful) result.result?.data else null
             val created = (call?.get("createdAt") as? com.google.firebase.Timestamp)?.toDate()?.time
             if (finished.get()) return@addOnCompleteListener
@@ -74,7 +72,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
             }
             val device = local.getString("flutter.wakeup_device_id",null)
             if (device == null) { if(finished.compareAndSet(false,true)){handler.removeCallbacks(timeout);pending.finish()};return@addOnCompleteListener }
-            db.document("chatAccounts/$uid/callDevices/$device").get(Source.SERVER).addOnCompleteListener consent@ { settings ->
+            db.document("chatAccounts/$uid/callDevices/$device").get().addOnCompleteListener consent@ { settings ->
                 if (!finished.compareAndSet(false,true)) return@consent
                 handler.removeCallbacks(timeout)
                 try {
@@ -130,7 +128,7 @@ class VoiceCallDeclineReceiver : BroadcastReceiver() {
         val handler=Handler(Looper.getMainLooper())
         val timeout=Runnable{if(done.compareAndSet(false,true))pending.finish()}
         handler.postDelayed(timeout,8000)
-        FirebaseFirestore.getInstance().document("voiceCalls/$id").update(mapOf("state" to "ended", "endedAt" to FieldValue.serverTimestamp()))
+        NativeDocuments.document("voiceCalls/$id").update(mapOf("state" to "ended", "endedAt" to FieldValue.serverTimestamp()))
             .addOnCompleteListener { if(done.compareAndSet(false,true)){handler.removeCallbacks(timeout);pending.finish()} }
     }
 }
@@ -152,9 +150,7 @@ class VoiceOngoingService : Service() {
         activeId = callId
         if(intent.action=="connected"){
             if(connectedAt==null)connectedAt=SystemClock.elapsedRealtime()
-            val remaining=intent.getLongExtra("remaining",900000).coerceIn(0,900000)
             handler.removeCallbacks(timeout)
-            handler.postDelayed(timeout,minOf(remaining,(900000-(SystemClock.elapsedRealtime()-connectedAt!!)).coerceAtLeast(0)))
             return START_NOT_STICKY
         }
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -166,7 +162,7 @@ class VoiceOngoingService : Service() {
         val stop = PendingIntent.getService(this, 1717, Intent(this,VoiceOngoingService::class.java).setAction("stop").putExtra("callId",callId),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val open = PendingIntent.getActivity(this,1718,Intent(this,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder=if(Build.VERSION.SDK_INT>=26)Notification.Builder(this,"ongoing_call_quiet")else Notification.Builder(this)
-        val notification=builder.setSmallIcon(R.mipmap.ic_neural).setContentTitle("Sesli arama sürüyor").setContentText("En fazla 15 dakika.")
+        val notification=builder.setSmallIcon(R.mipmap.ic_neural).setContentTitle("Arama sürüyor").setContentText("Bitirmek için dokun.")
             .setVisibility(Notification.VISIBILITY_SECRET).setOngoing(true).setContentIntent(open)
             .setPriority(Notification.PRIORITY_MIN).setOnlyAlertOnce(true)
             .addAction(Notification.Action.Builder(null,"Aramayı bitir",stop).build()).build()
@@ -175,9 +171,9 @@ class VoiceOngoingService : Service() {
             else startForeground(1717,notification)
         }catch(_:Exception){VoiceCallBridge.event("stopped",callId);stopSelf();return START_NOT_STICKY}
         manager.cancel(VoiceCallBridge.notificationId(callId))
-        if(wakeLock==null){wakeLock=(getSystemService(Context.POWER_SERVICE)as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"Neural:VoiceCall").apply{acquire(950000)}}
+        if(wakeLock==null){wakeLock=(getSystemService(Context.POWER_SERVICE)as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"Neural:VoiceCall").apply{acquire()}}
         handler.removeCallbacks(timeout)
-        if(connectedAt==null){handler.postDelayed(timeout,945000)}else{handler.postDelayed(timeout,(900000-(SystemClock.elapsedRealtime()-connectedAt!!)).coerceAtLeast(0))}
+        if(connectedAt==null)handler.postDelayed(timeout,60000)
         return START_NOT_STICKY
     }
     override fun onTaskRemoved(rootIntent: Intent?) { id?.let { VoiceCallBridge.event("stop",it) }; stopSelf() }

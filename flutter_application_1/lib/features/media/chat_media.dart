@@ -1,3 +1,4 @@
+import '../../core/data/oracle_media_batch.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
@@ -306,15 +307,23 @@ class ChatMedia {
     // Fetch only on explicit tap, never as part of the message listener.
     for (var start = 0; start < count; start += 16) {
       final ids = [for (var i = start; i < count && i < start + 16; i++) '$i'];
-      final snapshots = await Future.wait([
-        for (final id in ids)
-          ref
-              .collection('chunks')
-              .doc(id)
-              .get(const GetOptions(source: Source.server))
-              .timeout(const Duration(seconds: 30)),
+      final batch = await readOracleMediaChunks([
+        for (final id in ids) ref.collection('chunks').doc(id).path,
       ]);
-      final docs = {for (final doc in snapshots) doc.id: doc.data()};
+      late final Map<String, Map<String, dynamic>?> docs;
+      if (batch != null) {
+        docs = {for (var i = 0; i < ids.length; i++) ids[i]: batch[i]};
+      } else {
+        final snapshots = await Future.wait([
+          for (final id in ids)
+            ref
+                .collection('chunks')
+                .doc(id)
+                .get(const GetOptions(source: Source.server))
+                .timeout(const Duration(seconds: 30)),
+        ]);
+        docs = {for (final doc in snapshots) doc.id: doc.data()};
+      }
       final encoded = <Map<String, dynamic>>[];
       for (final id in ids) {
         final chunk = docs[id];

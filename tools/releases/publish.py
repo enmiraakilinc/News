@@ -31,6 +31,8 @@ def main():
     if not re.fullmatch(r'\d+\.\d+\.\d+',args.version):raise ValueError('Invalid version.')
     directory=ROOT/'artifacts/releases'/args.version
     report=json.loads((directory/'build-report.json').read_text(encoding='utf-8-sig'))
+    if report.get('postgresPrimary'):
+        raise RuntimeError('Primary releases require the reviewed VPS cutover procedure; do not publish via the Firebase compatibility publisher.')
     if report['version']!=args.version or not report['signingVerified']:raise RuntimeError('Build report mismatch.')
     if report['filename']!=f'Neural-Haber-{args.version}-arm64.apk' or report['abi']!=['arm64-v8a'] or report['debuggable']:raise RuntimeError('Unexpected release artifact.')
     apk=directory/report['filename']
