@@ -1,4 +1,5 @@
 import '../../core/utils/refresh_stream.dart';
+import '../../core/data/oracle_firestore_bridge.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -201,6 +202,7 @@ class CoupleService {
 
   static Future<void> _prepare() async {
     await Firebase.initializeApp();
+    installOracleReadBridge();
     final auth = FirebaseAuth.instance;
     if (auth.currentUser != null) return;
 

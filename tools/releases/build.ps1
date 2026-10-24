@@ -1,3 +1,4 @@
+param([switch]$FirebaseReads)
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $appPath = Join-Path $workspaceRoot 'flutter_application_1'
@@ -16,7 +17,9 @@ $previousWindowsFlag = [Environment]::GetEnvironmentVariable('FLUTTER_WINDOWS', 
 $env:FLUTTER_WINDOWS = 'false'
 Push-Location -LiteralPath $appPath
 try {
-    & $flutterPath build apk --release --target-platform android-arm64 --tree-shake-icons
+    $buildArguments = @('build', 'apk', '--release', '--target-platform', 'android-arm64', '--tree-shake-icons')
+    if (!$FirebaseReads) { $buildArguments += '--dart-define=NEURAL_POSTGRES_READS=true' }
+    & $flutterPath @buildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     $builtApk = Join-Path $appPath 'build/app/outputs/flutter-apk/app-release.apk'
     $details = & $aaptPath dump badging $builtApk
@@ -32,7 +35,7 @@ try {
     $outputApk = Join-Path $outputDir $filename
     Copy-Item -LiteralPath $builtApk -Destination $outputApk
     $size = (Get-Item -LiteralPath $outputApk).Length
-    $report = [ordered]@{version=$releaseVersion;code=[int]$releaseCode;filename=$filename;bytes=$size;MB=[Math]::Round($size/1000000,2);sha256=(Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash.ToLower();abi=@('arm64-v8a');signingVerified=$true;debuggable=$false;published=$false;physicalDeviceTested=$false}
+    $report = [ordered]@{version=$releaseVersion;code=[int]$releaseCode;filename=$filename;bytes=$size;MB=[Math]::Round($size/1000000,2);sha256=(Get-FileHash -LiteralPath $outputApk -Algorithm SHA256).Hash.ToLower();abi=@('arm64-v8a');signingVerified=$true;debuggable=$false;published=$false;physicalDeviceTested=$false;postgresReadsPreferred=(!$FirebaseReads);dataWriteMode='firebase-compatibility-bridge'}
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputDir 'build-report.json') -Encoding UTF8
     Write-Output "Verified signed ARM64 release: $releaseVersion ($releaseCode), $($report.MB) MB. Publication pending."
 } finally {
