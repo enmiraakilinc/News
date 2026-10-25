@@ -35,8 +35,9 @@ def main():
         assert commit({**payload,'requestId':str(uuid.uuid4())},other).status_code==403
         watch=requests.post(base+'/v1/watch',headers=headers(own),json={'kind':'document','path':path},stream=True,timeout=(15,20))
         watch.raise_for_status()
+        lines=watch.iter_lines(chunk_size=1)
         def event():
-            for line in watch.iter_lines(chunk_size=1):
+            for line in lines:
                 if line.startswith(b'data: '):return json.loads(line[6:])
             raise AssertionError('SSE ended before data')
         assert event()['row']['path']==path

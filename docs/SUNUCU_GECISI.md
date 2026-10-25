@@ -1,5 +1,10 @@
 # Oracle sunucusu ve PostgreSQL geçişi
 
+**25 Ekim 2026:** 6.499 belgenin son sürümleri tam eşleşti; PostgreSQL birincil
+mod açıldı, eski Firebase istemci yazmaları kapatıldı ve 1.16.0 aynı APK ile
+yayımlandı. HTTPS yazma, SSE, hesap yalıtımı ve özel güncelleme indirmesi
+doğrulandı. Aşağıdaki 24 Ekim bekleme bilgisi tarihçedir.
+
 **24 Ekim 2026 son durum:** 1.16.0 APK hazırdır; son kaynak karşılaştırması
 Firestore okuma kotasına takıldığı için yayın taslakta tutuldu. Birincil mod
 açılmadı, eski kurallar ve 1.15.1 güncelleme bilgisi geri yüklendi. Ayrıntılar:
