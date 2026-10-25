@@ -306,19 +306,22 @@ class _WakeupSettingsState extends State<WakeupSettings> {
         ListTile(
           leading: const Icon(Icons.alarm),
           title: const Text('Tam ekran alarm'),
-          subtitle: const Text(
-            'Kilit ekranında Alarmı kapat ekranı açılır. Android tam ekran izni gerekir; sistem bazen bildirim gösterebilir.',
-          ),
+          subtitle: const Text('Kilit ekranında alarmı gösterir.'),
           trailing: TextButton(
             onPressed: () => ReminderService.fullScreenAccess(context),
-            child: const Text('İzni kontrol et'),
+            child: const Text('İzin'),
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Alarm en fazla 20 saniye çalar. Android ekran açıkken tam ekran yerine bildirim gösterebilir. İnternet, izinler ve pil ayarları ulaşmasını etkiler.',
-          ),
+        const ExpansionTile(
+          title: Text('Alarm hakkında', style: TextStyle(fontSize: 13)),
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                'Alarm en fazla 20 saniye çalar. Android tam ekran yerine bildirim gösterebilir. İnternet, izinler ve pil ayarları ulaşmasını etkiler.',
+              ),
+            ),
+          ],
         ),
         ListTile(
           title: const Text('Uyandırma sesi'),

@@ -9,6 +9,7 @@ import 'package:flutter_application_1/core/theme/chat_theme.dart';
 import 'package:flutter_application_1/features/chat/chat_widgets.dart';
 import 'package:flutter_application_1/features/chat/conversation_style.dart';
 import 'package:flutter_application_1/features/contacts/contact_details_screen.dart';
+import 'package:flutter_application_1/features/contacts/profile_avatar.dart';
 
 void main() {
   testWidgets(
@@ -107,6 +108,13 @@ void main() {
 
     for (final name in ChatThemes.names.keys) {
       final scheme = ChatThemes.conversationTheme(name).colorScheme;
+      final incoming = ConversationColors(scheme).received;
+      expect(
+        incoming,
+        isNot(scheme.surface),
+        reason: '$name visible incoming bubble',
+      );
+      expect(contrast(incoming, scheme.onSurface), greaterThanOrEqualTo(4.5));
       expect(
         ChatThemes.conversationTheme(name).textTheme.bodyMedium!.color,
         scheme.onSurface,
@@ -242,6 +250,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: name);
+      expect(
+        tester.getRect(find.byType(ContactAvatar)).right,
+        lessThan(tester.getRect(find.text('Defne')).left),
+      );
       await screenshot('conversation_$name');
       await tester.longPress(find.text('Olur, ben de örnek kodları ekledim.'));
       await tester.pumpAndSettle();

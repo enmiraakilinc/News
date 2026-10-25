@@ -147,3 +147,20 @@ test('extended download consent uses the new expiry and preserves approval',asyn
  await run('mediaDownloadRequests/a_bob',approved,{...approved,expiresAt:active.expiresAt},{read});
  await denied(run('mediaDownloadRequests/a_bob',approved,{...approved,expiresAt:active.expiresAt},{uid:'bob',read}));
 });
+
+test('last seen is owner-controlled, opt-in and timestamp-bound',async()=>{
+ const p='chatAccounts/alice/presence/status',active={enabled:true,lastSeenAt:now};
+ await run(p,null,active);
+ await run(p,active,{enabled:false});
+ await denied(run(p,active,{enabled:false,lastSeenAt:now}));
+ await denied(run(p,null,active,{uid:'bob'}));
+ await denied(run(p,active,{...active,lastSeenAt:now.add(-1000)}));
+ await denied(run(p,{enabled:false},{enabled:false,lastSeenAt:now}));
+});
+test('only the owner can grant last-seen visibility to named peers',async()=>{
+ const p='chatAccounts/alice/personalConfig/presence';
+ await run(p,null,{peers:['bob']});
+ await denied(run(p,null,{peers:['bob']},{uid:'bob'}));
+ await denied(run(p,null,{peers:['bob','bob']}));
+ await denied(run(p,null,{peers:['invalid/uid']}));
+});

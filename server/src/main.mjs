@@ -1,4 +1,6 @@
 import {privateUpdate} from './updates.mjs';
+import {mediaBinary} from './media_binary.mjs';
+import {recordPresence} from './presence.mjs';
 import {authenticateLegacyWake} from './legacy_wake.mjs';
 import {Services} from './services.mjs';
 import {WatchDelta,affectsWatch} from './watch_delta.mjs';
@@ -122,6 +124,17 @@ const server=http.createServer(async(request,response)=>{
    send(response,200,{protocol:2,primaryWrites:primary});return;
   }
   const url=new URL(request.url,'https://138.2.185.151');
+  if(request.method==='POST'&&url.pathname==='/presence'){
+   const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);await ready();
+   await bodyOf(request,1024);
+   send(response,200,await recordPresence(pool,auth));return;
+  }
+  if(request.method==='POST'&&url.pathname==='/v1/media/chunks'){
+   const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);await ready();
+   const data=await mediaBinary(pool,auth,await bodyOf(request,32768));
+   response.writeHead(200,{'content-type':'application/octet-stream','content-length':data.length,'cache-control':'no-store','x-content-type-options':'nosniff'});
+   response.end(data);return;
+  }
   if(request.method==='POST'&&url.pathname==='/internal/legacy-wake'){
    await ready();if(!primary)throw new ApiError(503,'unavailable','Geçiş henüz başlamadı.');
    const body=authenticateLegacyWake(request.headers,await bodyOf(request,4096,true));

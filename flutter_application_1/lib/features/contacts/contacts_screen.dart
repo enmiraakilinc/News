@@ -1,3 +1,4 @@
+import '../chat/delivery_status.dart';
 import 'contact_names.dart';
 import '../chat/search/message_search.dart';
 import '../chat/letters_screen.dart';
@@ -933,17 +934,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   time: message.unlocked
                       ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
                       : 'Açılış: ${message.openAt.day}.${message.openAt.month}.${message.openAt.year} ${message.openAt.hour.toString().padLeft(2, '0')}:${message.openAt.minute.toString().padLeft(2, '0')}',
-                  status: message.pending
-                      ? 'Gönderiliyor…'
-                      : message.edited
-                      ? 'düzenlendi'
-                      : message.mine
-                      ? (widget.conversation.members.every(
-                              message.readBy.contains,
-                            )
-                            ? '✓✓ Okundu'
-                            : '✓ İletildi')
-                      : null,
+                  status: chatDeliveryStatus(
+                    pending: message.pending,
+                    mine: message.mine,
+                    edited: message.edited,
+                    read: widget.conversation.members.every(
+                      message.readBy.contains,
+                    ),
+                  ),
                   reactions: message.reactions,
                   onReact: message.unlocked
                       ? (emoji) => _action(

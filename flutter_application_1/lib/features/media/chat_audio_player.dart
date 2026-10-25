@@ -1,3 +1,4 @@
+import 'playback_speed_menu.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
@@ -24,6 +25,7 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
   bool _busy = false;
   double _progress = 0;
   bool _playing = false;
+  double _speed = 1;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   @override
@@ -81,6 +83,7 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
           return;
         }
         await _player.play(DeviceFileSource(_file!.path));
+        await _player.setPlaybackRate(_speed);
       } else {
         await ChatMedia.checkAccess(widget.id);
         if (!mounted) return;
@@ -89,6 +92,7 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
         }
         if (_duration == Duration.zero) {
           await _player.play(DeviceFileSource(_file!.path));
+          await _player.setPlaybackRate(_speed);
         } else {
           await _player.resume();
         }
@@ -108,6 +112,21 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setSpeed(double value) async {
+    final previous = _speed;
+    setState(() => _speed = value);
+    try {
+      if (_file != null) await _player.setPlaybackRate(value);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _speed = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Oynatma hızı değiştirilemedi.')),
+        );
+      }
     }
   }
 
@@ -236,6 +255,11 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
                   ? '${widget.name}\nYükleniyor · %${(_progress * 100).round()}'
                   : widget.name,
             ),
+          ),
+          PlaybackSpeedMenu(
+            value: _speed,
+            onChanged: _setSpeed,
+            enabled: !_busy,
           ),
         ],
       ),

@@ -23,7 +23,7 @@ with tarfile.open(fileobj=payload,mode='w:gz') as archive:
 options={
  'archive':base64.b64encode(payload.getvalue()).decode(),
  'credential':None if args.api_only else args.read_only_credential.read_text(encoding='utf-8'),
- 'sql':[(ROOT/'server/sql'/name).read_text(encoding='utf-8') for name in ('001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql','006_media_expiry.sql')],
+ 'sql':[(ROOT/'server/sql'/name).read_text(encoding='utf-8') for name in ('001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql','006_media_expiry.sql','007_presence.sql')],
  'nginx':(ROOT/'server/deploy/nginx.conf').read_text(encoding='utf-8'),
 }
 # The credential is transmitted on SSH stdin, never command arguments or logs.

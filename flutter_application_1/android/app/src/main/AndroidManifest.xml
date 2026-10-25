@@ -22,6 +22,7 @@
 <!-- Fotoğrafı galeriye kaydetmek için (Android 9 ve altı; 10+ gerekmez) -->
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     <application
+        android:networkSecurityConfig="@xml/network_security_config"
         android:label="Neural Haber"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_neural" android:roundIcon="@mipmap/ic_neural">

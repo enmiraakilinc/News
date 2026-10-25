@@ -804,6 +804,9 @@ void main() {
       final clock = Timestamp.fromDate(DateTime.utc(2026, 10, 24));
       const time = '2026-10-24T00:00:00.000000000Z';
       final mock = MockClient((request) async {
+        if (request.url.path == '/v1/media/chunks') {
+          return http.Response('{}', 404);
+        }
         final body = jsonDecode(request.body) as Map;
         Map<String, dynamic> result;
         if (request.url.path == '/v1/commit') {

@@ -8,15 +8,15 @@ nonce=uuid.uuid4().hex[:12]
 roles={k:k+'_test_'+nonce for k in ['neural_api','neural_sync','neural_writer','neural_service']}
 archive=io.BytesIO()
 with tarfile.open(fileobj=archive,mode='w:gz') as tar:
-    for name in ['access.mjs','write_policy.mjs','write_codec.mjs','commit.mjs','service_store.mjs','services.mjs','push_transport.mjs']:
+    for name in ['access.mjs','write_policy.mjs','write_codec.mjs','commit.mjs','presence.mjs','service_store.mjs','services.mjs','push_transport.mjs']:
         content=(ROOT/'server/src'/name).read_text(encoding='utf-8')
-        if name=='commit.mjs':content=content.replace('SET LOCAL ROLE neural_writer','SET LOCAL ROLE '+roles['neural_writer'])
+        if name in ['commit.mjs','presence.mjs']:content=content.replace('SET LOCAL ROLE neural_writer','SET LOCAL ROLE '+roles['neural_writer'])
         if name=='service_store.mjs':content=content.replace('SET LOCAL ROLE neural_service','SET LOCAL ROLE '+roles['neural_service'])
         data=content.encode()
         info=tarfile.TarInfo(name);info.size=len(data)
         tar.addfile(info,io.BytesIO(data))
 sql='\n'.join((ROOT/'server/sql'/name).read_text(encoding='utf-8') for name in
-    ['001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql','006_media_expiry.sql'])
+    ['001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql','006_media_expiry.sql','007_presence.sql'])
 for old,new in roles.items():sql=sql.replace(old,new)
 test=r"""
 import assert from 'node:assert/strict';
@@ -25,6 +25,7 @@ import pg from '/opt/neural/server/node_modules/pg/lib/index.js';
 import {commit} from './commit.mjs';
 import {encodeFields,decodeFields} from './write_codec.mjs';
 import {Services} from './services.mjs';
+import {recordPresence} from './presence.mjs';
 const database=process.env.TEST_DATABASE,api=process.env.TEST_API;
 const admin=new pg.Pool({host:'/var/run/postgresql',database,user:'postgres'});
 const clients=new pg.Pool({host:'/var/run/postgresql',database,user:'postgres',max:4});
@@ -58,6 +59,7 @@ try{
   sentAt:stamp,openAt:stamp,
  }}]);
  await assert.rejects(commit(pool,send,auth),e=>e.status===503);assertions++;
+ await assert.rejects(recordPresence(pool,auth),e=>e.status===503);assertions++;
  await admin.query("UPDATE neural.settings SET value='true' WHERE key='primary_writes'");
  const first=await commit(pool,send,auth);
  const repeat=await commit(pool,send,auth);
@@ -143,6 +145,24 @@ try{
  };
  assert.equal(await checkRead('alice','chatMedia/extended/chunks/0'),1);assertions++;
  assert.equal(await checkRead('outsider','chatMedia/extended/chunks/0'),0);assertions++;
+ const presence='chatAccounts/alice/presence/status';
+ const presenceConsent='chatAccounts/alice/personalConfig/presence';
+ await commit(pool,request([{type:'set',path:presenceConsent,fields:encodeFields({peers:['bob']})}]),auth);
+ await commit(pool,request([{type:'set',path:presence,fields:{...encodeFields({enabled:true}),lastSeenAt:stamp}}]),auth);
+ assert.equal(await checkRead('alice',presence),1);assertions++;
+ assert.equal(await checkRead('bob',presence),1);assertions++;
+ assert.equal(await checkRead('outsider',presence),0);assertions++;
+ await commit(pool,request([{type:'set',path:'couples/forged',fields:encodeFields({members:['alice','outsider']})}]),{uid:'outsider'});
+ assert.equal(await checkRead('outsider',presence),0);assertions++;
+ assert.equal(await checkRead('bob',presenceConsent),0);assertions++;
+ const receiptsBefore=(await admin.query('SELECT count(*)::int AS n FROM neural.commit_receipts')).rows[0].n;
+ await admin.query("UPDATE neural.documents SET document=jsonb_set(document,'{fields,lastSeenAt}',jsonb_build_object('timestampValue',to_char(now()-interval '1 minute','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'))) WHERE path=$1",[presence]);
+ assert.equal((await recordPresence(pool,auth)).recorded,true);assertions++;
+ assert.equal((await recordPresence(pool,auth)).recorded,false);assertions++;
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM neural.commit_receipts')).rows[0].n,receiptsBefore);assertions++;
+ await commit(pool,request([{type:'set',path:presence,fields:encodeFields({enabled:false})}]),auth);
+ assert.equal((await recordPresence(pool,auth)).recorded,false);assertions++;
+ await assert.rejects(commit(pool,request([{type:'update',path:presence,fields:[{field:['lastSeenAt'],value:stamp}]}]),auth),e=>e.status===403);assertions++;
  assert.equal(await checkRead('alice',personal),1);assertions++;
  assert.equal(await checkRead('bob',personal),0);assertions++;
  assert.equal(await checkRead('bob',privateFile),0);assertions++;

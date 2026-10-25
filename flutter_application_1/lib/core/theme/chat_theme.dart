@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/starred/starred_messages.dart';
 import '../../features/chat/chat_downloads.dart';
 import '../../features/chat/message_selection.dart';
+import '../../features/media/media_expiry_scope.dart';
+import '../../features/contacts/chat_presence.dart';
 
 class ThemeSelection extends ValueNotifier<String> {
   ThemeSelection(super.value);
@@ -232,7 +234,11 @@ class _ChatScaffoldState extends State<ChatScaffold> {
           sourceKey: widget.starsSource!,
           child: MessageSelectionScope(
             key: ValueKey(widget.starsSource),
-            child: child,
+            child: MediaExpiryScope(
+              key: ValueKey(widget.starsSource),
+              source: widget.starsSource!,
+              child: ChatPresenceSession(child: child),
+            ),
           ),
         );
 }

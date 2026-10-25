@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/security/secure_screen.dart';
+import 'playback_speed_menu.dart';
 
 Future<void> showPrivatePhoto(
   BuildContext context,
@@ -52,9 +54,21 @@ Future<void> showPrivatePhoto(
 }
 
 class PrivateVideoScreen extends StatefulWidget {
-  final File file;
+  final File? file;
+  final Uri? streamUri;
+  final Future<void> Function()? closeStream;
   final VoidCallback? onSave;
-  const PrivateVideoScreen({super.key, required this.file, this.onSave});
+  const PrivateVideoScreen({super.key, required File this.file, this.onSave})
+    : streamUri = null,
+      closeStream = null;
+  const PrivateVideoScreen.stream({
+    super.key,
+    required Uri uri,
+    required Future<void> Function() onClose,
+    this.onSave,
+  }) : file = null,
+       streamUri = uri,
+       closeStream = onClose;
   @override
   State<PrivateVideoScreen> createState() => _PrivateVideoScreenState();
 }
@@ -65,12 +79,28 @@ class _PrivateVideoScreenState extends State<PrivateVideoScreen>
   final _zoom = TransformationController();
   bool _ready = false;
   bool _failed = false;
+  double _speed = 1;
+  Future<void> _setSpeed(double rate) async {
+    try {
+      await _controller.setPlaybackSpeed(rate);
+      if (mounted) setState(() => _speed = rate);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Oynatma hızı değiştirilemedi.')),
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     SecureScreen.enable();
-    _controller = VideoPlayerController.file(widget.file);
+    _controller = widget.streamUri == null
+        ? VideoPlayerController.file(widget.file!)
+        : VideoPlayerController.networkUrl(widget.streamUri!);
     _initialize();
   }
 
@@ -100,6 +130,7 @@ class _PrivateVideoScreenState extends State<PrivateVideoScreen>
     WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_changed);
     _controller.dispose();
+    if (widget.closeStream != null) unawaited(widget.closeStream!());
     _zoom.dispose();
     super.dispose();
   }
@@ -111,6 +142,7 @@ class _PrivateVideoScreenState extends State<PrivateVideoScreen>
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
       actions: [
+        if (_ready) PlaybackSpeedMenu(value: _speed, onChanged: _setSpeed),
         if (_ready)
           IconButton(
             tooltip: 'Yakınlaştırmayı sıfırla',
