@@ -40,6 +40,15 @@ LANGUAGE sql STABLE SET search_path='' AS $$
    (d #>> '{fields,createdAt,timestampValue}')::timestamptz+interval '2 days')
 $$;
 REVOKE ALL ON FUNCTION neural.chat_media_expiry(jsonb) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION neural.share_conversation(a text,b text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT a IS NOT NULL AND b IS NOT NULL AND a<>'' AND b<>'' AND (a=b OR EXISTS(
+  SELECT 1 FROM neural.documents WHERE collection_id IN ('chats','couples') AND parent_path=collection_id
+   AND document @> jsonb_build_object('fields',jsonb_build_object('members',jsonb_build_object('arrayValue',
+     jsonb_build_object('values',jsonb_build_array(jsonb_build_object('stringValue',a),jsonb_build_object('stringValue',b))))))
+ ))
+$$;
+REVOKE ALL ON FUNCTION neural.share_conversation(text,text) FROM PUBLIC;
 CREATE OR REPLACE FUNCTION neural.can_read(p text,d jsonb,uid text) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE parts text[]:=string_to_array(p,'/'); n integer:=cardinality(parts); media jsonb;
@@ -54,6 +63,7 @@ BEGIN
   RETURN neural.member('couples',parts[2],uid);
  END IF;
  IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3]='messages')) AND neural.member('chats',parts[2],uid); END IF;
+ IF n=4 AND parts[1]='chatAccounts' AND parts[3]='presence' AND parts[4]='status' THEN RETURN parts[2]=uid OR neural.share_conversation(parts[2],uid) AND COALESCE(neural.raw_document('chatAccounts/'||parts[2]||'/personalConfig/presence') #> '{fields,peers,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
  IF parts[1]='chatAccounts' THEN
   IF parts[2]<>uid THEN RETURN false; END IF;
   IF n=6 AND parts[3]='personalFiles' AND parts[5]='chunks' THEN

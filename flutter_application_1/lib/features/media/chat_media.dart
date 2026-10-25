@@ -311,49 +311,69 @@ class ChatMedia {
     }
     final builder = BytesBuilder(copy: false);
     // Fetch only on explicit tap, never as part of the message listener.
-    for (var start = 0; start < count; start += 16) {
-      final ids = [for (var i = start; i < count && i < start + 16; i++) '$i'];
-      final batch = await readOracleMediaChunks([
-        for (final id in ids) ref.collection('chunks').doc(id).path,
+    for (var start = 0; start < count; start += 48) {
+      final batches = await Future.wait([
+        for (
+          var group = start;
+          group < count && group < start + 48;
+          group += 16
+        )
+          decodedChunks(
+            id,
+            group,
+            (count - group).clamp(0, 16),
+            secret: secret,
+          ),
       ]);
-      late final Map<String, Map<String, dynamic>?> docs;
-      if (batch != null) {
-        docs = {for (var i = 0; i < ids.length; i++) ids[i]: batch[i]};
-      } else {
-        final snapshots = await Future.wait([
-          for (final id in ids)
-            ref
-                .collection('chunks')
-                .doc(id)
-                .get(const GetOptions(source: Source.server))
-                .timeout(const Duration(seconds: 30)),
-        ]);
-        docs = {for (final doc in snapshots) doc.id: doc.data()};
+      for (final batch in batches) {
+        for (final bytes in batch) {
+          builder.add(bytes);
+          if (builder.length > size) throw Exception('Geçersiz dosya.');
+        }
+        onProgress?.call(builder.length / size);
       }
-      final encoded = <Map<String, dynamic>>[];
-      for (final id in ids) {
-        final chunk = docs[id];
-        if (chunk == null) throw Exception('Dosya eksik.');
-        encoded.add({
-          'bytes': (chunk['bytes'] as Blob).bytes,
-          'iv': (chunk['iv'] as Blob?)?.bytes,
-        });
-      }
-      final decoded = secret == null
-          ? decodeMediaBatch({'chunks': encoded, 'secret': null})
-          : await compute(decodeMediaBatch, {
-              'chunks': encoded,
-              'secret': secret,
-            });
-      for (final bytes in decoded) {
-        builder.add(bytes);
-        if (builder.length > size) throw Exception('Geçersiz dosya.');
-      }
-      onProgress?.call(builder.length / size);
     }
     final bytes = builder.takeBytes();
     if (bytes.length != size) throw Exception('Dosya eksik.');
     return MediaPreview(bytes, chatMediaExpiresAt(data));
+  }
+
+  static Future<List<Uint8List>> decodedChunks(
+    String id,
+    int start,
+    int count, {
+    String? secret,
+  }) async {
+    if (count < 1 || count > 16 || start < 0) {
+      throw const FormatException('Geçersiz medya aralığı.');
+    }
+    final paths = [
+      for (var i = start; i < start + count; i++) 'chatMedia/$id/chunks/$i',
+    ];
+    final binary = await readOracleMediaChunks(paths);
+    final docs =
+        binary ??
+        await Future.wait<Map<String, dynamic>?>([
+          for (final path in paths)
+            FirebaseFirestore.instance
+                .doc(path)
+                .get(const GetOptions(source: Source.server))
+                .then((doc) => doc.data()),
+        ]);
+    final encoded = <Map<String, dynamic>>[];
+    for (final chunk in docs) {
+      if (chunk == null) throw Exception('Dosya parçası eksik.');
+      encoded.add({
+        'bytes': (chunk['bytes'] as Blob).bytes,
+        'iv': (chunk['iv'] as Blob?)?.bytes,
+      });
+    }
+    return secret == null
+        ? [for (final chunk in encoded) chunk['bytes'] as Uint8List]
+        : await compute(decodeMediaBatch, {
+            'chunks': encoded,
+            'secret': secret,
+          });
   }
 
   static Future<MediaPreview?> preview(String id) async {

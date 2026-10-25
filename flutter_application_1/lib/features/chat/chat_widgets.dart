@@ -1,4 +1,5 @@
 import '../media/media_expiry_dialog.dart';
+import '../media/media_expiry_scope.dart';
 import 'conversation_style.dart';
 import '../media/chat_media.dart';
 import 'message_selection.dart';
@@ -315,6 +316,10 @@ class MessageBubble extends StatelessWidget {
                           .toList(),
                     ),
                   const SizedBox(height: 5),
+                  MediaExpiryLabel(
+                    message: text,
+                    color: foreground.withValues(alpha: .75),
+                  ),
                   if (starred) const Icon(Icons.star, size: 14),
                   Text(
                     '$time${status == null ? '' : '  ${status!}'}',

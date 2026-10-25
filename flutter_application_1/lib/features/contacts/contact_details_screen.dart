@@ -1,6 +1,7 @@
 import '../chat/conversation_style.dart';
 import 'package:flutter/material.dart';
 import 'contact_names.dart';
+import 'chat_presence.dart';
 import 'profile_avatar.dart';
 import '../starred/starred_messages.dart';
 import '../../core/utils/user_errors.dart';
@@ -133,6 +134,14 @@ class ContactChatHeader extends StatelessWidget {
       valueListenable: ContactNames.changes,
       builder: (_, _, _) => Row(
         children: [
+          Builder(
+            builder: (anchor) => ContactAvatar(
+              contactId: contactId,
+              userId: userId,
+              onTap: () => open(anchor),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: InkWell(
               onTap: details,
@@ -144,14 +153,12 @@ class ContactChatHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    members == null
+                  LastSeenLabel(
+                    peer: userId,
+                    source: sourceKey,
+                    fallback: members == null
                         ? 'Kişi ayrıntıları'
                         : '${members!.length} kişi · Grup ayrıntıları',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.normal,
-                    ),
                   ),
                 ],
               ),
@@ -171,14 +178,6 @@ class ContactChatHeader extends StatelessWidget {
               onPressed: () => call(true),
             ),
           ],
-          const SizedBox(width: 4),
-          Builder(
-            builder: (anchor) => ContactAvatar(
-              contactId: contactId,
-              userId: userId,
-              onTap: () => open(anchor),
-            ),
-          ),
         ],
       ),
     );
@@ -268,6 +267,7 @@ class ContactDetailsScreen extends StatelessWidget {
                 title: Text('Sohbet teması'),
                 trailing: ChatThemeButton(),
               ),
+              LastSeenSwitch(source: sourceKey, peer: userId),
               if (members == null) ...[
                 ListTile(
                   leading: const Icon(Icons.videocam_outlined),

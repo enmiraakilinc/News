@@ -10,7 +10,12 @@ class ConversationColors {
   Color get panel => scheme.surfaceContainerLowest;
   Color get sent => scheme.primaryContainer;
   Color get onSent => scheme.onPrimaryContainer;
-  Color get received => panel;
+  Color get received => scheme.brightness == Brightness.dark
+      ? Color.alphaBlend(
+          scheme.onSurface.withValues(alpha: .10),
+          scheme.surface,
+        )
+      : panel;
   Color get onReceived => scheme.onSurface;
   Color get line => scheme.outlineVariant.withValues(alpha: .45);
 }

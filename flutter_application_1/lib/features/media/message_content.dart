@@ -14,6 +14,7 @@ import 'media_viewer.dart';
 import 'photo_gallery.dart';
 import '../../core/utils/user_errors.dart';
 import 'chat_audio_player.dart';
+import 'private_media_stream.dart';
 import '../chat/chat_downloads.dart';
 
 const attachmentPrefix = 'NEURAL_FILE:';
@@ -439,6 +440,33 @@ class _RemoteMediaState extends State<_RemoteMedia> {
     });
     try {
       final data = jsonDecode(widget.text.substring(mediaPrefix.length)) as Map;
+      if (widget.mediaLoader == null && attachmentViewKind(data) == 'video') {
+        final stream = await PrivateMediaStream.open(
+          ChatMedia.idFrom(widget.text),
+        );
+        if (!mounted) {
+          await stream.close();
+          return;
+        }
+        try {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrivateVideoScreen.stream(
+                uri: stream.uri,
+                onClose: stream.close,
+                onSave: () => ChatDownloads.saveOrRequest(
+                  context,
+                  ChatMedia.idFrom(widget.text),
+                ),
+              ),
+            ),
+          );
+        } finally {
+          await stream.close();
+        }
+        return;
+      }
       final initialScope = widget.mediaLoader == null
           ? await ChatMedia.accessScope()
           : null;

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'oracle_client.dart';
 
@@ -133,6 +134,27 @@ class OraclePrimaryTransport {
       onCancel: cancel,
     );
     return controller.stream;
+  }
+
+  Future<Uint8List> mediaBytes(List<String> paths) async {
+    final response = await _http
+        .post(
+          identity.base.resolve('/v1/media/chunks'),
+          headers: await _headers(),
+          body: jsonEncode({'paths': paths}),
+        )
+        .timeout(const Duration(seconds: 45));
+    if (response.statusCode != 200) {
+      dynamic error;
+      try {
+        error = jsonDecode(response.body);
+      } catch (_) {}
+      throw _error(response.statusCode, error);
+    }
+    if (response.bodyBytes.length > 16 * 460850 + 6) {
+      throw const FormatException('Medya yanıtı çok büyük.');
+    }
+    return response.bodyBytes;
   }
 
   void close() => _http.close();
