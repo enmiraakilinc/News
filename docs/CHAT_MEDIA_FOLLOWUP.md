@@ -1,4 +1,4 @@
-# Sohbet ve medya iyileştirmeleri — yayımlanmayı bekliyor
+# Sohbet ve medya iyileştirmeleri — 1.16.2
 
 Bu çalışma yayımlanmış 1.16.1+2082 APK'sını değiştirmez. Kullanıcı sonraki
 sürümü 1.16.2+2083 olarak belirledi ve yayımlanmasını onayladı.
