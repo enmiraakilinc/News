@@ -38,5 +38,5 @@ kimlikler, içerik ve yedek Git'e alınmaz. Firebase kaynakları değiştirilmed
 
 Telefonundaki 1.16.0 sabit iki günlük kontrolü kullanır. Dosyalar sunucuda
 korunsa da uzatılmış tarihle açma/seçme davranışı 1.16.1 APK kurulduğunda
-çalışır. Bu APK henüz yayımlanmadı. Uzun süre saklanan dosyalar, süreleri
+çalışır. 1.16.1 APK 25 Ekim 2026'da yayımlandı. Uzun süre saklanan dosyalar, süreleri
 doluncaya kadar sunucu diskini kullanmaya devam eder.

@@ -35,7 +35,7 @@ becerinin renk ve bileşen rehberleriyle kullanıcı örneği birlikte incelendi
 Testlerde `CHAT_PREVIEW_DIR` verilirse yalnızca yerel görsel inceleme için PNG
 üretilir. Bu seçenek Windows Arial/emoji ve Flutter ikon fontlarını yükler;
 normal test çalışması bu yerel dosyalara bağımlı değildir. APK sürüm adı/kodu
-kullanıcının seçimiyle 1.16.1+2082 olarak hazırlandı; bu tasarım henüz yayımlanmadı.
+kullanıcının seçimiyle 1.16.1+2082 olarak 25 Ekim 2026'da yayımlandı.
 
 ## Hafif hareket ve önceki özellikler
 
