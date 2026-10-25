@@ -390,7 +390,6 @@ class _LettersViewState extends State<_LettersView> {
           onUnpair: () => _confirmUnpair(context),
         ),
       ),
-      backgroundColor: const Color(0xffedf3f1),
       bottomNavigationBar: ChatComposer(
         coupleId: widget.coupleId,
         onShareLocation: () => LocationShares.send(

@@ -797,7 +797,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   Widget build(BuildContext context) => ChatScaffold(
     starsSource: 'chat/${widget.conversation.id}',
-    backgroundColor: const Color(0xffedf3f1),
     appBar: AppBar(
       titleSpacing: 0,
       actions: [

@@ -1,3 +1,4 @@
+import '../chat/conversation_style.dart';
 import 'package:flutter/material.dart';
 import 'contact_names.dart';
 import 'profile_avatar.dart';
@@ -111,18 +112,27 @@ class ContactChatHeader extends StatelessWidget {
       }
     }
 
+    Future<void> call(bool video) async {
+      try {
+        await VoiceCalls.start(
+          context,
+          sourceKey,
+          ContactNames.name(contactId, fallbackName),
+          video: video,
+        );
+      } catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(userError(error))));
+        }
+      }
+    }
+
     return ValueListenableBuilder<int>(
       valueListenable: ContactNames.changes,
       builder: (_, _, _) => Row(
         children: [
-          Builder(
-            builder: (anchor) => ContactAvatar(
-              contactId: contactId,
-              userId: userId,
-              onTap: () => open(anchor),
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: InkWell(
               onTap: details,
@@ -145,6 +155,28 @@ class ContactChatHeader extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          if (members == null) ...[
+            IconButton(
+              tooltip: 'Sesli ara',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.call_outlined, size: 22),
+              onPressed: () => call(false),
+            ),
+            IconButton(
+              tooltip: 'Görüntülü ara',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.videocam_outlined, size: 23),
+              onPressed: () => call(true),
+            ),
+          ],
+          const SizedBox(width: 4),
+          Builder(
+            builder: (anchor) => ContactAvatar(
+              contactId: contactId,
+              userId: userId,
+              onTap: () => open(anchor),
             ),
           ),
         ],
@@ -171,90 +203,112 @@ class ContactDetailsScreen extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => ChatScaffold(
+    conversationStyle: true,
     appBar: AppBar(title: const Text('Kişi ayrıntıları')),
     body: ValueListenableBuilder<int>(
       valueListenable: ContactNames.changes,
-      builder: (_, _, _) => ListView(
+      builder: (context, _, _) => ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 24),
-          Center(
-            child: ContactAvatar(contactId: contactId, userId: userId),
-          ),
-          ListTile(
-            title: Text(ContactNames.name(contactId, fallbackName)),
-            trailing: const Icon(Icons.edit_outlined),
-            onTap: () => ContactNames.rename(context, contactId, fallbackName),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add_a_photo_outlined),
-            title: const Text('Bu kişinin fotoğrafı veya emojisi'),
-            subtitle: const Text('Yalnızca senin kayıtlarında değişir.'),
-            onTap: () async {
-              try {
-                await editProfileAvatar(context, contactId: contactId);
-              } catch (error) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(userError(error))));
-                }
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.star_outline),
-            title: const Text('Yıldızlı mesajlar'),
-            onTap: () => Navigator.push<void>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StarredMessagesScreen(sourceKey: sourceKey),
+          ConversationSection(
+            children: [
+              const SizedBox(height: 24),
+              Center(
+                child: SizedBox.square(
+                  dimension: 88,
+                  child: Center(
+                    child: Transform.scale(
+                      scale: 2,
+                      child: ContactAvatar(
+                        contactId: contactId,
+                        userId: userId,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const ListTile(
-            leading: Icon(Icons.palette_outlined),
-            title: Text('Sohbet teması'),
-            trailing: ChatThemeButton(),
-          ),
-          if (members == null) ...[
-            ListTile(
-              leading: const Icon(Icons.videocam_outlined),
-              title: const Text('Görüntülü ara'),
-              onTap: () => VoiceCalls.start(
-                context,
-                sourceKey,
-                ContactNames.name(contactId, fallbackName),
-                video: true,
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.call_outlined),
-              title: const Text('Sesli ara'),
-              onTap: () => VoiceCalls.start(
-                context,
-                sourceKey,
-                ContactNames.name(contactId, fallbackName),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Karşı tarafın beni kaydettiği isim'),
-              onTap: () => SharedContactLabel.show(context, sourceKey),
-            ),
-            ShareContactLabelSwitch(
-              source: sourceKey,
-              contactId: contactId,
-              fallback: fallbackName,
-            ),
-          ],
-          if (members != null) ...[
-            const ListTile(title: Text('Grup üyeleri')),
-            for (final name in members!.values)
               ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(name),
+                title: Text(ContactNames.name(contactId, fallbackName)),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () =>
+                    ContactNames.rename(context, contactId, fallbackName),
               ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.add_a_photo_outlined),
+                title: const Text('Bu kişinin fotoğrafı veya emojisi'),
+                subtitle: const Text('Yalnızca senin kayıtlarında değişir.'),
+                onTap: () async {
+                  try {
+                    await editProfileAvatar(context, contactId: contactId);
+                  } catch (error) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(userError(error))));
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+          ConversationSection(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.star_outline),
+                title: const Text('Yıldızlı mesajlar'),
+                onTap: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => StarredMessagesScreen(sourceKey: sourceKey),
+                  ),
+                ),
+              ),
+              const ListTile(
+                leading: Icon(Icons.palette_outlined),
+                title: Text('Sohbet teması'),
+                trailing: ChatThemeButton(),
+              ),
+              if (members == null) ...[
+                ListTile(
+                  leading: const Icon(Icons.videocam_outlined),
+                  title: const Text('Görüntülü ara'),
+                  onTap: () => VoiceCalls.start(
+                    context,
+                    sourceKey,
+                    ContactNames.name(contactId, fallbackName),
+                    video: true,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.call_outlined),
+                  title: const Text('Sesli ara'),
+                  onTap: () => VoiceCalls.start(
+                    context,
+                    sourceKey,
+                    ContactNames.name(contactId, fallbackName),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.badge_outlined),
+                  title: const Text('Karşı tarafın beni kaydettiği isim'),
+                  onTap: () => SharedContactLabel.show(context, sourceKey),
+                ),
+                ShareContactLabelSwitch(
+                  source: sourceKey,
+                  contactId: contactId,
+                  fallback: fallbackName,
+                ),
+              ],
+              if (members != null) ...[
+                const ListTile(title: Text('Grup üyeleri')),
+                for (final name in members!.values)
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: Text(name),
+                  ),
+              ],
+            ],
+          ),
           if (sourceKey.startsWith('couple/'))
             ListTile(
               leading: const Icon(Icons.notifications_outlined),
@@ -262,15 +316,24 @@ class ContactDetailsScreen extends StatelessWidget {
               onTap: () => editNotifText(context, kNotifLetters),
             ),
           if (userId != null || sourceKey.startsWith('couple/'))
-            WakeupSettings(sourceKey: sourceKey),
+            ConversationSection(
+              children: [WakeupSettings(sourceKey: sourceKey)],
+            ),
           if (onUnpair != null)
-            ListTile(
-              leading: const Icon(Icons.link_off),
-              title: const Text('Bağı bu telefondan kaldır'),
-              onTap: () {
-                Navigator.pop(context);
-                onUnpair!();
-              },
+            ConversationSection(
+              children: [
+                ListTile(
+                  leading: Icon(
+                    Icons.link_off,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: const Text('Bağı bu telefondan kaldır'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onUnpair!();
+                  },
+                ),
+              ],
             ),
         ],
       ),

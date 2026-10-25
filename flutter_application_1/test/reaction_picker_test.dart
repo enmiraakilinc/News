@@ -25,7 +25,9 @@ void main() {
       );
       await tester.longPress(find.text('Merhaba'));
       await tester.pumpAndSettle();
-      expect(find.text('❤️'), findsNothing);
+      // The supplied design now exposes personalized quick reactions above
+      // the selected message, while the full editor remains a separate action.
+      expect(find.text('❤️'), findsOneWidget);
       await tester.tap(find.text('İfade bırak'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Emojileri düzenle'));

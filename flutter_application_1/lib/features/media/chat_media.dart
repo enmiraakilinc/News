@@ -85,8 +85,18 @@ const chatMediaLifetime = Duration(days: 2);
 const chatVideoLifetime = Duration(days: 2);
 Duration chatAttachmentLifetime(String kind) =>
     kind == 'video' ? chatVideoLifetime : chatMediaLifetime;
-bool chatAttachmentExpired(String kind, DateTime createdAt, DateTime now) =>
-    !createdAt.add(chatAttachmentLifetime(kind)).isAfter(now);
+bool chatAttachmentExpired(
+  String kind,
+  DateTime createdAt,
+  DateTime now, {
+  DateTime? expiresAt,
+}) => !(expiresAt ?? createdAt.add(chatAttachmentLifetime(kind))).isAfter(now);
+
+DateTime chatMediaExpiresAt(Map<String, dynamic> data) =>
+    (data['expiresAt'] as Timestamp?)?.toDate() ??
+    (data['createdAt'] as Timestamp).toDate().add(
+      chatAttachmentLifetime(data['kind'] as String),
+    );
 
 /// Private-pair attachments retain secret-word encryption, outside message docs.
 Map<String, dynamic> transformMediaChunk(Map<String, dynamic> input) {
@@ -283,11 +293,7 @@ class ChatMedia {
             .data();
     if (data == null ||
         data['ready'] != true ||
-        chatAttachmentExpired(
-          data['kind'] as String,
-          (data['createdAt'] as Timestamp).toDate(),
-          DateTime.now(),
-        )) {
+        !chatMediaExpiresAt(data).isAfter(DateTime.now())) {
       throw Exception('Dosyanın erişim süresi dolmuş.');
     }
     final size = data['size'] as int;
@@ -347,10 +353,7 @@ class ChatMedia {
     }
     final bytes = builder.takeBytes();
     if (bytes.length != size) throw Exception('Dosya eksik.');
-    return MediaPreview(
-      bytes,
-      (data['createdAt'] as Timestamp).toDate().add(chatMediaLifetime),
-    );
+    return MediaPreview(bytes, chatMediaExpiresAt(data));
   }
 
   static Future<MediaPreview?> preview(String id) async {
@@ -362,9 +365,7 @@ class ChatMedia {
     if (data == null || data['ready'] != true || data['kind'] != 'photo') {
       return null;
     }
-    final expires = (data['createdAt'] as Timestamp).toDate().add(
-      chatMediaLifetime,
-    );
+    final expires = chatMediaExpiresAt(data);
     if (!expires.isAfter(DateTime.now())) return null;
     final cid = data['coupleId'] as String?;
     final secret = cid == null ? null : await CoupleService.secret();
@@ -408,11 +409,7 @@ class ChatMedia {
             .data();
     if (data == null ||
         data['ready'] != true ||
-        chatAttachmentExpired(
-          data['kind'] as String,
-          (data['createdAt'] as Timestamp).toDate(),
-          DateTime.now(),
-        )) {
+        !chatMediaExpiresAt(data).isAfter(DateTime.now())) {
       throw Exception('Dosyanın erişim süresi dolmuş.');
     }
     final cid = data['coupleId'] as String?;
@@ -433,6 +430,50 @@ class ChatMedia {
     }
   }
 
+  static Future<Map<String, dynamic>> expiryInfo(String id) async {
+    await CoupleService.ensureReady();
+    final data =
+        (await _collection.doc(id).get(const GetOptions(source: Source.server)))
+            .data();
+    if (data == null) throw Exception('Bu dosya artık sunucuda bulunmuyor.');
+    return data;
+  }
+
+  static Future<void> extendUntil(String id, DateTime until) async {
+    await CoupleService.ensureReady();
+    final uid = CoupleService.uid;
+    final db = FirebaseFirestore.instance;
+    final requests = await db
+        .collection('mediaDownloadRequests')
+        .where('ownerUid', isEqualTo: uid)
+        .where('mediaId', isEqualTo: id)
+        .limit(450)
+        .get();
+    await db.runTransaction((tx) async {
+      final ref = _collection.doc(id);
+      final data = (await tx.get(ref)).data();
+      if (data == null || data['ready'] != true) {
+        throw Exception('Dosya artık mevcut değil.');
+      }
+      if (data['owner'] != uid) {
+        throw Exception('Süreyi yalnızca dosyayı gönderen uzatabilir.');
+      }
+      if (!chatMediaExpiresAt(data).isAfter(DateTime.now())) {
+        throw Exception(
+          'Dosyanın süresi dolmuş. Silinmeden önce süreyi uzatmalısın.',
+        );
+      }
+      if (!until.isAfter(chatMediaExpiresAt(data))) {
+        throw Exception('Mevcut süreden daha ileri bir tarih seç.');
+      }
+      tx.update(ref, {'expiresAt': Timestamp.fromDate(until)});
+      for (final request in requests.docs) {
+        tx.update(request.reference, {'expiresAt': Timestamp.fromDate(until)});
+      }
+    });
+    clearCache();
+  }
+
   static Future<void> remove(String id, {bool explicitly = false}) async {
     final ref = _collection.doc(id);
     final data = (await ref.get(
@@ -440,7 +481,7 @@ class ChatMedia {
     )).data();
     if (data == null) return;
     if (explicitly &&
-        data['kind'] == 'video' &&
+        ['photo', 'video', 'audio', 'file'].contains(data['kind']) &&
         data['owner'] == CoupleService.uid) {
       await ref.update({'deleteRequestedAt': FieldValue.serverTimestamp()});
     }
@@ -501,6 +542,7 @@ class ChatMedia {
               doc.data()['kind'] as String,
               created.toDate(),
               DateTime.now(),
+              expiresAt: (doc.data()['expiresAt'] as Timestamp?)?.toDate(),
             )) {
           ids.add(doc.id);
         }
