@@ -43,6 +43,10 @@ export async function commit(pool,body,auth){
    }
    const mode=await db.query("SELECT value FROM neural.settings WHERE key='primary_writes'");
    if(mode.rows[0]?.value!==true)throw new ApiError(503,'failed-precondition','Sunucuya yazma geçişi henüz etkin değil.');
+   // Serialize metadata extensions/deletes with retention before checking time.
+   for(const path of body.operations.map(op=>op.path).filter(p=>/^chatMedia\/[^/]+$/.test(p)).sort()){
+    await db.query('SELECT path FROM neural.documents WHERE path=$1 FOR UPDATE',[path]);
+   }
    const clock=await db.query("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS instant");
    const now=Instant.parse(clock.rows[0].instant),stamp=encodeTyped(now).timestampValue;
    const rows=new Map(),plain=new Map(),after=new Map();

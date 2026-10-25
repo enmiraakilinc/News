@@ -6,12 +6,18 @@ DECLARE removed integer;
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM neural.settings WHERE key='primary_writes' AND value='true'::jsonb)
  THEN RETURN 0; END IF;
- WITH expired AS (
+ WITH expired_media AS MATERIALIZED (
+  SELECT path FROM neural.documents
+  WHERE collection_id='chatMedia' AND neural.chat_media_expiry(document)<=now()
+  ORDER BY path LIMIT greatest(1,least(batch_size,2000))
+  FOR UPDATE SKIP LOCKED
+ ), expired AS (
  SELECT d.path FROM neural.documents d
  WHERE
   (split_part(d.path,'/',1)='chatMedia' AND
-   COALESCE((neural.raw_document('chatMedia/'||split_part(d.path,'/',2)) #>> '{fields,createdAt,timestampValue}')::timestamptz,
-    d.changed_at) < now()-interval '2 days')
+   ('chatMedia/'||split_part(d.path,'/',2) IN (SELECT path FROM expired_media)
+    OR NOT EXISTS(SELECT 1 FROM neural.documents parent WHERE parent.path='chatMedia/'||split_part(d.path,'/',2))
+      AND d.changed_at+interval '2 days'<=now()))
   OR (d.collection_id='sharedLocations' AND
    COALESCE((d.document #>> '{fields,createdAt,timestampValue}')::timestamptz,d.changed_at)<now()-interval '1 hour')
   OR (d.path ~ '^couples/[^/]+/courses/[^/]+/entries/[^/]+/chunks/[^/]+$' AND

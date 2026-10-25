@@ -9,7 +9,7 @@ const source={
  'chatProfiles/bob':{name:'Bob'},
 };
 const run=(path,a,b,options={})=>authorizeWrite({path,before:a,after:b,uid:'alice',now,
- read:async p=>source[p],readAfter:async p=>source[p],...options});
+ read:async p=>source[p],readAfter:options.read??(async p=>source[p]),...options});
 const denied=p=>assert.rejects(p,e=>e.status===403);
 const message={sender:'alice',text:'hello',sentAt:now,openAt:now,readBy:['alice'],replyTo:null,scheduled:false};
 const media={owner:'alice',chatId:'direct',coupleId:null,name:'movie.mp4',
@@ -113,4 +113,37 @@ test('account alias cannot claim another UID or email',async()=>{
 test('timestamp comparisons keep nanoseconds and fail closed on missing bounds',async()=>{
  const a=Instant.parse('2026-10-24T18:00:00.123456788Z');
  await denied(run('chats/direct/messages/a',null,{...message,sentAt:a}));
+});
+
+test('only the sender can extend active media repeatedly without changing its contents',async()=>{
+ const active={...media,ready:true},week={...active,expiresAt:now.add(7*86400000)};
+ await run('chatMedia/a',active,week);
+ await run('chatMedia/a',week,{...week,expiresAt:now.add(365*86400000)});
+ await denied(run('chatMedia/a',active,week,{uid:'bob'}));
+ await denied(run('chatMedia/a',active,{...week,owner:'bob'}));
+ await denied(run('chatMedia/a',week,{...week,expiresAt:now.add(3*86400000)}));
+ await denied(run('chatMedia/a',{...active,createdAt:now.add(-3*86400000)},week));
+ await denied(run('chatMedia/a',media,{...media,expiresAt:now.add(7*86400000)}));
+});
+
+test('old automatic cleanup cannot delete active extended media, explicit sender delete still works',async()=>{
+ const active={...media,ready:true,createdAt:now.add(-3*86400000),expiresAt:now.add(7*86400000)};
+ const read=async p=>p==='chatMedia/a'?active:source[p];
+ await denied(run('chatMedia/a',active,null,{read}));
+ await denied(run('chatMedia/a/chunks/0',{bytes:Buffer.from([1])},null,{read}));
+ await denied(run('chatMedia/a/chunks/0',{bytes:Buffer.from([1])},null,{uid:'bob',read}));
+ const marked={...active,deleteRequestedAt:now};
+ await run('chatMedia/a',active,marked);
+ await run('chatMedia/a',marked,null,{read:async p=>p==='chatMedia/a'?marked:source[p]});
+ await run('chatMedia/a/chunks/0',{bytes:Buffer.from([1])},null,{read:async p=>p==='chatMedia/a'?marked:source[p]});
+});
+
+test('extended download consent uses the new expiry and preserves approval',async()=>{
+ const active={...media,ready:true,expiresAt:now.add(30*86400000)};
+ const read=async p=>p==='chatMedia/a'?active:source[p];
+ const request={mediaId:'a',ownerUid:'alice',requesterUid:'bob',sourceKey:'chat/direct',status:'pending',requestedAt:now,expiresAt:active.expiresAt};
+ await run('mediaDownloadRequests/a_bob',null,request,{uid:'bob',read});
+ const approved={...request,status:'approved',expiresAt:now.add(172800000)};
+ await run('mediaDownloadRequests/a_bob',approved,{...approved,expiresAt:active.expiresAt},{read});
+ await denied(run('mediaDownloadRequests/a_bob',approved,{...approved,expiresAt:active.expiresAt},{uid:'bob',read}));
 });

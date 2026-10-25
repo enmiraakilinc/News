@@ -16,7 +16,7 @@ with tarfile.open(fileobj=archive,mode='w:gz') as tar:
         info=tarfile.TarInfo(name);info.size=len(data)
         tar.addfile(info,io.BytesIO(data))
 sql='\n'.join((ROOT/'server/sql'/name).read_text(encoding='utf-8') for name in
-    ['001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql'])
+    ['001_documents.sql','002_read_access.sql','003_primary_writes.sql','004_retention.sql','005_services.sql','006_media_expiry.sql'])
 for old,new in roles.items():sql=sql.replace(old,new)
 test=r"""
 import assert from 'node:assert/strict';
@@ -92,6 +92,8 @@ try{
  const media={...encodeFields({owner:'alice',chatId:'direct',ready:true}),createdAt:stampAt(3)};
  await insert('chatMedia/old',media);await insert('chatMedia/old/chunks/0',encodeFields({bytes:Buffer.from([1])}));
  await insert('chatMedia/fresh',{...media,createdAt:stampAt(0)});await insert('chatMedia/fresh/chunks/0',encodeFields({bytes:Buffer.from([1])}));
+ await insert('chatMedia/extended',{...media,createdAt:stampAt(3),expiresAt:stampAt(-7)});
+ await insert('chatMedia/extended/chunks/0',encodeFields({bytes:Buffer.from([1])}));
  const note='couples/pair/courses/course/entries/note';
  await insert(note,{...encodeFields({cipher:'keep note'}),createdAt:stampAt(8)});
  await insert(note+'/chunks/0',encodeFields({bytes:Buffer.from([1])}));
@@ -103,7 +105,7 @@ try{
   await reader.query('ROLLBACK');
  }finally{reader.release();}
  assert.equal((await admin.query('SELECT neural.prune_expired(500) AS n')).rows[0].n,3);assertions++;
- for(const path of ['chatMedia/fresh/chunks/0',note,'couples/pair/timeline/permanent','chats/direct/messages/test']){
+ for(const path of ['chatMedia/fresh/chunks/0','chatMedia/extended','chatMedia/extended/chunks/0',note,'couples/pair/timeline/permanent','chats/direct/messages/test']){
   assert.equal((await admin.query('SELECT path FROM neural.documents WHERE path=$1',[path])).rowCount,1);assertions++;
  }
  let pushes=0;const services=new Services(pool,{push:async()=>{pushes++;return true;}});
@@ -139,6 +141,8 @@ try{
    const result=await c.query('SELECT path FROM neural.documents WHERE path=$1',[path]);await c.query('ROLLBACK');return result.rowCount;
   }finally{c.release();}
  };
+ assert.equal(await checkRead('alice','chatMedia/extended/chunks/0'),1);assertions++;
+ assert.equal(await checkRead('outsider','chatMedia/extended/chunks/0'),0);assertions++;
  assert.equal(await checkRead('alice',personal),1);assertions++;
  assert.equal(await checkRead('bob',personal),0);assertions++;
  assert.equal(await checkRead('bob',privateFile),0);assertions++;

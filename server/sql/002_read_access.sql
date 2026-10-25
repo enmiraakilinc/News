@@ -34,6 +34,12 @@ AS $$ SELECT COALESCE(
  AND neural.member(CASE d #>> '{fields,sourceType,stringValue}' WHEN 'chat' THEN 'chats' ELSE 'couples' END,
   d #>> '{fields,sourceId,stringValue}',d #>> '{fields,callee,stringValue}'),false) $$;
 REVOKE ALL ON FUNCTION neural.call_participant(jsonb,text) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION neural.chat_media_expiry(d jsonb) RETURNS timestamptz
+LANGUAGE sql STABLE SET search_path='' AS $$
+ SELECT COALESCE((d #>> '{fields,expiresAt,timestampValue}')::timestamptz,
+   (d #>> '{fields,createdAt,timestampValue}')::timestamptz+interval '2 days')
+$$;
+REVOKE ALL ON FUNCTION neural.chat_media_expiry(jsonb) FROM PUBLIC;
 CREATE OR REPLACE FUNCTION neural.can_read(p text,d jsonb,uid text) RETURNS boolean
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE parts text[]:=string_to_array(p,'/'); n integer:=cardinality(parts); media jsonb;
@@ -70,7 +76,7 @@ BEGIN
   IF n<>4 OR parts[3] NOT IN ('chunks','preview') THEN RETURN false; END IF;
   media:=neural.raw_document('chatMedia/'||parts[2]);
   RETURN neural.media_member(media,uid) AND media #>> '{fields,ready,booleanValue}'='true'
-   AND now() < (media #>> '{fields,createdAt,timestampValue}')::timestamptz+interval '2 days';
+   AND now() < neural.chat_media_expiry(media);
  END IF;
  IF n=2 AND parts[1]='sharedLocations' THEN RETURN neural.media_member(d,uid) AND now()<(d #>> '{fields,createdAt,timestampValue}')::timestamptz+interval '1 hour'; END IF;
  IF n=2 AND parts[1]='mediaDownloadRequests' THEN RETURN uid IN (d #>> '{fields,ownerUid,stringValue}',d #>> '{fields,requesterUid,stringValue}'); END IF;

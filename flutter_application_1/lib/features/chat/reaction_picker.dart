@@ -3,6 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/widgets/emoji_picker.dart';
 import '../pair/couple_service.dart';
 
+Future<List<String>> loadReactionFavorites() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getStringList(
+        'reaction_favorites_${CoupleService.uid ?? 'local'}',
+      ) ??
+      ['❤️', '😂', '👍', '😮', '😢', '🙏'];
+}
+
 Future<String?> chooseReaction(BuildContext context) =>
     showModalBottomSheet<String>(
       context: context,

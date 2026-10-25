@@ -1,3 +1,5 @@
+import '../media/media_expiry_dialog.dart';
+import 'conversation_style.dart';
 import '../media/chat_media.dart';
 import 'message_selection.dart';
 import 'dart:io';
@@ -54,6 +56,13 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final colors = ConversationColors(scheme);
+    final foreground = scheduled
+        ? scheme.onTertiaryContainer
+        : mine
+        ? colors.onSent
+        : colors.onReceived;
     final stars = MessageStarsScope.of(context);
     final selection = MessageSelectionScope.of(context);
     final canStar = stars != null && starMessageId != null;
@@ -62,6 +71,7 @@ class MessageBubble extends StatelessWidget {
         !scheduled &&
         !text.startsWith(attachmentPrefix) &&
         !text.startsWith(mediaPrefix);
+    final canExtend = mine && text.startsWith(mediaPrefix);
     final canSelect = canCopy && starMessageId != null && selection != null;
     final selecting = selection?.ids.isNotEmpty == true;
     final selected = selection?.ids.contains(starMessageId) == true;
@@ -90,9 +100,9 @@ class MessageBubble extends StatelessWidget {
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * .82,
+            maxWidth: MediaQuery.sizeOf(context).width * .80,
           ),
-          margin: const EdgeInsets.symmetric(vertical: 4),
+          margin: const EdgeInsets.symmetric(vertical: 6),
           decoration: BoxDecoration(
             border: selected
                 ? Border.all(
@@ -103,8 +113,8 @@ class MessageBubble extends StatelessWidget {
             color: scheduled
                 ? Theme.of(context).colorScheme.tertiaryContainer
                 : mine
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerHigh,
+                ? colors.sent
+                : colors.received,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(18),
               topRight: const Radius.circular(18),
@@ -128,97 +138,101 @@ class MessageBubble extends StatelessWidget {
                     onEdit == null &&
                     onReact == null &&
                     !canStar &&
-                    !canCopy
+                    !canCopy &&
+                    !canExtend
                 ? null
-                : () => showModalBottomSheet<void>(
-                    context: context,
-                    builder: (ctx) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (canSelect)
-                            ListTile(
-                              leading: const Icon(Icons.checklist),
-                              title: const Text('Toplu seç'),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                toggleSelection();
-                              },
-                            ),
-                          if (canCopy)
-                            ListTile(
-                              leading: const Icon(Icons.copy),
-                              title: const Text('Kopyala'),
-                              onTap: () async {
-                                Navigator.pop(ctx);
-                                await Clipboard.setData(
-                                  ClipboardData(text: text),
-                                );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Mesaj kopyalandı.'),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          if (canStar)
-                            ListTile(
-                              leading: Icon(
-                                starred ? Icons.star : Icons.star_border,
-                              ),
-                              title: Text(
-                                starred ? 'Yıldızı kaldır' : 'Yıldızla',
-                              ),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                stars.toggle(starMessageId!, !starred);
-                              },
-                            ),
-                          if (onReact != null)
-                            ListTile(
-                              leading: const Icon(Icons.add_reaction_outlined),
-                              title: const Text('İfade bırak'),
-                              onTap: () async {
-                                Navigator.pop(ctx);
-                                final emoji = await chooseReaction(context);
-                                if (emoji != null && context.mounted) {
-                                  onReact!(emoji);
-                                }
-                              },
-                            ),
-                          if (onEdit != null)
-                            ListTile(
-                              leading: const Icon(Icons.edit_outlined),
-                              title: const Text('Düzenle'),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                onEdit!();
-                              },
-                            ),
-                          if (onReply != null)
-                            ListTile(
-                              leading: const Icon(Icons.reply),
-                              title: const Text('Yanıtla'),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                onReply!();
-                              },
-                            ),
-                          if (onDelete != null)
-                            ListTile(
-                              leading: const Icon(Icons.delete_outline),
-                              title: const Text('Sil'),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                onDelete!();
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
+                : () async {
+                    final action = await showConversationActions(
+                      context,
+                      preview: messagePreview(text),
+                      quoted: quoted == null ? null : messagePreview(quoted!),
+                      time: time,
+                      mine: mine,
+                      reactions: onReact != null,
+                      actions: [
+                        if (canExtend)
+                          const ConversationAction(
+                            'expiry',
+                            'Erişim süresini uzat',
+                            Icons.more_time,
+                          ),
+                        if (canSelect)
+                          const ConversationAction(
+                            'select',
+                            'Toplu seç',
+                            Icons.checklist,
+                          ),
+                        if (canCopy)
+                          const ConversationAction(
+                            'copy',
+                            'Kopyala',
+                            Icons.copy_outlined,
+                          ),
+                        if (canStar)
+                          ConversationAction(
+                            'star',
+                            starred ? 'Yıldızı kaldır' : 'Yıldızla',
+                            starred ? Icons.star : Icons.star_border,
+                          ),
+                        if (onReact != null)
+                          const ConversationAction(
+                            'reaction',
+                            'İfade bırak',
+                            Icons.add_reaction_outlined,
+                          ),
+                        if (onEdit != null)
+                          const ConversationAction(
+                            'edit',
+                            'Düzenle',
+                            Icons.edit_outlined,
+                          ),
+                        if (onReply != null)
+                          const ConversationAction(
+                            'reply',
+                            'Yanıtla',
+                            Icons.reply,
+                          ),
+                        if (onDelete != null)
+                          const ConversationAction(
+                            'delete',
+                            'Sil',
+                            Icons.delete_outline,
+                            destructive: true,
+                          ),
+                      ],
+                    );
+                    if (!context.mounted || action == null) return;
+                    if (action.startsWith('emoji:')) {
+                      onReact?.call(action.substring(6));
+                      return;
+                    }
+                    switch (action) {
+                      case 'expiry':
+                        await extendChatAttachment(context, text);
+                      case 'select':
+                        toggleSelection();
+                      case 'copy':
+                        await Clipboard.setData(ClipboardData(text: text));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Mesaj kopyalandı.')),
+                          );
+                        }
+                      case 'star':
+                        stars!.toggle(starMessageId!, !starred);
+                      case 'reaction':
+                        final emoji = await chooseReaction(context);
+                        if (emoji != null && context.mounted) {
+                          onReact?.call(emoji);
+                        }
+                      case 'edit':
+                        onEdit?.call();
+                      case 'reply':
+                        onReply?.call();
+                      case 'delete':
+                        onDelete?.call();
+                    }
+                  },
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 12, 8),
               child: Column(
@@ -233,7 +247,7 @@ class MessageBubble extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: foreground,
                         ),
                       ),
                     ),
@@ -243,10 +257,10 @@ class MessageBubble extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0x10000000),
+                        color: foreground.withValues(alpha: .08),
                         border: Border(
                           left: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
+                            color: foreground.withValues(alpha: .6),
                             width: 3,
                           ),
                         ),
@@ -256,7 +270,10 @@ class MessageBubble extends StatelessWidget {
                         messagePreview(quoted!),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: foreground.withValues(alpha: .85),
+                        ),
                       ),
                     ),
                   if (scheduled)
@@ -264,7 +281,17 @@ class MessageBubble extends StatelessWidget {
                       padding: EdgeInsets.only(bottom: 6),
                       child: Icon(Icons.lock_clock_outlined, size: 20),
                     ),
-                  MessageContent(text: text, photoMessages: photoMessages),
+                  DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 15,
+                      height: 1.45,
+                    ),
+                    child: MessageContent(
+                      text: text,
+                      photoMessages: photoMessages,
+                    ),
+                  ),
                   if (reactions.isNotEmpty)
                     Wrap(
                       spacing: 4,
@@ -273,6 +300,13 @@ class MessageBubble extends StatelessWidget {
                           .map(
                             (emoji) => Chip(
                               visualDensity: VisualDensity.compact,
+                              backgroundColor: colors.panel,
+                              labelStyle: TextStyle(
+                                color: scheme.onSurface,
+                                fontSize: 12,
+                              ),
+                              side: BorderSide(color: colors.line),
+                              shape: const StadiumBorder(),
                               label: Text(
                                 '$emoji ${reactions.values.where((value) => value == emoji).length}',
                               ),
@@ -286,7 +320,7 @@ class MessageBubble extends StatelessWidget {
                     '$time${status == null ? '' : '  ${status!}'}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: foreground.withValues(alpha: .75),
                     ),
                   ),
                 ],
@@ -806,11 +840,11 @@ class _ChatComposerState extends State<ChatComposer> {
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
     child: ColoredBox(
-      color: Theme.of(context).colorScheme.surfaceContainer,
+      color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -891,6 +925,36 @@ class _ChatComposerState extends State<ChatComposer> {
                     icon: const Icon(Icons.schedule_outlined),
                     tooltip: 'Geleceğe gönder',
                   ),
+                  Expanded(
+                    child: TextField(
+                      focusNode: _focus,
+                      controller: _text,
+                      minLines: 1,
+                      maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
+                          ? 3
+                          : 5,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText: 'Mesajını yaz…',
+                        hintMaxLines: 1,
+                        hintStyle: const TextStyle(fontSize: 14),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLowest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
                   IconButton(
                     onPressed: _sending ? null : _attach,
                     icon: const Icon(Icons.attach_file),
@@ -907,71 +971,70 @@ class _ChatComposerState extends State<ChatComposer> {
                     itemBuilder: (_) => [
                       const PopupMenuItem(
                         value: 'voice',
-                        child: Text('Sesli mesaj kaydet'),
+                        child: ConversationMenuLabel(
+                          icon: Icons.mic_none_rounded,
+                          label: 'Sesli mesaj kaydet',
+                        ),
                       ),
                       const PopupMenuItem(
                         value: 'photo',
-                        child: Text('Fotoğraf çek'),
+                        child: ConversationMenuLabel(
+                          icon: Icons.photo_camera_outlined,
+                          label: 'Fotoğraf çek',
+                        ),
                       ),
                       const PopupMenuItem(
                         value: 'video',
-                        child: Text('Video çek'),
+                        child: ConversationMenuLabel(
+                          icon: Icons.videocam_outlined,
+                          label: 'Video çek',
+                        ),
                       ),
                       const PopupMenuItem(
                         value: 'galleryPhoto',
-                        child: Text('Galeriden fotoğraf seç'),
+                        child: ConversationMenuLabel(
+                          icon: Icons.photo_library_outlined,
+                          label: 'Galeriden fotoğraf seç',
+                        ),
                       ),
                       const PopupMenuItem(
                         value: 'galleryVideo',
-                        child: Text('Galeriden video seç'),
+                        child: ConversationMenuLabel(
+                          icon: Icons.video_library_outlined,
+                          label: 'Galeriden video seç',
+                        ),
                       ),
                       if (widget.onShareLocation != null)
                         const PopupMenuItem(
                           value: 'location',
-                          child: Text('Konum paylaş · 1 saat'),
+                          child: ConversationMenuLabel(
+                            icon: Icons.location_on_outlined,
+                            label: 'Konum paylaş · 1 saat',
+                          ),
                         ),
                     ],
                   ),
-                  Expanded(
-                    child: TextField(
-                      focusNode: _focus,
-                      controller: _text,
-                      minLines: 1,
-                      maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
-                          ? 3
-                          : 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Mektubunu yaz…',
-                        filled: true,
-                        fillColor: Theme.of(
+                  const SizedBox(width: 2),
+                  ConversationPressFeedback(
+                    child: IconButton.filled(
+                      onPressed: _sending ? null : _send,
+                      tooltip: 'Gönder',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Theme.of(
                           context,
-                        ).colorScheme.surfaceContainerHigh,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
+                        ).colorScheme.primaryContainer,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimaryContainer,
                       ),
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sending ? null : _send,
-                    tooltip: 'Gönder',
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xff39756b),
-                    ),
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded),
                   ),
                 ],
               ),
@@ -980,7 +1043,7 @@ class _ChatComposerState extends State<ChatComposer> {
                 const Padding(
                   padding: EdgeInsets.only(top: 4),
                   child: Text(
-                    'Ekler 2 gün • Dosya 80 MB • Video 100 MB (tek mesaj)',
+                    'Ekler varsayılan 2 gün (uzatılabilir) • Dosya 80 MB • Video 100 MB',
                     style: TextStyle(fontSize: 10, color: Colors.blueGrey),
                   ),
                 ),

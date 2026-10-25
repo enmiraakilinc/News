@@ -41,9 +41,7 @@ class ChatDownloads {
             'sourceKey': source(media),
             'status': 'pending',
             'requestedAt': FieldValue.serverTimestamp(),
-            'expiresAt': Timestamp.fromDate(
-              (media['createdAt'] as Timestamp).toDate().add(chatMediaLifetime),
-            ),
+            'expiresAt': Timestamp.fromDate(chatMediaExpiresAt(media)),
           });
         }
         if (context.mounted) {

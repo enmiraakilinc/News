@@ -23,6 +23,13 @@ const has=(v,u)=>list(v)&&v.includes(u);
 const at=(v,t)=>v instanceof Instant&&t instanceof Instant&&v.nanos===t.nanos;
 const before=(v,t)=>v instanceof Instant&&t instanceof Instant&&v.nanos<t.nanos;
 const expired=(d,now,ms=172800000)=>d?.createdAt instanceof Instant&&now.nanos>=d.createdAt.add(ms).nanos;
+const mediaExpiry=d=>d?.expiresAt instanceof Instant?d.expiresAt:d?.createdAt?.add(172800000);
+const mediaExpired=(d,now)=>!(mediaExpiry(d) instanceof Instant)||!before(now,mediaExpiry(d));
+// Old clients clean up by createdAt. Extended files require a fresh explicit
+// deletion marker while active, even when the caller is their owner.
+const mediaRemoval=(d,uid,now)=>mediaExpired(d,now)||d?.owner===uid&&(
+ !(d.expiresAt instanceof Instant)||d.deleteRequestedAt instanceof Instant
+ &&!before(now,d.deleteRequestedAt)&&before(now,d.deleteRequestedAt.add(120000)));
 const validSource=v=>typeof v==='string'&&/^(chat|couple)\/[A-Za-z0-9_-]{1,200}$/.test(v);
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,200}$/.test(v);
 const activeInvite=(d,now)=>d&&(d.createdAt instanceof Instant?before(now,d.createdAt.add(3600000)):before(now,d.expiresAt));
@@ -174,8 +181,8 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   if(p.length===4&&['chunks','preview'].includes(p[2])){
    const media=await read('chatMedia/'+p[1]);
    if(!await mediaMember(media))return deny();
-   if(remove&&(media.owner===uid||expired(media,now)))return allow();
-   if(!create||media.owner!==uid||media.ready!==false||expired(media,now)||!only(b,['bytes','iv'])
+   if(remove&&mediaRemoval(media,uid,now))return allow();
+   if(!create||media.owner!==uid||media.ready!==false||mediaExpired(media,now)||!only(b,['bytes','iv'])
       ||!Buffer.isBuffer(b.bytes)||b.bytes.length<1)return deny();
    if(media.coupleId===null?Object.hasOwn(b,'iv'):!Buffer.isBuffer(b.iv)||b.iv.length!==16)return deny();
    if(p[2]==='preview')return p[3]==='image'&&media.kind==='photo'&&b.bytes.length<=24592?allow():deny();
@@ -188,21 +195,25 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
      &&integer(b.size,1,b.kind==='video'?104857600:b.kind==='file'?83886080:20971520)
      &&integer(b.chunks,1,228)&&b.chunks===Math.ceil(b.size/460800)&&at(b.createdAt,now)&&b.ready===false)return allow();
   if(!await mediaMember(a))return deny();
-  if(remove&&(a.owner===uid||expired(a,now))&&!await readAfter(path+'/preview/image'))return allow();
+  if(remove&&mediaRemoval(a,uid,now)&&!await readAfter(path+'/preview/image'))return allow();
   if(update&&a.owner===uid
-     &&(changes(a,b,['ready'])&&a.ready===false&&b.ready===true&&!expired(a,now)
-       ||a.kind==='video'&&changes(a,b,['deleteRequestedAt'])&&at(b.deleteRequestedAt,now)))return allow();
+     &&(changes(a,b,['ready'])&&a.ready===false&&b.ready===true&&!mediaExpired(a,now)
+       ||changes(a,b,['deleteRequestedAt'])&&at(b.deleteRequestedAt,now)
+       ||a.ready===true&&!mediaExpired(a,now)&&changes(a,b,['expiresAt'])
+         &&b.expiresAt instanceof Instant&&before(now,b.expiresAt)&&before(mediaExpiry(a),b.expiresAt)))return allow();
   return deny();
  }
  if(p[0]==='mediaDownloadRequests'&&p.length===2){
   if(remove&&a&&[a.ownerUid,a.requesterUid].includes(uid))return allow();
   if(!b||typeof b.mediaId!=='string')return deny();
-  const media=await read('chatMedia/'+b.mediaId);
-  if(!media||media.ready!==true||expired(media,now)||!await mediaMember(media))return deny();
+  const media=await readAfter('chatMedia/'+b.mediaId);
+  if(!media||media.ready!==true||mediaExpired(media,now)||!await mediaMember(media))return deny();
   if(create&&only(b,['mediaId','ownerUid','requesterUid','sourceKey','status','requestedAt','expiresAt'])
      &&p[1]===b.mediaId+'_'+uid&&b.requesterUid===uid&&b.ownerUid===media.owner&&media.owner!==uid
      &&['photo','video'].includes(media.kind)&&b.sourceKey===(typeof media.chatId==='string'?'chat/'+media.chatId:'couple/'+media.coupleId)
-     &&at(b.expiresAt,media.createdAt.add(172800000))&&b.status==='pending'&&at(b.requestedAt,now))return allow();
+     &&at(b.expiresAt,mediaExpiry(media))&&b.status==='pending'&&at(b.requestedAt,now))return allow();
+  if(update&&a.ownerUid===uid&&media.owner===uid&&changes(a,b,['expiresAt'])
+     &&at(b.expiresAt,mediaExpiry(media)))return allow();
   if(update&&a.ownerUid===uid&&media.owner===uid&&a.status==='pending'&&changes(a,b,['status','decidedAt'])
      &&['approved','declined'].includes(b.status)&&at(b.decidedAt,now))return allow();
   return deny();

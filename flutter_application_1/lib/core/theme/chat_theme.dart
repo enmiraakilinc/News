@@ -12,7 +12,7 @@ class ThemeSelection extends ValueNotifier<String> {
 class ChatThemes {
   static final selected = ThemeSelection('pastel');
   static int? accent;
-  static double roundness = 24;
+  static double roundness = 14;
   static Future<void>? _loading;
   static final Map<String, ThemeData> _cache = {};
   static const names = {
@@ -31,7 +31,7 @@ class ChatThemes {
   static Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     accent = null;
-    roundness = 24;
+    roundness = 14;
     final saved = prefs.getString('neural_chat_theme');
     if (names.containsKey(saved)) selected.value = saved!;
     selected.refresh();
@@ -46,6 +46,42 @@ class ChatThemes {
   static ThemeData theme(String value) {
     final key = '$value:$accent:$roundness';
     return _cache.putIfAbsent(key, () => _buildTheme(value));
+  }
+
+  static ThemeData conversationTheme(String value) {
+    final base = theme(value);
+    final scheme = value == 'purple'
+        ? ColorScheme.fromSeed(seedColor: const Color(0xff614692)).copyWith(
+            primary: const Color(0xff492e79),
+            primaryContainer: const Color(0xff614692),
+            onPrimaryContainer: Colors.white,
+            surface: const Color(0xfffef7ff),
+            surfaceContainerLowest: Colors.white,
+          )
+        : base.colorScheme;
+    // Build text/icon defaults from this scheme too: copying a dark theme and
+    // only replacing its colors leaves white controls on the light reference.
+    return ThemeData(useMaterial3: true, colorScheme: scheme).copyWith(
+      scaffoldBackgroundColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        titleTextStyle: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+        iconTheme: IconThemeData(color: scheme.primary),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
   }
 
   static ThemeData _buildTheme(String value) {
@@ -128,6 +164,7 @@ class ChatThemes {
 }
 
 class ChatScaffold extends StatefulWidget {
+  final bool conversationStyle;
   final String? starsSource;
   final PreferredSizeWidget? appBar;
   final Widget? body;
@@ -135,6 +172,7 @@ class ChatScaffold extends StatefulWidget {
   final Color? backgroundColor;
   const ChatScaffold({
     super.key,
+    this.conversationStyle = false,
     this.starsSource,
     this.appBar,
     this.body,
@@ -156,7 +194,9 @@ class _ChatScaffoldState extends State<ChatScaffold> {
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
     valueListenable: ChatThemes.selected,
     builder: (_, value, child) => Theme(
-      data: ChatThemes.theme(value),
+      data: widget.starsSource != null || widget.conversationStyle
+          ? ChatThemes.conversationTheme(value)
+          : ChatThemes.theme(value),
       child: _withStars(
         Scaffold(
           // The composer already reserves the keyboard inset below itself.
