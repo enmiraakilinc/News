@@ -1,4 +1,4 @@
-"""Publish a private APK after primary cutover; never change migration state."""
+"""Publish a release APK after primary cutover; never change migration state."""
 import argparse,hashlib,json,re,subprocess,sys,time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -27,7 +27,8 @@ def publish(version):
     assert int(before['fields']['code']['integerValue'])<=report['code']
     staged=remote("import subprocess\nprint(subprocess.check_output(['sudo','sha256sum',"+repr('/var/lib/neural/releases/'+version+'.apk')+"],text=True).split()[0])\n")
     assert staged==report['sha256'],'Stage the immutable private VPS APK first'
-    repository=json.loads(gh('api',f'repositories/{REPO_ID}'));assert repository['private']
+    repository=json.loads(gh('api',f'repositories/{REPO_ID}'))
+    assert repository['id']==REPO_ID and repository['full_name']==LEGACY_ALIAS
     repo=repository['full_name']
     head=subprocess.check_output(['git','-c','safe.directory='+ROOT.as_posix(),'rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     assert gh('api',f'repositories/{REPO_ID}/commits/main','--jq','.sha')==head,'Push reviewed source before release'
@@ -53,7 +54,7 @@ def publish(version):
             for block in response.iter_content(1048576):digest.update(block);size+=len(block)
         proof={'sha256':digest.hexdigest(),'bytes':size}
     assert proof['sha256']==report['sha256'] and proof['bytes']==report['bytes']
-    print('Private GitHub and staged VPS APK hashes verified.',flush=True)
+    print('GitHub release and staged VPS APK hashes verified.',flush=True)
     fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':version},
         'notes':{'stringValue':'Genel görünüm ve kararlılık iyileştirmeleri.'},
         'repository':{'stringValue':LEGACY_ALIAS},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}
@@ -88,7 +89,7 @@ def publish(version):
         githubDownloadVerified=True,releaseUrl=f'https://github.com/{repo}/releases/tag/v{version}',
         legacyMetadataUpdated=True,vpsMetadataUpdated=True,physicalDeviceTested=False)
     (directory/'build-report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
-    print(json.dumps({'published':version,'code':report['code'],'eligibleMembers':len(members),'primaryStateUnchanged':True,'repositoryPrivate':True}))
+    print(json.dumps({'published':version,'code':report['code'],'eligibleMembers':len(members),'primaryStateUnchanged':True,'repositoryPrivate':repository['private']}))
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--version',required=True)
