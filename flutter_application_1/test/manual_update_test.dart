@@ -7,50 +7,50 @@ import 'package:flutter_application_1/features/updates/update_service.dart';
 void main() {
   test('Public GitHub releases provide a verified, unauthenticated update', () {
     final update = publicGithubUpdate({
-      'tag_name': 'v1.16.5',
+      'tag_name': 'v1.16.6',
       'draft': false,
       'prerelease': false,
-      'body': 'Build code: 2086\nStability improvements.',
+      'body': 'Build code: 2087\nSohbet bildirimleri artık anında iletilir.',
       'assets': [
         {
-          'name': 'Neural-Haber-1.16.5-arm64.apk',
+          'name': 'Neural-Haber-1.16.6-arm64.apk',
           'browser_download_url':
-              'https://github.com/enmiraakilinc/News/releases/download/v1.16.5/Neural-Haber-1.16.5-arm64.apk',
+              'https://github.com/enmiraakilinc/News/releases/download/v1.16.6/Neural-Haber-1.16.6-arm64.apk',
           'digest': 'sha256:${'a' * 64}',
         },
       ],
-    }, currentCode: 2085);
+    }, currentCode: 2086);
 
-    expect(update?.code, 2086);
-    expect(update?.name, '1.16.5');
+    expect(update?.code, 2087);
+    expect(update?.name, '1.16.6');
     expect(update?.authenticated, isFalse);
     expect(update?.sha256, 'a' * 64);
-    expect(update?.notes, 'Stability improvements.');
+    expect(update?.notes, 'Sohbet bildirimleri artık anında iletilir.');
   });
 
   test(
     'Public GitHub update rejects untrusted assets and unversioned builds',
     () {
       final release = {
-        'tag_name': 'v1.16.5',
+        'tag_name': 'v1.16.6',
         'draft': false,
         'prerelease': false,
-        'body': 'Build code: 2086',
+        'body': 'Build code: 2087',
         'assets': [
           {
-            'name': 'Neural-Haber-1.16.5-arm64.apk',
+            'name': 'Neural-Haber-1.16.6-arm64.apk',
             'browser_download_url':
-                'https://attacker.example/Neural-Haber-1.16.5-arm64.apk',
+                'https://attacker.example/Neural-Haber-1.16.6-arm64.apk',
             'digest': 'sha256:${'a' * 64}',
           },
         ],
       };
-      expect(publicGithubUpdate(release, currentCode: 2085), isNull);
+      expect(publicGithubUpdate(release, currentCode: 2086), isNull);
       expect(
-        publicGithubUpdate({...release, 'body': ''}, currentCode: 2085),
+        publicGithubUpdate({...release, 'body': ''}, currentCode: 2086),
         isNull,
       );
-      expect(publicGithubUpdate(release, currentCode: 2086), isNull);
+      expect(publicGithubUpdate(release, currentCode: 2087), isNull);
     },
   );
 
