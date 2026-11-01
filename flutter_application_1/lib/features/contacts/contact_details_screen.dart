@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'contact_names.dart';
 import 'chat_presence.dart';
 import 'profile_avatar.dart';
+import '../chat/chat_service.dart';
 import '../starred/starred_messages.dart';
 import '../../core/utils/user_errors.dart';
 import '../wakeup/wakeup_service.dart';
@@ -157,7 +158,8 @@ class ContactChatHeader extends StatelessWidget {
                     chatId: sourceKey.startsWith('chat/')
                         ? sourceKey.substring('chat/'.length)
                         : null,
-                    members: members ??
+                    members:
+                        members ??
                         (userId == null
                             ? null
                             : {
@@ -266,6 +268,10 @@ class ContactDetailsScreen extends StatelessWidget {
           ),
           ConversationSection(
             children: [
+              if (sourceKey.startsWith('chat/'))
+                _ClearChatContentTile(
+                  chatId: sourceKey.substring('chat/'.length),
+                ),
               ListTile(
                 leading: const Icon(Icons.star_outline),
                 title: const Text('Yıldızlı mesajlar'),
@@ -352,5 +358,74 @@ class ContactDetailsScreen extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _ClearChatContentTile extends StatefulWidget {
+  final String chatId;
+  const _ClearChatContentTile({required this.chatId});
+
+  @override
+  State<_ClearChatContentTile> createState() => _ClearChatContentTileState();
+}
+
+class _ClearChatContentTileState extends State<_ClearChatContentTile> {
+  bool _busy = false;
+
+  Future<void> _clear() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sohbet içeriğini temizle?'),
+        content: const Text(
+          'Bu sohbetteki tüm mesajlar sunucudan ve tüm katılımcıların '
+          'cihazlarından kalıcı olarak silinecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tümünü sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ChatService.clearMessages(widget.chatId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sohbet içeriği silindi.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: const Icon(Icons.delete_sweep_outlined),
+    title: const Text('Sohbet içeriğini temizle'),
+    subtitle: const Text('Bu sohbetteki tüm mesajları sil'),
+    trailing: _busy
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : null,
+    onTap: _busy ? null : _clear,
   );
 }

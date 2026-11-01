@@ -159,7 +159,11 @@ const server=http.createServer(async(request,response)=>{
    const auth=await authenticate(request);
    if(!auth.uid)throw new ApiError(401,'unauthenticated','Oturumunu yeniden aç.');
    rateLimit(auth.uid,request.socket.remoteAddress);
-   send(response,200,await commit(pool,await bodyOf(request,8*1024*1024),auth));return;
+   const result=await commit(pool,await bodyOf(request,8*1024*1024),auth);
+   void services.notifyChatMessages(result.createdMessages,auth,result.requestId).catch(error=>{
+    console.error(JSON.stringify({event:'chat_notification_failed',code:String(error.code??'unknown').slice(0,50)}));
+   });
+   send(response,200,result);return;
   }
   if(!['/v1/read','/v1/watch'].includes(request.url)||request.method!=='POST'){send(response,404,{error:{code:'not-found',message:'Bu adres bulunamadı.'}});return;}
   const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);

@@ -3,6 +3,7 @@ import 'notification_permission.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../features/chat/chat_notification_service.dart';
 
 Future<void> editChatNotifications(BuildContext context) async {
   var enabled = await chatNotificationsEnabled();
@@ -182,12 +183,13 @@ class _FeatureNotificationSwitchState extends State<FeatureNotificationSwitch> {
                 if (!await ensureNotificationPermission(context)) return;
               }
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool(
-                'content_notification_${widget.kind.collection}',
-                value,
-              );
               if (widget.kind == kNotifChats) {
-                await prefs.setBool(kChatNotificationsKey, value);
+                await setChatNotifications(value);
+              } else {
+                await prefs.setBool(
+                  'content_notification_${widget.kind.collection}',
+                  value,
+                );
               }
               if (mounted) setState(() => _enabled = value);
               // Platform cleanup must never undo a successfully saved choice.
@@ -228,11 +230,26 @@ class _FeatureNotificationSwitchState extends State<FeatureNotificationSwitch> {
 
 Future<void> setChatNotifications(bool value) async {
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  final oldValue =
+      prefs.getBool('content_notification_chats') ??
+      prefs.getBool(kChatNotificationsKey) ??
+      prefs.getBool(kPushBarKey) ??
+      false;
   await prefs.setBool(kChatNotificationsKey, value);
   await prefs.setBool('content_notification_chats', value);
   if (!value) {
-    final plugin = FlutterLocalNotificationsPlugin();
-    await plugin.cancel(kNotifChats.id);
+    await FlutterLocalNotificationsPlugin().cancel(kNotifChats.id);
+  }
+  try {
+    await ChatNotificationService.sync(value);
+  } catch (error) {
+    if (value) {
+      await prefs.setBool(kChatNotificationsKey, oldValue);
+      await prefs.setBool('content_notification_chats', oldValue);
+      rethrow;
+    }
+    debugPrint('Chat notification device cleanup failed: $error');
   }
 }
 

@@ -56,8 +56,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }, onError: (Object error) => throw error);
     // A second observer prevents an early network failure becoming unhandled.
     refreshed.catchError((_) => null);
-    final cached = await ChatService.myName(cacheOnly: true)
-        .catchError((_) => null);
+    final cached = await ChatService.myName(
+      cacheOnly: true,
+    ).catchError((_) => null);
     return cached ?? await refreshed;
   }
 
@@ -223,8 +224,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
       await operation();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(userError(error))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -716,7 +718,6 @@ class ConversationScreen extends StatefulWidget {
 
 class _ConversationScreenState extends State<ConversationScreen> {
   int _messageLimit = 100;
-  bool _clearing = false;
   late Stream<List<ChatMessage>> _stream = ChatService.messages(
     widget.conversation.id,
   );
@@ -796,58 +797,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  Future<void> _clearConversation() async {
-    if (_clearing) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sohbet içeriğini temizle?'),
-        content: const Text(
-          'Bu sohbetteki tüm mesajlar sunucudan ve tüm katılımcıların '
-          'cihazlarından kalıcı olarak silinecek.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Tümünü sil'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    setState(() => _clearing = true);
-    try {
-      await ChatService.clearMessages(widget.conversation.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sohbet içeriği silindi.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(userError(error))));
-      }
-    } finally {
-      if (mounted) setState(() => _clearing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) => ChatScaffold(
     starsSource: 'chat/${widget.conversation.id}',
     appBar: AppBar(
       titleSpacing: 0,
       actions: [
-        IconButton(
-          tooltip: 'Sohbet içeriğini temizle',
-          icon: const Icon(Icons.delete_sweep_outlined),
-          onPressed: _clearing ? null : _clearConversation,
-        ),
         IconButton(
           tooltip: 'Mesajlarda ara',
           icon: const Icon(Icons.search),
@@ -874,10 +829,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     ),
     bottomNavigationBar: ChatComposer(
       chatId: widget.conversation.id,
-      onTyping: (typing) => ChatService.setTyping(
-        widget.conversation.id,
-        typing,
-      ),
+      onTyping: (typing) =>
+          ChatService.setTyping(widget.conversation.id, typing),
       onShareLocation: () => LocationShares.send(
         context,
         chatId: widget.conversation.id,

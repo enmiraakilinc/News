@@ -14,6 +14,8 @@ test('invites, login aliases and profiles cannot be enumerated',()=>{
 test('address books are owner-only',()=>{
  assert.throws(()=>queryAllowed({path:'chatAccounts/bob/contacts'},'alice'));
  queryAllowed({path:'chatAccounts/alice/contacts'},'alice');
+ queryAllowed({path:'chatAccounts/alice/chatDevices'},'alice');
+ assert.throws(()=>queryAllowed({path:'chatAccounts/bob/chatDevices'},'alice'));
 });
 test('chat and call inboxes require the authenticated identity filter',()=>{
  assert.throws(()=>queryAllowed({path:'chats'},'alice'));

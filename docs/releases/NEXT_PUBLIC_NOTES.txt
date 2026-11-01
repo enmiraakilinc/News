@@ -1,1 +1,1 @@
-Bağlantı ve kararlılık iyileştirmeleri.
+Sohbet bildirimleri artık anında iletilir. Bildirim yazısı kişisel ayarınızı korur. Sohbet içeriğini temizleme seçeneği kişi ayrıntılarına taşındı.

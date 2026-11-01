@@ -10,7 +10,7 @@ import '../features/updates/update_service.dart';
 import '../features/pair/badge_service.dart';
 import '../features/location/location_share.dart';
 import '../features/media/chat_media.dart';
-import '../features/chat/chat_unread.dart';
+import '../features/chat/chat_notification_service.dart';
 import '../features/wakeup/wakeup_service.dart';
 import '../features/storage/storage_monitor.dart';
 
@@ -53,22 +53,6 @@ Future<void> checkIncomingContent() async {
     await prefs.reload();
   } catch (_) {}
 
-  try {
-    if (await hasNewChatMessages() && await chatNotificationsEnabled()) {
-      await flutterLocalNotificationsPlugin.show(
-        kNotifChats.id,
-        'Güncelleme',
-        await notifText(kNotifChats),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'updates',
-            'Güncellemeler',
-            importance: Importance.defaultImportance,
-          ),
-        ),
-      );
-    }
-  } catch (_) {}
   final cid = prefs.getString('couple_id');
   if (cid == null) return; // eşleşme yoksa kontrol edilecek bir şey yok
 
@@ -354,6 +338,11 @@ Future<void> _initFcm() async {
   try {
     final messaging = FirebaseMessaging.instance;
     unawaited(WakeupService.restoreRegistration());
+    try {
+      await ChatNotificationService.sync(await chatNotificationsEnabled());
+    } catch (error) {
+      debugPrint('Chat notification registration failed: $error');
+    }
     if (await contentNotificationEnabled(kNotifUpdates)) {
       await messaging.subscribeToTopic('updates');
     } else {
@@ -361,6 +350,27 @@ Future<void> _initFcm() async {
     }
     // Uygulama ön plandayken push gelirse Android otomatik göstermez → elle göster.
     FirebaseMessaging.onMessage.listen((RemoteMessage m) async {
+      if (m.data['type'] == 'chat') {
+        if (m.data['recipientUid'] != CoupleService.uid ||
+            !await chatNotificationsEnabled()) {
+          return;
+        }
+        await flutterLocalNotificationsPlugin.show(
+          kNotifChats.id,
+          'Güncelleme',
+          await notifText(kNotifChats),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'updates',
+              'Güncellemeler',
+              importance: Importance.defaultImportance,
+              priority: Priority.defaultPriority,
+              autoCancel: true,
+            ),
+          ),
+        );
+        return;
+      }
       final n = m.notification;
       if (n == null) return;
       // Kullanıcı bildirim çubuğunu kapattıysa push de gösterilmez.

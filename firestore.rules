@@ -107,6 +107,14 @@ service cloud.firestore {
         && request.resource.data.token is string && request.resource.data.token.size() >= 20
         && request.resource.data.token.size() <= 4096 && request.resource.data.updatedAt == request.time;
     }
+    match /chatAccounts/{userId}/chatDevices/{deviceId} {
+      allow read, delete: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && deviceId.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasOnly(['token', 'updatedAt'])
+        && request.resource.data.token is string && request.resource.data.token.size() >= 20
+        && request.resource.data.token.size() <= 4096 && request.resource.data.updatedAt == request.time;
+    }
     match /chatAccounts/{userId}/wakePermissions/{permissionId} {
       allow read, delete: if girisYapti() && request.auth.uid == userId;
       allow create, update: if girisYapti() && request.auth.uid == userId
