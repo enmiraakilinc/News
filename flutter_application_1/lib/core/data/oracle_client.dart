@@ -45,7 +45,7 @@ class OracleDataClient {
     Uri? base,
     this.timeout = const Duration(seconds: 5),
   }) : _http = client ?? http.Client(),
-       base = base ?? Uri.parse('https://138.2.185.151') {
+       base = base ?? Uri.parse('https://158.180.38.94') {
     if (this.base.scheme != 'https' ||
         this.base.userInfo.isNotEmpty ||
         this.base.query.isNotEmpty ||

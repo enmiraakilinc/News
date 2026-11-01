@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import sql,remote
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key'];accounts=[];paths=[]
-identity='https://identitytoolkit.googleapis.com/v1/';base='https://138.2.185.151';q=lambda v:"'"+v.replace("'","''")+"'"
+identity='https://identitytoolkit.googleapis.com/v1/';base='https://158.180.38.94';q=lambda v:"'"+v.replace("'","''")+"'"
 try:
  for _ in range(3):
   r=requests.post(identity+'accounts:signUp',params={'key':key},json={'returnSecureToken':True},timeout=20);r.raise_for_status();accounts.append(r.json())

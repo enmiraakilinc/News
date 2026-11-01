@@ -3,6 +3,7 @@ import '../media/media_expiry_scope.dart';
 import 'conversation_style.dart';
 import '../media/chat_media.dart';
 import 'message_selection.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -345,6 +346,7 @@ class ChatComposer extends StatefulWidget {
   final Future<void> Function()? onShareLocation;
   final String? chatId;
   final String? coupleId;
+  final Future<void> Function(bool typing)? onTyping;
   final Future<XFile?> Function(bool video, bool gallery)? pickMedia;
   final Future<List<XFile>> Function(bool video)? pickGallery;
   const ChatComposer({
@@ -355,6 +357,7 @@ class ChatComposer extends StatefulWidget {
     this.onShareLocation,
     this.chatId,
     this.coupleId,
+    this.onTyping,
     this.pickMedia,
     this.pickGallery,
   });
@@ -370,18 +373,75 @@ class _TextDelivery {
   _TextDelivery(this.text, this.scheduled, this.send);
 }
 
-class _ChatComposerState extends State<ChatComposer> {
+class _ChatComposerState extends State<ChatComposer>
+    with WidgetsBindingObserver {
   final _text = TextEditingController();
   final _focus = FocusNode();
+  Timer? _typingDebounce;
+  Timer? _typingRefresh;
+  bool _typing = false;
   DateTime? _scheduled;
   bool _sending = false;
   String? _mediaStatus;
   final List<_TextDelivery> _failedTexts = [];
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopTyping();
     _text.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _stopTyping();
+  }
+
+  void _onTextChanged(String value) {
+    if (widget.onTyping == null || widget.chatId == null) return;
+    if (value.trim().isEmpty) {
+      _stopTyping();
+      return;
+    }
+    if (_typing) return;
+    _typingDebounce?.cancel();
+    _typingDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted || _text.text.trim().isEmpty) return;
+      _typing = true;
+      unawaited(_writeTyping(true));
+      _typingRefresh = Timer.periodic(const Duration(seconds: 3), (_) {
+        unawaited(_writeTyping(true));
+      });
+    });
+  }
+
+  void _stopTyping() {
+    _typingDebounce?.cancel();
+    _typingRefresh?.cancel();
+    if (!_typing) return;
+    _typing = false;
+    unawaited(_writeTyping(false));
+  }
+
+  Future<void> _writeTyping(bool typing) async {
+    try {
+      await widget.onTyping?.call(typing);
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'chat typing indicator',
+        ),
+      );
+    }
   }
 
   Future<void> _attach() async {
@@ -806,6 +866,7 @@ class _ChatComposerState extends State<ChatComposer> {
   Future<void> _send() async {
     final text = _text.text.trim();
     if (text.isEmpty || _sending) return;
+    _stopTyping();
     if (_scheduled != null && !_scheduled!.isAfter(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -934,6 +995,7 @@ class _ChatComposerState extends State<ChatComposer> {
                     child: TextField(
                       focusNode: _focus,
                       controller: _text,
+                      onChanged: _onTextChanged,
                       minLines: 1,
                       maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
                           ? 3

@@ -4,7 +4,7 @@ Run prepare before freezing legacy writes; activate compares every source
 document version before stopping replication. Never rolls primary writes back.
 The legacy metadata repository alias stays pinned for old Worker clients.
 """
-import argparse, hashlib, json, re, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 import requests
 
@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 from tools.admin.firebase_config import PROJECT_ID, admin_session
 from tools.server.ssh_admin import SSH, KEY, HOST
 
-GH = 'C:/Program Files/GitHub CLI/gh.exe'
+GH = os.environ.get('GH_CLI') or shutil.which('gh') or 'gh'
 REPO_ID = 1426918054
 REPO = 'enmiraakilinc/News'
 VERSION = '1.16.0'
@@ -128,7 +128,7 @@ def activate():
     assert destination()==source, 'Mirror changed during stop; primary remains disabled'
     sql("BEGIN; UPDATE neural.settings SET value='true' WHERE key='primary_writes'; COMMIT;")
     for attempt in range(5):
-        result=requests.get('https://138.2.185.151/v1/capabilities',timeout=20)
+        result=requests.get('https://158.180.38.94/v1/capabilities',timeout=20)
         result.raise_for_status()
         if result.json()['primaryWrites'] is True:break
         time.sleep(1)

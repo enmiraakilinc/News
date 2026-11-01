@@ -33,7 +33,7 @@ object NativeDocuments {
         val user = FirebaseAuth.getInstance().currentUser ?: error("Oturum gerekli.")
         val uid = user.uid
         val token = Tasks.await(user.getIdToken(false), 3, TimeUnit.SECONDS).token ?: error("Oturum gerekli.")
-        val connection = URL("https://138.2.185.151$route").openConnection() as HttpsURLConnection
+        val connection = URL("https://158.180.38.94$route").openConnection() as HttpsURLConnection
         try {
             connection.requestMethod = "POST"
             connection.connectTimeout = 2500

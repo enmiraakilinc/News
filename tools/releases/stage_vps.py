@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -11,6 +12,8 @@ import uuid
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.server.ssh_admin import execute,KEY,HOST
+
+SCP=shutil.which('scp') or 'scp'
 
 def main():
     parser=argparse.ArgumentParser()
@@ -28,7 +31,7 @@ def main():
     temporary='/var/tmp/neural-stage-'+nonce
     execute("import pathlib\np=pathlib.Path("+repr(temporary)+")\nassert p.parent==pathlib.Path('/var/tmp') and p.name.startswith('neural-stage-')\np.mkdir(mode=0o700)\n")
     try:
-        subprocess.run(['C:/Windows/System32/OpenSSH/scp.exe','-q','-i',str(KEY),'-o','BatchMode=yes',str(apk),HOST+':'+temporary+'/release.apk'],check=True)
+        subprocess.run([SCP,'-q','-i',str(KEY),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes',str(apk),HOST+':'+temporary+'/release.apk'],check=True)
         script='''import pathlib,hashlib,subprocess,json
 def stage(options):
     source=pathlib.Path(options['temporary'])/'release.apk'

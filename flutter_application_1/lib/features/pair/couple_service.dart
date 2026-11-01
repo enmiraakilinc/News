@@ -1,5 +1,6 @@
 import '../../core/utils/refresh_stream.dart';
 import '../../core/data/oracle_firestore_bridge.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -466,7 +467,7 @@ class CoupleService {
           : Timestamp.fromDate(openDate),
       'scheduled': openDate != null,
       'createdAt': FieldValue.serverTimestamp(),
-      'replyTo': ?replyToId,
+      'replyTo': replyToId,
     });
   }
 
@@ -570,6 +571,23 @@ class CoupleService {
     await ref.collection('letters').doc(letterId).delete();
   }
 
+  static Future<void> clearLetters() async {
+    final ref = await _coupleRef();
+    if (ref == null) throw Exception('Bağ bulunamadı.');
+    final letters = ref.collection('letters');
+    while (true) {
+      final snapshot = await letters
+          .limit(400)
+          .get(const GetOptions(source: Source.server));
+      if (snapshot.docs.isEmpty) return;
+      final batch = _db.batch();
+      for (final letter in snapshot.docs) {
+        batch.delete(letter.reference);
+      }
+      await batch.commit();
+    }
+  }
+
   /// Alıcı mektubu açıp okuduğunda çağrılır. Yalnızca alıcı (gönderen olmayan)
   /// tarafın çağırması beklenir; gönderen bunu "Okundu" olarak görür.
   static Future<void> markLetterRead(String letterId) async {
@@ -647,9 +665,9 @@ class CoupleService {
               String place = '';
               String note = '';
               try {
-                final m =
-                    jsonDecode(_decrypt(data['meta'] as String, secret))
-                        as Map<String, dynamic>;
+                final m = jsonDecode(
+                  _decrypt(data['meta'] as String, secret),
+                ) as Map<String, dynamic>;
                 place = (m['place'] ?? '').toString();
                 note = (m['note'] ?? '').toString();
               } catch (_) {}

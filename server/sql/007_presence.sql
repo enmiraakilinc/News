@@ -22,7 +22,7 @@ BEGIN
   END IF;
   RETURN neural.member('couples',parts[2],uid);
  END IF;
- IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3]='messages')) AND neural.member('chats',parts[2],uid); END IF;
+ IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3] IN ('messages','typing'))) AND neural.member('chats',parts[2],uid); END IF;
  IF n=4 AND parts[1]='chatAccounts' AND parts[3]='presence' AND parts[4]='status' THEN RETURN parts[2]=uid OR neural.share_conversation(parts[2],uid) AND COALESCE(neural.raw_document('chatAccounts/'||parts[2]||'/personalConfig/presence') #> '{fields,peers,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
  IF parts[1]='chatAccounts' THEN
   IF parts[2]<>uid THEN RETURN false; END IF;
@@ -67,6 +67,7 @@ BEGIN
  IF a[1]='chats' THEN
   IF n=2 THEN RETURN neural.member('chats',a[2],uid) OR
     COALESCE(d #> '{fields,members,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
+  IF n=4 AND a[3]='typing' THEN RETURN a[4]=uid AND neural.member('chats',a[2],uid); END IF;
   RETURN n=4 AND a[3]='messages' AND neural.member('chats',a[2],uid);
  END IF;
  IF a[1]='chatAccounts' THEN RETURN a[2]=uid AND (

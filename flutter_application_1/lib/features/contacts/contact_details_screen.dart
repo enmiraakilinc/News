@@ -153,12 +153,26 @@ class ContactChatHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  LastSeenLabel(
-                    peer: userId,
-                    source: sourceKey,
-                    fallback: members == null
-                        ? 'Kişi ayrıntıları'
-                        : '${members!.length} kişi · Grup ayrıntıları',
+                  ChatTypingLabel(
+                    chatId: sourceKey.startsWith('chat/')
+                        ? sourceKey.substring('chat/'.length)
+                        : null,
+                    members: members ??
+                        (userId == null
+                            ? null
+                            : {
+                                userId!: ContactNames.name(
+                                  contactId,
+                                  fallbackName,
+                                ),
+                              }),
+                    fallback: LastSeenLabel(
+                      peer: userId,
+                      source: sourceKey,
+                      fallback: members == null
+                          ? 'Kişi ayrıntıları'
+                          : '${members!.length} kişi · Grup ayrıntıları',
+                    ),
                   ),
                 ],
               ),

@@ -12,14 +12,14 @@ test('primary mode forwards old service requests only to the VPS',async()=>{
  };
  const result=await proxyOracle(new Request('https://old/account/resolve',{method:'POST',headers:{authorization:'Bearer test-user'},body:'{"code":"123456789012"}'}),{NEURAL_PUSH_SECRET:secret},{fetch:fetcher});
  assert.equal(result.status,200);assert.equal((await result.json()).email,'opaque-login');
- assert.ok(urls.every(url=>url.startsWith('https://138.2.185.151/')));
+ assert.ok(urls.every(url=>url.startsWith('https://158.180.38.94/')));
 });
 test('legacy alarm plans are signed and revalidated on the VPS',async()=>{
  const {proxyOracle}=await import('./oracle_proxy.mjs?scheduled');
  const secret='test-only-secret';
  const result=await proxyOracle(new Request('https://old/nudge',{method:'POST',body:'{"fireAt":1,"eventId":"test"}'}),{NEURAL_PUSH_SECRET:secret},{scheduledUid:'owner',fetch:async(url,options)=>{
   if(String(url).endsWith('/v1/capabilities'))return Response.json({primaryWrites:true});
-  assert.equal(String(url),'https://138.2.185.151/internal/legacy-wake');
+  assert.equal(String(url),'https://158.180.38.94/internal/legacy-wake');
   const expected=createHmac('sha256',secret).update(options.headers['x-neural-time']+'\nlegacy-wake\n'+options.body).digest('hex');
   assert.equal(options.headers['x-neural-signature'],expected);
   assert.equal(JSON.parse(options.body).uid,'owner');return Response.json({message:'ok'});

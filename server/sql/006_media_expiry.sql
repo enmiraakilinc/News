@@ -18,7 +18,7 @@ BEGIN
   END IF;
   RETURN neural.member('couples',parts[2],uid);
  END IF;
- IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3]='messages')) AND neural.member('chats',parts[2],uid); END IF;
+ IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3] IN ('messages','typing'))) AND neural.member('chats',parts[2],uid); END IF;
  IF parts[1]='chatAccounts' THEN
   IF parts[2]<>uid THEN RETURN false; END IF;
   IF n=6 AND parts[3]='personalFiles' AND parts[5]='chunks' THEN

@@ -260,6 +260,16 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
         && request.resource.data.updatedAt == request.time;
 
+      match /typing/{userId} {
+        allow read: if sohbetUyesi(chatId);
+        allow create, update: if sohbetUyesi(chatId)
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['typing', 'updatedAt'])
+          && request.resource.data.typing is bool
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if sohbetUyesi(chatId) && request.auth.uid == userId;
+      }
+
       match /messages/{messageId} {
         allow read: if sohbetUyesi(chatId);
         allow create: if sohbetUyesi(chatId)
@@ -285,7 +295,7 @@ service cloud.firestore {
             && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
             && request.resource.data.reactions.get(request.auth.uid, '') is string
             && request.resource.data.reactions.get(request.auth.uid, '').size() <= 64));
-        allow delete: if sohbetUyesi(chatId) && resource.data.sender == request.auth.uid;
+        allow delete: if sohbetUyesi(chatId);
       }
     }
 

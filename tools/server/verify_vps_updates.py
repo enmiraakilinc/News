@@ -29,7 +29,7 @@ def main():
     result=requests.post(base+'accounts:signUp',params={'key':key},json={'returnSecureToken':True},timeout=20)
     result.raise_for_status();identity=result.json();uid=identity['localId'];token=identity['idToken'];created=False
     try:
-        endpoint='https://138.2.185.151/updates/latest'
+        endpoint='https://158.180.38.94/updates/latest'
         assert requests.get(endpoint,timeout=20).status_code==401
         headers={'Authorization':'Bearer '+token}
         assert requests.get(endpoint,headers=headers,timeout=20).status_code==403

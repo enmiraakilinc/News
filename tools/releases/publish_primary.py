@@ -5,8 +5,7 @@ from urllib.parse import urlparse
 import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
-from tools.releases.primary_cutover import gh,sql,remote,REPO_ID
-from tools.releases.repository import RELEASE_REPOSITORY as LEGACY_ALIAS
+from tools.releases.primary_cutover import gh,sql,remote,REPO,REPO_ID
 from tools.admin.firebase_config import admin_session,PROJECT_ID
 
 def quote(value):return "'"+value.replace("'","''")+"'"
@@ -21,21 +20,22 @@ def publish(version):
     assert report['abi']==['arm64-v8a'] and not report['debuggable']
     assert hashlib.sha256(apk.read_bytes()).hexdigest()==report['sha256'] and apk.stat().st_size==report['bytes']
     assert sql("SELECT value FROM neural.settings WHERE key='primary_writes'")=='true'
-    health=requests.get('https://138.2.185.151/health',timeout=20);health.raise_for_status()
+    health=requests.get('https://158.180.38.94/health',timeout=20);health.raise_for_status()
     assert health.json()['mode']=='primary'
     before=json.loads(sql("SELECT document FROM neural.documents WHERE path='config/private_app_version'"))
     assert int(before['fields']['code']['integerValue'])<=report['code']
     staged=remote("import subprocess\nprint(subprocess.check_output(['sudo','sha256sum',"+repr('/var/lib/neural/releases/'+version+'.apk')+"],text=True).split()[0])\n")
     assert staged==report['sha256'],'Stage the immutable private VPS APK first'
     repository=json.loads(gh('api',f'repositories/{REPO_ID}'))
-    assert repository['id']==REPO_ID and repository['full_name']==LEGACY_ALIAS
+    assert repository['id']==REPO_ID and repository['full_name']==REPO
     repo=repository['full_name']
     head=subprocess.check_output(['git','-c','safe.directory='+ROOT.as_posix(),'rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     assert gh('api',f'repositories/{REPO_ID}/commits/main','--jq','.sha')==head,'Push reviewed source before release'
     releases=json.loads(gh('api',f'repositories/{REPO_ID}/releases?per_page=100'))
     release=next((r for r in releases if r['tag_name']=='v'+version),None)
     if release is None:
-        gh('release','create','v'+version,str(apk),'--repo',repo,'--draft','--target',head,'--title',version,'--notes','Maintenance update.')
+        notes=directory/'RELEASE_NOTES.md'
+        gh('release','create','v'+version,str(apk),'--repo',repo,'--draft','--target',head,'--title',version,'--notes-file',str(notes))
         release=next(r for r in json.loads(gh('api',f'repositories/{REPO_ID}/releases?per_page=100')) if r['tag_name']=='v'+version)
     asset=next(a for a in release['assets'] if a['name']==apk.name)
     assert asset['size']==report['bytes'] and asset.get('digest')=='sha256:'+report['sha256']
@@ -57,7 +57,7 @@ def publish(version):
     print('GitHub release and staged VPS APK hashes verified.',flush=True)
     fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':version},
         'notes':{'stringValue':'Genel görünüm ve kararlılık iyileştirmeleri.'},
-        'repository':{'stringValue':LEGACY_ALIAS},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}
+        'repository':{'stringValue':repo},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}
     session=admin_session()
     base=f'https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents'
     endpoint=base+'/config/private_app_version'

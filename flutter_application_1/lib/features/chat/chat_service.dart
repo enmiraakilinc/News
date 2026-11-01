@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../pair/couple_service.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../media/chat_media.dart';
@@ -82,6 +84,16 @@ class ChatMessage {
 }
 
 class ChatService {
+  static Future<void> setTyping(String id, bool typing) async {
+    await CoupleService.ensureReady();
+    await _db
+        .collection('chats')
+        .doc(id)
+        .collection('typing')
+        .doc(_uid)
+        .set({'typing': typing, 'updatedAt': FieldValue.serverTimestamp()});
+  }
+
   static Future<void> edit(String id, String messageId, String text) async {
     await _db
         .collection('chats')
@@ -412,5 +424,37 @@ class ChatService {
       await ChatMedia.remove(ChatMedia.idFrom(text), explicitly: true);
     }
     await ref.delete();
+  }
+
+  static Future<void> clearMessages(String id) async {
+    await CoupleService.ensureReady();
+    final messages = _db.collection('chats').doc(id).collection('messages');
+    while (true) {
+      final snapshot = await messages
+          .limit(400)
+          .get(const GetOptions(source: Source.server));
+      if (snapshot.docs.isEmpty) break;
+
+      // Delete attachment metadata, previews and chunks on the backing store
+      // before removing message references. A repeated clear is safe because
+      // ChatMedia.remove treats an already-removed attachment as complete.
+      final mediaIds = <String>{};
+      for (final message in snapshot.docs) {
+        final text = message.data()['text'];
+        if (text is String && text.startsWith(mediaPrefix)) {
+          mediaIds.add(ChatMedia.idFrom(text));
+        }
+      }
+      for (final mediaId in mediaIds) {
+        await ChatMedia.remove(mediaId, explicitly: true);
+      }
+
+      final batch = _db.batch();
+      for (final message in snapshot.docs) {
+        batch.delete(message.reference);
+      }
+      await batch.commit();
+    }
+    ChatMedia.clearCache();
   }
 }
