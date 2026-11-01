@@ -145,12 +145,18 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
    }
    return deny();
   }
+  if(p.length===4&&p[2]==='typing'){
+   if(!await member('chats',p[1]))return deny();
+   if(remove)return p[3]===uid?allow():deny();
+   return p[3]===uid&&only(b,['typing','updatedAt'])&&typeof b.typing==='boolean'
+    &&at(b.updatedAt,now)?allow():deny();
+  }
   if(p.length!==4||p[2]!=='messages'||!await member('chats',p[1]))return deny();
   if(create&&only(b,['sender','text','sentAt','openAt','readBy','replyTo','scheduled'])&&b.sender===uid
     &&str(b.text,1,800000)&&at(b.sentAt,now)&&b.openAt instanceof Instant
     &&typeof(b.scheduled??true)==='boolean'&&((b.scheduled??true)||at(b.openAt,now))
     &&equal(b.readBy,[uid])&&(b.replyTo==null||typeof b.replyTo==='string'))return allow();
-  if(remove&&a?.sender===uid)return allow();
+  if(remove&&a)return allow();
   if(update&&a.openAt instanceof Instant&&!before(now,a.openAt)){
    if(changes(a,b,['readBy'])&&list(a.readBy)&&list(b.readBy)&&a.readBy.every(u=>b.readBy.includes(u))
       &&b.readBy.every(u=>a.readBy.includes(u)||u===uid))return allow();

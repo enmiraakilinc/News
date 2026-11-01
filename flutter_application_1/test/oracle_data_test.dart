@@ -227,7 +227,7 @@ void main() {
     expect(
       () => OracleDataClient(
         token: () async => null,
-        base: Uri.parse('http://138.2.185.151'),
+        base: Uri.parse('http://158.180.38.94'),
       ),
       throwsArgumentError,
     );

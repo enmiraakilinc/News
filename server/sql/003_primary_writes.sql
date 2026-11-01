@@ -46,6 +46,7 @@ BEGIN
  IF a[1]='chats' THEN
   IF n=2 THEN RETURN neural.member('chats',a[2],uid) OR
     COALESCE(d #> '{fields,members,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
+  IF n=4 AND a[3]='typing' THEN RETURN a[4]=uid AND neural.member('chats',a[2],uid); END IF;
   RETURN n=4 AND a[3]='messages' AND neural.member('chats',a[2],uid);
  END IF;
  IF a[1]='chatAccounts' THEN RETURN a[2]=uid AND (

@@ -8,7 +8,7 @@ from tools.admin.firebase_config import admin_session
 info=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text())
 API_KEY=info['client'][0]['api_key'][0]['current_key']
 PROJECT=info['project_info']['project_id']
-BASE='https://138.2.185.151'
+BASE='https://158.180.38.94'
 FIRESTORE='https://firestore.googleapis.com/v1/projects/'+PROJECT+'/databases/(default)/documents/'
 accounts=[]
 def checked(response):

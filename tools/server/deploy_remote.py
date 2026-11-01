@@ -94,4 +94,4 @@ WantedBy=timers.target
         run('sudo','-n','systemctl','enable','neural-sync')
         run('sudo','-n','systemctl','restart','neural-sync')
     run('sudo','-n','systemctl','reload','nginx')
-    print(json.dumps({'deployed':True,'applicationCutover':False,'firestoreModified':False,'api':'https://138.2.185.151','mode':'read-migration-bridge','mirrorStarted':bool(options.get('credential'))}))
+    print(json.dumps({'deployed':True,'applicationCutover':False,'firestoreModified':False,'api':'https://158.180.38.94','mode':'read-migration-bridge','mirrorStarted':bool(options.get('credential'))}))

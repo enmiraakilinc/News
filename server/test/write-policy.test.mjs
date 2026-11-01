@@ -41,6 +41,21 @@ test('message create uses authenticated identity and server timestamp',async()=>
  await denied(run('chats/direct/messages/a',null,{...message,sentAt:now.add(-1)}));
  await denied(run('chats/direct/messages/a',null,{...message,openAt:now.add(1)}));
 });
+test('typing indicators are scoped to a chat member and its own document',async()=>{
+ const typing={typing:true,updatedAt:now};
+ await run('chats/direct/typing/alice',null,typing);
+ await run('chats/direct/typing/alice',typing,{typing:false,updatedAt:now});
+ await denied(run('chats/direct/typing/bob',null,typing));
+ await denied(run('chats/direct/typing/alice',null,typing,{uid:'mallory'}));
+ await denied(run('chats/direct/typing/alice',null,{...typing,extra:'leak'}));
+ await denied(run('chats/direct/typing/alice',null,{...typing,updatedAt:now.add(-1)}));
+ await denied(run('chats/direct/typing/bob',typing,null));
+});
+test('either chat member can clear messages, but outsiders cannot delete them',async()=>{
+ await run('chats/direct/messages/a',message,null);
+ await run('chats/direct/messages/a',{...message,sender:'bob'},null,{uid:'bob'});
+ await denied(run('chats/direct/messages/a',message,null,{uid:'mallory'}));
+});
 test('future messages cannot be edited or reacted to early',async()=>{
  const a={...message,scheduled:true,openAt:now.add(60000)};
  await denied(run('chats/direct/messages/a',a,{...a,text:'edited',editedAt:now}));

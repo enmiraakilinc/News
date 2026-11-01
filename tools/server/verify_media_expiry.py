@@ -8,7 +8,7 @@ sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import sql
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key'];accounts=[];paths=[]
-identity='https://identitytoolkit.googleapis.com/v1/';base='https://138.2.185.151'
+identity='https://identitytoolkit.googleapis.com/v1/';base='https://158.180.38.94'
 q=lambda value:"'"+value.replace("'","''")+"'"
 stamp=lambda value:{'timestampValue':value.isoformat().replace('+00:00','Z')}
 text=lambda value:{'stringValue':value}

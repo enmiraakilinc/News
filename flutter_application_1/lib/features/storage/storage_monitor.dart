@@ -10,7 +10,7 @@ class StorageMonitor {
   static Future<Map<String, dynamic>?> check() async {
     await CoupleService.ensureReady();
     final uid = CoupleService.uid;
-    const endpoint = 'https://138.2.185.151';
+    const endpoint = 'https://158.180.38.94';
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (token == null) return null;
     final response = await http

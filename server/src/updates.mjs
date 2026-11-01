@@ -13,7 +13,9 @@ export async function privateUpdate(store,auth,url,response,{directory='/var/lib
  const headers={'cache-control':'no-store','x-content-type-options':'nosniff'};
  if(url.pathname==='/updates/latest'){
   response.writeHead(200,{...headers,'content-type':'application/json; charset=utf-8'});
-  response.end(JSON.stringify({code,name,sha256,notes:str(config,'notes')??'',url:'https://138.2.185.151/updates/apk?version='+name}));return;
+  const downloadUrl=new URL('/updates/apk',url);
+  downloadUrl.searchParams.set('version',name);
+  response.end(JSON.stringify({code,name,sha256,notes:str(config,'notes')??'',url:downloadUrl.toString()}));return;
  }
  if(url.searchParams.get('version')!==name)throw new ApiError(409,'failed-precondition','Daha yeni bir güncelleme var. Tekrar kontrol et.');
  response.writeHead(200,{...headers,'content-type':'application/vnd.android.package-archive','content-length':file.size,'content-disposition':'attachment; filename="Neural-Haber-'+name+'.apk"'});

@@ -166,10 +166,14 @@ class LastSeenLabel extends StatefulWidget {
 
 class _LastSeenLabelState extends State<LastSeenLabel> {
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _stream;
+  Timer? _clock;
   @override
   void initState() {
     super.initState();
     _listen();
+    _clock = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -210,35 +214,177 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-    stream: _stream,
-    builder: (context, snapshot) {
-      final data = snapshot.data?.data();
-      final stamp = (data?['enabled'] == true) ? data!['lastSeenAt'] : null;
-      final date = stamp is Timestamp ? stamp.toDate() : null;
-      final clock = date == null
-          ? ''
-          : '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      final text = date == null
-          ? widget.fallback
-          : DateUtils.isSameDay(date, DateTime.now())
-          ? 'Son görülme: $clock'
-          : 'Son: ${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')} $clock';
-      return Tooltip(
-        message: date == null
-            ? widget.fallback
-            : 'Son görülme: ${date.day}.${date.month}.${date.year} $clock',
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
-        ),
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          final data = snapshot.data?.data();
+          final stamp = (data?['enabled'] == true) ? data!['lastSeenAt'] : null;
+          final date = stamp is Timestamp ? stamp.toDate().toLocal() : null;
+          final now = DateTime.now();
+          final online = isPresenceOnline(date, now: now);
+          final text = online
+              ? 'Çevrimiçi'
+              : formatLastSeen(date, now: now) ?? widget.fallback;
+          return Tooltip(
+            message: text,
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          );
+        },
       );
-    },
-  );
+}
+
+String? formatLastSeen(DateTime? date, {DateTime? now}) {
+  if (date == null) return null;
+  final current = now ?? DateTime.now();
+  final time =
+      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  if (DateUtils.isSameDay(date, current)) return 'Bugün $time';
+  if (DateUtils.isSameDay(date, current.subtract(const Duration(days: 1)))) {
+    return 'Dün $time';
+  }
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return date.year == current.year
+      ? '$day.$month $time'
+      : '$day.$month.${date.year} $time';
+}
+
+bool isPresenceOnline(DateTime? date, {DateTime? now}) {
+  if (date == null) return false;
+  final age = (now ?? DateTime.now()).difference(date);
+  return !age.isNegative && age < const Duration(seconds: 90);
+}
+
+class ChatTypingLabel extends StatelessWidget {
+  final String? chatId;
+  final Map<String, String>? members;
+  final Widget fallback;
+  const ChatTypingLabel({
+    super.key,
+    required this.chatId,
+    required this.fallback,
+    this.members,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (chatId == null) return fallback;
+    return _ChatTypingLabel(
+      chatId: chatId!,
+      members: members,
+      fallback: fallback,
+    );
+  }
+}
+
+class _ChatTypingLabel extends StatefulWidget {
+  final String chatId;
+  final Map<String, String>? members;
+  final Widget fallback;
+  const _ChatTypingLabel({
+    required this.chatId,
+    required this.members,
+    required this.fallback,
+  });
+
+  @override
+  State<_ChatTypingLabel> createState() => _ChatTypingLabelState();
+}
+
+class _ChatTypingLabelState extends State<_ChatTypingLabel> {
+  Timer? _clock;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+    _clock = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatTypingLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chatId != widget.chatId) _listen();
+  }
+
+  void _listen() {
+    try {
+      _stream = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.chatId)
+          .collection('typing')
+          .where('typing', isEqualTo: true)
+          .snapshots();
+    } catch (_) {
+      _stream = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          final now = DateTime.now();
+          final typing = (snapshot.data?.docs ?? [])
+              .where((document) {
+                if (document.id == CoupleService.uid) return false;
+                final stamp = document.data()['updatedAt'];
+                if (stamp is! Timestamp) return false;
+                final age = now.difference(stamp.toDate());
+                return !age.isNegative && age < const Duration(seconds: 8);
+              })
+              .map((document) => document.id)
+              .toList();
+          if (typing.isEmpty) return widget.fallback;
+          final names = typing
+              .map((uid) => widget.members?[uid])
+              .whereType<String>()
+              .where((name) => name.isNotEmpty)
+              .toList();
+          final label = names.length == 1
+              ? '${names.first} yazıyor…'
+              : names.length == 2
+              ? '${names[0]} ve ${names[1]} yazıyor…'
+              : names.length > 2
+              ? '${names.length} kişi yazıyor…'
+              : 'Yazıyor…';
+          return Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+      );
 }
 
 class LastSeenSwitch extends StatefulWidget {

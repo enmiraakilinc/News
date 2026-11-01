@@ -21,6 +21,17 @@ test('chat and call inboxes require the authenticated identity filter',()=>{
  queryAllowed({path:'chats',filters:[{field:['members'],op:'array-contains',value:value('alice')}]},'alice');
  assert.throws(()=>queryAllowed({path:'voiceCalls',filters:[{field:['callee'],op:'==',value:value('bob')}]},'alice'));
 });
+test('typing indicators can only be listed for active typing chat members',()=>{
+ const query={path:'chats/direct/typing',filters:[
+  {field:['typing'],op:'==',value:{booleanValue:true}},
+ ]};
+ queryAllowed(query,'alice');
+ assert.throws(()=>queryAllowed({path:'chats/direct/typing'},'alice'));
+ assert.throws(()=>queryAllowed({...query,filters:[
+  {field:['typing'],op:'==',value:{booleanValue:false}},
+ ]},'alice'));
+ assert.throws(()=>queryAllowed(query,null));
+});
 test('SQL fields and user values are always parameters',()=>{
  const evil="x'); DROP TABLE neural.documents;--";
  const q=compileQuery({path:'couples/a/letters',filters:[{field:[evil],op:'==',value:value(evil)}]},'alice');

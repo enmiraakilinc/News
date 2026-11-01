@@ -8,7 +8,7 @@ sys.path.insert(0,str(ROOT))
 from tools.server.ssh_admin import execute
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key']
-base='https://138.2.185.151'
+base='https://158.180.38.94'
 accounts=[]
 paths=[]
 def sql_run(sql):

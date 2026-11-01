@@ -1,16 +1,34 @@
-﻿# Özel APK yayınları ve güncellemeler
+# APK yayınları ve uygulama içi güncellemeler
 
-Uygulamanın kaynak ve APK yayın deposu **enschumacher/Neural-Haber** (private).
+Uygulamanın kaynak deposu **enmiraakilinc/News** (public). GitHub Releases
+dosyaları herkese açık olduğundan APK doğrudan da indirilebilir.
 
 ## Yayın akışı
 
-1. Kullanıcının sürüm oluşturma/yayımlama onayına göre testleri ve imzalı ARM64 release derlemesini tamamla.
-2. `tools/releases/build.ps1` APK ve doğrulanmış build-report.json üretir.
-3. `python tools/releases/publish.py --version X.Y.Z --publish` artık varsayılan olarak private yayın yapar. Repo tek yerden, `tools/releases/repository.py` içinden alınır.
-4. Yayın aracı APK'yı yeni private repo Releases bölümüne koyar; dosya özetini doğrular ve Firebase `config/private_app_version` kaydını günceller.
-5. Telefon aynı Cloudflare adresine Firebase oturumuyla bağlanır. Sunucu updateAccess yetkisini denetleyip private GitHub APK'sını akışla iletir. Notlar ve normal APK indirmeleri oturumsuz verilmez. Telefon APK'nın SHA-256 özetini kurulumdan önce doğrular.
+1. Kullanıcı onayıyla testleri çalıştır; imzalı ARM64 release derlemesini
+   `--dart-define=NEURAL_POSTGRES_PRIMARY=true` ile üret.
+2. Doğrulanmış APK'yı ve build report'u `artifacts/releases/X.Y.Z/` altına koy.
+3. GitHub Releases'e yükle; Oracle'a `tools/releases/stage_vps.py` ile APK'yı
+   aktar ve SHA-256 özetini doğrula.
+4. `tools/releases/publish_primary.py --version X.Y.Z` hedef repository ID'sini,
+   kaynak dalını, release asset'ini ve VPS kopyasını doğrular. Ardından yalnızca
+   `/updates/latest` ve `/updates/apk` üzerinden kullanılan sürüm kaydını
+   PostgreSQL-primary metadata'sında yayımlar ve üye erişim kayıtlarını korur.
+5. Uygulama güncelleme uç noktası oturum ve `updateAccess` yetkisini denetler;
+   APK'nın SHA-256 özeti kurulmadan önce doğrulanır. GitHub deposu public
+   olduğundan doğrudan release indirmesi bu uygulama içi yetki denetiminden
+   bağımsızdır.
 
-GitHub anahtarı yalnızca Cloudflare secret `GITHUB_RELEASE_TOKEN` alanında saklanır. Bu anahtar enschumacher hesabında yalnızca Neural-Haber deposuna **Contents: Read-only** izni vermelidir. Süresi dolarsa yenilenir; kaynak koda veya sohbete yazılmaz.
+Yeni istemciler, özel güncelleme kaynağı erişilemezse `enmiraakilinc/News`
+üzerindeki herkese açık son sürümü yedek olarak kontrol eder. Bu sürümün
+release açıklamasında `Build code: N` satırı bulunmalı; ARM64 dosyası
+`Neural-Haber-X.Y.Z-arm64.apk` olarak eklenmeli ve GitHub'ın asset SHA-256
+özeti kullanılmalıdır. Bu biçim sağlanmazsa istemci yayımlamayı güncelleme
+olarak sunmaz.
+
+Yayın aracı GitHub CLI oturumunu yalnızca release asset'ini doğrulamak için
+kullanır; token CDN'ye veya VPS'ye gönderilmez. Google ve SSH erişim bilgileri
+yerel kalır; kaynak koda veya sohbete eklenmez.
 
 ## Eski telefonlar için tek sürümlük geçiş
 

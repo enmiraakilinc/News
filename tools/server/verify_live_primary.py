@@ -10,7 +10,7 @@ def main():
     config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text())
     key=config['client'][0]['api_key'][0]['current_key']
     identity='https://identitytoolkit.googleapis.com/v1/'
-    base='https://138.2.185.151'
+    base='https://158.180.38.94'
     accounts=[];paths=[]
     try:
         for _ in range(2):

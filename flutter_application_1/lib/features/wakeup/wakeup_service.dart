@@ -42,7 +42,7 @@ class WakeupService {
       .doc(permissionId(sourceKey, device));
   static Future<String?> endpoint() async {
     if (const bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY')) {
-      return 'https://138.2.185.151';
+      return 'https://158.180.38.94';
     }
     try {
       final data =

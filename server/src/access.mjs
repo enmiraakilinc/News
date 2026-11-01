@@ -18,6 +18,9 @@ export function queryAllowed(q,uid) {
  const eq=(field,value,op='==')=>(q.filters??[]).some(f=>JSON.stringify(f.field)===JSON.stringify([field])&&f.op===op&&f.value?.stringValue===value);
  const okay=
   root==='chats'&&eq('members',uid,'array-contains') ||
+  p[0]==='chats'&&p.length===3&&p[2]==='typing'
+   &&(q.filters??[]).some(f=>JSON.stringify(f.field)===JSON.stringify(['typing'])
+    &&f.op==='=='&&f.value?.booleanValue===true) ||
   root==='voiceCalls'&&eq('callee',uid) ||
   root==='chatMedia'&&['owner','chatId','coupleId'].some(k=>(q.filters??[]).some(f=>JSON.stringify(f.field)===JSON.stringify([k])&&f.op==='=='&&typeof f.value?.stringValue==='string')) ||
   root==='mediaDownloadRequests'&&(eq('ownerUid',uid)||eq('requesterUid',uid)) ||

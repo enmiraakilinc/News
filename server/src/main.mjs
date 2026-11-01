@@ -123,7 +123,7 @@ const server=http.createServer(async(request,response)=>{
    await ready();
    send(response,200,{protocol:2,primaryWrites:primary});return;
   }
-  const url=new URL(request.url,'https://138.2.185.151');
+  const url=new URL(request.url,'https://158.180.38.94');
   if(request.method==='POST'&&url.pathname==='/presence'){
    const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);await ready();
    await bodyOf(request,1024);

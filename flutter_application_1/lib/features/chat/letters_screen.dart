@@ -3,8 +3,10 @@ import 'search/message_search.dart';
 import '../contacts/contact_names.dart';
 import '../../core/theme/chat_theme.dart';
 import 'chat_widgets.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../pair/couple_service.dart';
 import '../location/location_share.dart';
 import '../media/chat_media.dart';
@@ -106,9 +108,8 @@ class _PairingViewState extends State<_PairingView> {
       if (mounted) widget.onPaired();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_msg(e))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_msg(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -290,6 +291,7 @@ class _LettersView extends StatefulWidget {
 
 class _LettersViewState extends State<_LettersView> {
   int _messageLimit = 100;
+  bool _clearing = false;
   @override
   void initState() {
     super.initState();
@@ -362,6 +364,47 @@ class _LettersViewState extends State<_LettersView> {
     });
   }
 
+  Future<void> _clearConversation() async {
+    if (_clearing) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sohbet içeriğini temizle?'),
+        content: const Text(
+          'Bu sohbetteki tüm mektuplar sunucudan ve her iki kişinin '
+          'cihazlarından kalıcı olarak silinecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tümünü sil'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _clearing = true);
+    try {
+      await CoupleService.clearLetters();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sohbet içeriği silindi.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChatScaffold(
@@ -369,6 +412,11 @@ class _LettersViewState extends State<_LettersView> {
       appBar: AppBar(
         titleSpacing: 0,
         actions: [
+          IconButton(
+            tooltip: 'Sohbet içeriğini temizle',
+            icon: const Icon(Icons.delete_sweep_outlined),
+            onPressed: _clearing ? null : _clearConversation,
+          ),
           IconButton(
             tooltip: 'Mesajlarda ara',
             icon: const Icon(Icons.search),
