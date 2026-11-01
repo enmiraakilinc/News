@@ -98,12 +98,12 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
    if('alias'in b&&!str(b.alias,1,60)||'hidden'in b&&typeof b.hidden!=='boolean')return deny();
    return allow();
   }
-  if(!['starredMessages','callDevices','wakeDevices','wakePermissions'].includes(kind))return deny();
+  if(!['starredMessages','callDevices','wakeDevices','wakePermissions','chatDevices'].includes(kind))return deny();
   if(remove)return allow();
   if(!b)return deny();
   if(kind==='starredMessages'&&/^[a-f0-9]{64}$/.test(key)&&only(b,['sourceKey','messageId','starredAt'])
     &&validSource(b.sourceKey)&&id(b.messageId)&&at(b.starredAt,now))return allow();
-  if(['callDevices','wakeDevices'].includes(kind)&&/^[a-f0-9]{32}$/.test(key)
+  if(['callDevices','wakeDevices','chatDevices'].includes(kind)&&/^[a-f0-9]{32}$/.test(key)
     &&only(b,kind==='callDevices'?['token','enabled','updatedAt']:['token','updatedAt'])
     &&str(b.token,20,4096)&&(kind!=='callDevices'||typeof b.enabled==='boolean')&&at(b.updatedAt,now))return allow();
   if(kind==='wakePermissions'&&/^[a-f0-9]{64}$/.test(key)&&only(b,['sourceKey','enabled','volume','deviceId'])

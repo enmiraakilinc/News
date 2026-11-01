@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {ApiError} from './access.mjs';
-import {ServiceStore,str,bool,requirePair} from './service_store.mjs';
+import {ServiceStore,str,bool,members,requirePair} from './service_store.mjs';
 import {deliverPush} from './push_transport.mjs';
 export class Services {
  constructor(pool,{push=deliverPush}={}){this.store=new ServiceStore(pool);this.push=push;}
@@ -28,6 +28,32 @@ export class Services {
   for(const device of devices.filter(d=>bool(d,'enabled')&&str(d,'token')).slice(0,5))
    if(await this.push({token:str(device,'token'),data:{type:ringing?'voice_call':'voice_call_end',callId:body.id,recipientUid:recipient},android:{priority:'HIGH',ttl:'45s',collapse_key:'call_'+body.id}}))count++;
   return {message:count?'Arama iletildi.':'Uygulama dışında arama alma ayarı açık değil; uygulama içinde arama bekleniyor.'};
+ }
+ async notifyChatMessages(paths,auth,requestId){
+  if(!auth.uid||!Array.isArray(paths))return;
+  for(const path of paths.slice(0,50)){
+   const match=/^chats\/([A-Za-z0-9_-]{1,200})\/messages\/([A-Za-z0-9_-]{1,200})$/.exec(path);
+   if(!match)continue;
+   try{
+    const [,chatId,messageId]=match;
+    const [chat,message]=await Promise.all([this.store.get('chats/'+chatId),this.store.get(path)]);
+    if(!message||message.scheduled?.booleanValue!==false)continue;
+    const recipients=members(chat).filter(uid=>uid!==auth.uid);
+    for(const recipientUid of recipients){
+     const devices=await this.store.list('chatAccounts/'+recipientUid+'/chatDevices');
+     for(const device of devices.filter(d=>str(d,'token')).slice(0,5)){
+      const sent=await this.push({
+       token:str(device,'token'),
+       data:{type:'chat',recipientUid,chatId,messageId,eventId:requestId+'_'+messageId},
+       android:{priority:'HIGH',ttl:'60s'},
+      });
+      if(!sent)console.error(JSON.stringify({event:'chat_notification_push_failed'}));
+     }
+    }
+   }catch(error){
+    console.error(JSON.stringify({event:'chat_notification_failed',code:String(error.code??'unknown').slice(0,50)}));
+   }
+  }
  }
  async nudge(path,body,auth,{scheduled=false}={}){
   const {sourceKey,recipientUid}=body,uid=auth.uid;

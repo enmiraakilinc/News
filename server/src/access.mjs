@@ -26,7 +26,7 @@ export function queryAllowed(q,uid) {
   root==='mediaDownloadRequests'&&(eq('ownerUid',uid)||eq('requesterUid',uid)) ||
   p[0]==='couples'&&p.length>=3 ||
   p[0]==='chats'&&p.length===3&&p[2]==='messages' ||
-  p[0]==='chatAccounts'&&p.length===3&&p[1]===uid&&['contacts','starredMessages','callDevices','wakeDevices','wakePermissions'].includes(p[2]) ||
+  p[0]==='chatAccounts'&&p.length===3&&p[1]===uid&&['contacts','starredMessages','callDevices','wakeDevices','wakePermissions','chatDevices'].includes(p[2]) ||
   p[0]==='chatAccounts'&&p[1]===uid&&((p.length===3&&['personalData','personalFiles'].includes(p[2]))||(p.length===5&&p[2]==='personalFiles'&&p[4]==='chunks')) ||
   ['chatContactLabels','coupleContactLabels'].includes(p[0])&&p.length===3&&p[2]==='names' ||
   p[0]==='voiceCalls'&&p.length===3&&p[2]==='candidates';

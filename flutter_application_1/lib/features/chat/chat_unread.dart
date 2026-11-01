@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_service.dart';
 import '../pair/couple_service.dart';
 import '../pair/badge_service.dart';
@@ -90,42 +88,4 @@ class _ChatUnreadBadgeState extends State<ChatUnreadBadge> {
     builder: (_, snapshot) =>
         YeniRozet(unreadMessageCount(snapshot.data ?? [])),
   );
-}
-
-/// Available to chat-only accounts; no couple ID or secret is required.
-Future<bool> hasNewChatMessages() async {
-  await CoupleService.ensureReady();
-  final uid = CoupleService.uid!;
-  final prefs = await SharedPreferences.getInstance();
-  final db = FirebaseFirestore.instance;
-  final conversations = await db
-      .collection('chats')
-      .where('members', arrayContains: uid)
-      .get();
-  var incoming = false;
-  for (final chat in conversations.docs) {
-    final key = 'notified_chat_${uid}_${chat.id}';
-    final previous = (prefs.getStringList(key) ?? []).toSet();
-    final snapshot = await db
-        .collection('chats')
-        .doc(chat.id)
-        .collection('messages')
-        .orderBy('sentAt', descending: true)
-        .limit(100)
-        .get();
-    final now = DateTime.now();
-    final unread = <String>[];
-    for (final doc in snapshot.docs) {
-      final d = doc.data();
-      if (d['sender'] != uid &&
-          !(d['readBy'] as List? ?? []).contains(uid) &&
-          (d['scheduled'] == false ||
-              !(d['openAt'] as Timestamp).toDate().isAfter(now))) {
-        unread.add(doc.id);
-        if (!previous.contains(doc.id)) incoming = true;
-      }
-    }
-    await prefs.setStringList(key, unread);
-  }
-  return incoming;
 }

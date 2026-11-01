@@ -84,7 +84,7 @@ export async function commit(pool,body,auth){
     if(ad!==bd)return ad?1:-1;
     return (ad?-1:1)*(a.path.split('/').length-b.path.split('/').length)||a.path.localeCompare(b.path);
    });
-   const versions={},documents=[];let responseBytes=0;
+   const versions={},documents=[],createdMessages=[];let responseBytes=0;
    for(const op of ordered){
     const data=after.get(op.path);
     if(data===null){
@@ -92,6 +92,7 @@ export async function commit(pool,body,auth){
     }
     const parts=op.path.split('/');
     const previous=await load(op.path);
+    if(!previous&&op.type==='set'&&parts.length===4&&parts[0]==='chats'&&parts[2]==='messages')createdMessages.push(op.path);
     const document={name:'projects/'+process.env.FIREBASE_PROJECT_ID+'/databases/(default)/documents/'+op.path,
       fields:encodeFields(data),createTime:previous?.document.createTime??stamp,updateTime:stamp};
     if(Buffer.byteLength(JSON.stringify(document))>1100000)throw new ApiError(413,'resource-exhausted','Kayıt çok büyük. İçeriği küçük parçalara ayır.');
@@ -104,7 +105,7 @@ export async function commit(pool,body,auth){
      documents.push({path:op.path,document,version:result.rows[0].version});responseBytes+=bytes;
     }
    }
-   const response={requestId:body.requestId,commitTime:stamp,versions,documents};
+   const response={requestId:body.requestId,commitTime:stamp,versions,documents,createdMessages};
    await db.query('INSERT INTO neural.commit_receipts(uid,request_id,request_hash,response) VALUES($1,$2,$3,$4::jsonb)',
     [auth.uid,body.requestId,hash,JSON.stringify(response)]);
    await db.query('COMMIT');return response;

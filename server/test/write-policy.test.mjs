@@ -24,6 +24,13 @@ test('default deny protects config and another personal account',async()=>{
  await run('chatAccounts/alice/contacts/bob',null,{alias:'Bob',avatarEmoji:'🌻'});
  await denied(run('chatAccounts/alice/contacts/bob',{alias:'Bob'},null));
 });
+test('chat notification device tokens are scoped to their owner',async()=>{
+ const token={token:'fcm-device-token-123456789',updatedAt:now};
+ await run('chatAccounts/alice/chatDevices/'+'a'.repeat(32),null,token);
+ await denied(run('chatAccounts/bob/chatDevices/'+'a'.repeat(32),null,token));
+ await denied(run('chatAccounts/alice/chatDevices/'+'invalid',null,token));
+ await denied(run('chatAccounts/alice/chatDevices/'+'a'.repeat(32),null,{...token,extra:true}));
+});
 test('chat membership never grants access to another couple',async()=>{
  await run('couples/pair/letters/a',null,{cipher:'encrypted'});
  await denied(run('couples/pair/letters/a',null,{cipher:'encrypted'},{uid:'outsider'}));
