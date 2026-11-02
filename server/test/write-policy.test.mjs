@@ -77,6 +77,16 @@ test('message updates cannot forge another sender or reaction',async()=>{
  await run('chats/direct/messages/a',message,{...message,readBy:['alice','bob']},{uid:'bob'});
  await denied(run('chats/direct/messages/a',message,{...message,readBy:['alice','mallory']},{uid:'bob'}));
 });
+test('a recipient can hide another member message only for their own account',async()=>{
+ const incoming={...message,sender:'bob'};
+ await run('chats/direct/messages/a',incoming,{...incoming,hiddenFor:['alice']});
+ await run('chats/direct/messages/a',
+  {...incoming,hiddenFor:['charlie']},{...incoming,hiddenFor:['charlie','alice']});
+ await denied(run('chats/direct/messages/a',incoming,{...incoming,hiddenFor:['bob']}));
+ await denied(run('chats/direct/messages/a',message,{...message,hiddenFor:['alice']}));
+ await denied(run('chats/direct/messages/a',incoming,{...incoming,text:'changed',hiddenFor:['alice']}));
+ await denied(run('chats/direct/messages/a',incoming,{...incoming,hiddenFor:['alice','alice']}));
+});
 test('direct chat creation checks the consumed invite in the same batch',async()=>{
  const invite={owner:'bob',name:'Bob',usedBy:'alice',createdAt:now,expiresAt:now.add(3600000)};
  const b={group:false,title:'',members:['alice','bob'],names:{alice:'Alice',bob:'Bob'},
@@ -115,6 +125,9 @@ test('accepted calls permit later ICE candidates without a 15 minute cutoff',asy
   {read:async p=>p==='voiceCalls/a'?active:source[p]}));
  await denied(run('voiceCalls/a/candidates/b',null,candidate,
   {read:async p=>p==='voiceCalls/a'?{...active,state:'ringing'}:source[p]}));
+ const ended={...active,state:'ended',endReason:'rejected',endedAt:now};
+ await run('voiceCalls/a',active,ended);
+ await denied(run('voiceCalls/a',active,{...ended,endReason:'unsupported'}));
 });
 test('download approval belongs to the sender and is bound to the media',async()=>{
  const active={...media,ready:true};

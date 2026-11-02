@@ -20,6 +20,8 @@ object CallRingtone {
     private var vibrator: Vibrator? = null
     private val handler = Handler(Looper.getMainLooper())
     private var ringingId: String? = null
+    private var ringbackId: String? = null
+    private var ringbackTone: ToneGenerator? = null
     private fun prefs(c: Context) = c.getSharedPreferences("call_ringtone", Context.MODE_PRIVATE)
     private fun mode(c: Context) = prefs(c).getString("mode", "sound") ?: "sound"
     private fun uri(c: Context): Uri = prefs(c).getString("uri", null)?.let(Uri::parse)
@@ -60,11 +62,19 @@ object CallRingtone {
             n.getNotificationChannel(channel(c))?.importance == NotificationManager.IMPORTANCE_NONE)
     }
     fun stop(id: String? = null) {
-        if (id != null && id != ringingId) return
-        handler.removeCallbacksAndMessages(null)
-        try { ringtone?.stop() } catch (_: Exception) {}
-        try { vibrator?.cancel() } catch (_: Exception) {}
-        ringtone = null; vibrator = null; ringingId = null
+        if (id != null && id != ringingId && id != ringbackId) return
+        if (id == null || id == ringingId) {
+            handler.removeCallbacksAndMessages(null)
+            try { ringtone?.stop() } catch (_: Exception) {}
+            try { vibrator?.cancel() } catch (_: Exception) {}
+            ringtone = null; vibrator = null; ringingId = null
+        }
+        if (id == null || id == ringbackId) {
+            try { ringbackTone?.stopTone() } catch (_: Exception) {}
+            try { ringbackTone?.release() } catch (_: Exception) {}
+            ringbackTone = null
+            ringbackId = null
+        }
     }
     fun ring(c: Context, id: String, preview: Boolean = false) {
         if (ringingId == id) return
@@ -102,6 +112,23 @@ object CallRingtone {
         } catch (_: Exception) {}
         handler.postDelayed({ stop(id) }, if (preview) 5000 else 45000)
     }
+    fun ringback(c: Context, id: String) {
+        if (ringbackId == id) return
+        stop()
+        val audio = c.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val notifications = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (mode(c) == "silent" || audio.ringerMode == AudioManager.RINGER_MODE_SILENT ||
+            notifications.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) return
+        try {
+            ringbackTone = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 65)
+            ringbackId = id
+            ringbackTone?.startTone(ToneGenerator.TONE_SUP_RINGTONE, -1)
+        } catch (_: Exception) {
+            try { ringbackTone?.release() } catch (_: Exception) {}
+            ringbackTone = null
+            ringbackId = null
+        }
+    }
     fun attach(activity: FlutterActivity, engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, "app/call_ringtone").setMethodCallHandler { call, result ->
             try {
@@ -138,6 +165,11 @@ object CallRingtone {
                         val id = call.argument<String>("id") ?: ""
                         require(Regex("^[A-Za-z0-9]{20}$").matches(id))
                         ring(activity, id); result.success(null)
+                    }
+                    "ringback" -> {
+                        val id = call.argument<String>("id") ?: ""
+                        require(Regex("^[A-Za-z0-9]{20}$").matches(id))
+                        ringback(activity, id); result.success(null)
                     }
                     "stop" -> { stop(call.argument<String>("id")); result.success(null) }
                     "channelSettings" -> {
@@ -180,7 +212,7 @@ object CallRingtone {
         return true
     }
     fun detach() {
-        stop()
+        if (ringingId == "preview") stop("preview")
         pending?.error("cancelled", "Ses seçimi kapatıldı.", null); pending = null
     }
 }

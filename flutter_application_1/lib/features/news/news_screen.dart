@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../media/message_content.dart';
 import 'news_notes.dart';
 import '../games/sudoku_screen.dart';
+import '../games/sliding_puzzle_screen.dart';
 import '../../core/notifications/notif_prefs.dart';
 import '../study/course_screen.dart';
 import '../../core/notifications/incoming_call_settings.dart';
@@ -194,6 +195,17 @@ class _NewsScreenState extends State<_NewsScreen> {
                     Navigator.push<void>(
                       context,
                       _newsRoute(builder: (_) => const SudokuScreen()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.view_module_outlined),
+                  title: const Text('15 Taş Bulmacası'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push<void>(
+                      context,
+                      _newsRoute(builder: (_) => const SlidingPuzzleScreen()),
                     );
                   },
                 ),
@@ -441,11 +453,43 @@ class _ArticlePageState extends State<_ArticlePage> {
   @override
   Widget build(BuildContext context) {
     final article = _articles[widget.index];
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return Theme(
       data: newsTheme,
       child: Builder(
         builder: (context) => Scaffold(
           appBar: AppBar(title: const Text('Neural Haber')),
+          bottomNavigationBar: Padding(
+            padding: EdgeInsets.only(bottom: keyboardInset),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        minLines: 1,
+                        maxLines: 3,
+                        scrollPadding: const EdgeInsets.only(bottom: 120),
+                        decoration: const InputDecoration(
+                          hintText: 'Yorumunuzu yazın',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _ready ? _submit : null,
+                      child: const Text('Yorum yap'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           body: ListView(
             padding: EdgeInsets.fromLTRB(
               24,
@@ -535,19 +579,6 @@ class _ArticlePageState extends State<_ArticlePage> {
                   padding: EdgeInsets.symmetric(vertical: 16),
                   child: Text('İlk yorumu sen yaz.'),
                 ),
-              TextField(
-                controller: _controller,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Yorumunuzu yazın',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _ready ? _submit : null,
-                child: const Text('Yorum gönder'),
-              ),
             ],
           ),
         ),

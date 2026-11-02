@@ -765,12 +765,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _delete(ChatMessage message) async {
+    final forMe = !message.mine;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mektubu sil'),
-        content: const Text(
-          'Bu mektup sohbetin tüm katılımcılarından silinecek.',
+        title: Text(
+          forMe ? 'Kendin için silinsin mi?' : 'Herkesten silinsin mi?',
+        ),
+        content: Text(
+          forMe
+              ? 'Bu mesaj yalnızca senin sohbet görünümünden kaldırılacak.'
+              : 'Bu mesaj sohbetin tüm katılımcılarından silinecek.',
         ),
         actions: [
           TextButton(
@@ -779,14 +784,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sil'),
+            child: Text(forMe ? 'Kendin için sil' : 'Herkesten sil'),
           ),
         ],
       ),
     );
     if (ok == true) {
       try {
-        await ChatService.deleteMessage(widget.conversation.id, message.id);
+        if (forMe) {
+          await ChatService.deleteMessageForMe(
+            widget.conversation.id,
+            message.id,
+          );
+        } else {
+          await ChatService.deleteMessage(widget.conversation.id, message.id);
+        }
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -864,6 +876,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
           padding: const EdgeInsets.all(12),
           itemCount:
               messages.length + (messages.length >= _messageLimit ? 1 : 0),
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<String> ||
+                !key.value.startsWith('chat-message-')) {
+              return null;
+            }
+            final id = key.value.substring('chat-message-'.length);
+            final index = messages.indexWhere((message) => message.id == id);
+            return index < 0 ? null : index;
+          },
           itemBuilder: (context, index) {
             if (index == messages.length) {
               return TextButton.icon(
@@ -895,6 +916,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 previous.month != date.month ||
                 previous.year != date.year;
             return Column(
+              key: ValueKey('chat-message-${message.id}'),
               children: [
                 if (dateLabel)
                   Padding(
@@ -908,6 +930,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     ),
                   ),
                 MessageBubble(
+                  messageId: message.id,
                   copyOrder: date.millisecondsSinceEpoch,
                   photoMessages: photoMessages,
                   starMessageId: message.unlocked ? message.id : null,
@@ -980,7 +1003,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   onReply: message.unlocked
                       ? () => setState(() => _reply = message)
                       : null,
-                  onDelete: message.mine ? () => _delete(message) : null,
+                  onDelete: () => _delete(message),
                 ),
               ],
             );

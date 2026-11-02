@@ -99,7 +99,6 @@ class MainActivity : FlutterActivity() {
         if (MicrophoneSessionService.mode == "voice") stopService(android.content.Intent(this, MicrophoneSessionService::class.java))
         MicrophoneSessionBridge.channel?.setMethodCallHandler(null)
         MicrophoneSessionBridge.channel = null
-        stopService(android.content.Intent(this, VoiceOngoingService::class.java))
         VoiceCallBridge.channel = null
         if (::videoParts.isInitialized) videoParts.close()
         finishLocation(null, "cancelled")
@@ -140,15 +139,21 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "cancelIncoming" -> { call.argument<String>("id")?.let { (getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(VoiceCallBridge.notificationId(it)) };result.success(null) }
-                "stop" -> { if(call.argument<String>("id")==VoiceOngoingService.activeId)stopService(android.content.Intent(this,VoiceOngoingService::class.java));result.success(null) }
-                "start", "connected" -> {
+                "stop" -> {
+                    if(call.argument<String>("id")==VoiceOngoingService.activeId) {
+                        startService(android.content.Intent(this,VoiceOngoingService::class.java)
+                            .setAction("stop").putExtra("callId",call.argument<String>("id")))
+                    }
+                    result.success(null)
+                }
+                "start", "connecting", "connected" -> {
                     val id=call.argument<String>("id")
                     val uid=com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
                     if(id==null||!Regex("^[A-Za-z0-9]{20}$").matches(id)||uid==null){result.error("invalid","Arama bulunamadı.",null);return@setMethodCallHandler}
                     try {
                         val service=android.content.Intent(this,VoiceOngoingService::class.java).setAction(call.method)
                             .putExtra("callId",id).putExtra("uid",uid).putExtra("video",call.argument<Boolean>("video")?:false)
-                        if(call.method=="connected"){
+                        if(call.method=="connected"||call.method=="connecting"){
                             if(VoiceOngoingService.activeId!=id){result.error("not_active","Arama sona erdi.",null);return@setMethodCallHandler}
                             startService(service)
                         }else if(Build.VERSION.SDK_INT>=26)startForegroundService(service)else startService(service)

@@ -53,6 +53,14 @@ void main() {
       true,
     );
   });
+  test('Delete-for-me hides a message only from the selected account', () {
+    final message = {
+      'hiddenFor': ['alice'],
+    };
+    expect(hiddenForUser(message, 'alice'), isTrue);
+    expect(hiddenForUser(message, 'bob'), isFalse);
+    expect(hiddenForUser({'hiddenFor': 'alice'}, 'alice'), isFalse);
+  });
   testWidgets(
     'Typing filters loaded messages; older pages load only when requested',
     (tester) async {

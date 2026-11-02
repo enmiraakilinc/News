@@ -11,6 +11,7 @@ import '../../core/theme/chat_theme.dart';
 import '../../core/notifications/notif_prefs.dart';
 import 'shared_contact_label.dart';
 import '../calls/voice_call.dart';
+import '../media/shared_conversation_media_screen.dart';
 
 class ContactChatHeader extends StatelessWidget {
   final String contactId, fallbackName, sourceKey;
@@ -271,6 +272,20 @@ class ContactDetailsScreen extends StatelessWidget {
               if (sourceKey.startsWith('chat/'))
                 _ClearChatContentTile(
                   chatId: sourceKey.substring('chat/'.length),
+                ),
+              if (sourceKey.startsWith('chat/') ||
+                  sourceKey.startsWith('couple/'))
+                ListTile(
+                  leading: const Icon(Icons.perm_media_outlined),
+                  title: const Text('Medya, bağlantılar ve belgeler'),
+                  subtitle: const Text('Erişim süresi dolmamış paylaşımlar'),
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SharedConversationMediaScreen(sourceKey: sourceKey),
+                    ),
+                  ),
                 ),
               ListTile(
                 leading: const Icon(Icons.star_outline),

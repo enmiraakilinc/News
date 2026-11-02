@@ -128,7 +128,11 @@ class VoiceCallDeclineReceiver : BroadcastReceiver() {
         val handler=Handler(Looper.getMainLooper())
         val timeout=Runnable{if(done.compareAndSet(false,true))pending.finish()}
         handler.postDelayed(timeout,8000)
-        NativeDocuments.document("voiceCalls/$id").update(mapOf("state" to "ended", "endedAt" to FieldValue.serverTimestamp()))
+        NativeDocuments.document("voiceCalls/$id").update(mapOf(
+            "state" to "ended",
+            "endReason" to "rejected",
+            "endedAt" to FieldValue.serverTimestamp()
+        ))
             .addOnCompleteListener { if(done.compareAndSet(false,true)){handler.removeCallbacks(timeout);pending.finish()} }
     }
 }
@@ -139,11 +143,31 @@ class VoiceOngoingService : Service() {
     private var id: String? = null
     private var connectedAt: Long? = null
     private var wakeLock: PowerManager.WakeLock? = null
-    private val timeout = Runnable { id?.let { VoiceCallBridge.event("timeout",it) }; stopSelf() }
+    private var intentionalStop = false
+    private val timeout = Runnable {
+        id?.let { callId ->
+            NativeDocuments.document("voiceCalls/$callId").get().addOnSuccessListener { call ->
+                val reason = when (call.getString("state")) {
+                    "ringing" -> "unanswered"
+                    "accepted" -> "connection_timeout"
+                    else -> null
+                }
+                if (reason != null) {
+                    NativeDocuments.document("voiceCalls/$callId").update(mapOf(
+                        "state" to "ended",
+                        "endReason" to reason,
+                        "endedAt" to FieldValue.serverTimestamp()
+                    ))
+                }
+            }
+            VoiceCallBridge.event("timeout", callId)
+        }
+        stopSelf()
+    }
     override fun onBind(intent: Intent?) = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val callId = intent?.getStringExtra("callId") ?: return START_NOT_STICKY
-        if (intent.action == "stop") { VoiceCallBridge.event("stop",callId); stopSelf(); return START_NOT_STICKY }
+        if (intent.action == "stop") { intentionalStop = true; VoiceCallBridge.event("stop",callId); stopSelf(); return START_NOT_STICKY }
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null || uid != intent.getStringExtra("uid") || (id != null && id != callId)) { stopSelf(); return START_NOT_STICKY }
         id = callId
@@ -153,29 +177,31 @@ class VoiceOngoingService : Service() {
             handler.removeCallbacks(timeout)
             return START_NOT_STICKY
         }
+        if(intent.action=="connecting"){
+            handler.removeCallbacks(timeout)
+            if(connectedAt==null)handler.postDelayed(timeout,60000)
+            return START_NOT_STICKY
+        }
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
-            val channel = NotificationChannel("ongoing_call_quiet","Devam eden arama",NotificationManager.IMPORTANCE_MIN)
+            val channel = NotificationChannel("background_activity_v2","Arka plan etkinliği",NotificationManager.IMPORTANCE_MIN)
             channel.lockscreenVisibility=Notification.VISIBILITY_SECRET; channel.setSound(null,null); channel.setShowBadge(false)
             manager.createNotificationChannel(channel)
         }
-        val stop = PendingIntent.getService(this, 1717, Intent(this,VoiceOngoingService::class.java).setAction("stop").putExtra("callId",callId),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val open = PendingIntent.getActivity(this,1718,Intent(this,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val builder=if(Build.VERSION.SDK_INT>=26)Notification.Builder(this,"ongoing_call_quiet")else Notification.Builder(this)
-        val notification=builder.setSmallIcon(R.mipmap.ic_neural).setContentTitle("Arama sürüyor").setContentText("Bitirmek için dokun.")
-            .setVisibility(Notification.VISIBILITY_SECRET).setOngoing(true).setContentIntent(open)
+        val builder=if(Build.VERSION.SDK_INT>=26)Notification.Builder(this,"background_activity_v2")else Notification.Builder(this)
+        val notification=builder.setSmallIcon(R.mipmap.ic_neural)
+            .setVisibility(Notification.VISIBILITY_SECRET).setOngoing(true)
             .setPriority(Notification.PRIORITY_MIN).setOnlyAlertOnce(true)
-            .addAction(Notification.Action.Builder(null,"Aramayı bitir",stop).build()).build()
+            .build()
         try {
             if(Build.VERSION.SDK_INT>=30)startForeground(1717,notification,android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or (if(intent.getBooleanExtra("video",false))android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0))
             else startForeground(1717,notification)
-        }catch(_:Exception){VoiceCallBridge.event("stopped",callId);stopSelf();return START_NOT_STICKY}
+        }catch(_:Exception){stopSelf();return START_NOT_STICKY}
         manager.cancel(VoiceCallBridge.notificationId(callId))
         if(wakeLock==null){wakeLock=(getSystemService(Context.POWER_SERVICE)as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"Neural:VoiceCall").apply{acquire()}}
         handler.removeCallbacks(timeout)
         if(connectedAt==null)handler.postDelayed(timeout,60000)
         return START_NOT_STICKY
     }
-    override fun onTaskRemoved(rootIntent: Intent?) { id?.let { VoiceCallBridge.event("stop",it) }; stopSelf() }
-    override fun onDestroy(){handler.removeCallbacks(timeout);if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null;id?.let{VoiceCallBridge.event("stopped",it)};if(activeId==id)activeId=null;super.onDestroy()}
+    override fun onDestroy(){handler.removeCallbacks(timeout);if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null;if(!intentionalStop)id?.let{VoiceCallBridge.event("dropped",it)};if(activeId==id)activeId=null;super.onDestroy()}
 }

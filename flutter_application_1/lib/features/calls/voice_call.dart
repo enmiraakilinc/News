@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../chat/chat_service.dart';
 import '../pair/couple_service.dart';
 import '../contacts/contact_names.dart';
 import '../../core/utils/user_errors.dart';
@@ -11,15 +12,12 @@ import 'call_background.dart';
 import 'call_controls.dart';
 import 'call_audio.dart';
 import 'call_ringtone.dart';
+import 'call_state.dart';
 import '../../core/security/feature_access.dart';
 import '../../core/notifications/incoming_call_settings.dart';
 import '../../core/security/secure_screen.dart';
 
 const voiceCallRingDuration = Duration(seconds: 45);
-Duration voiceCallElapsed(DateTime started, DateTime now) {
-  final elapsed = now.difference(started);
-  return elapsed.isNegative ? Duration.zero : elapsed;
-}
 
 class VoiceCalls {
   static final answerRequested = ValueNotifier<String?>(null);
@@ -69,11 +67,13 @@ class VoiceCalls {
       final accepted = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(
-            '${video ? 'Görüntülü' : 'Sesli'} arama · S?re s?n?r? yok',
-          ),
+          title: Text('${video ? 'Görüntülü' : 'Sesli'} arama başlatılsın mı?'),
           content: const Text(
-            'Karşı taraf Ayarlar’dan uygulama kapalıyken arama almayı açabilir. Görüşme bildirim izniyle arka planda sürer. Ses kaydı tutulmaz. Bağlantı için Google STUN sunucusuyla ağ adresi bilgisi paylaşılır; farklı ağlarda bağlantı kurulamayabilir.',
+            'Karşı taraf Ayarlar’dan uygulama kapalıyken arama almayı açabilir. '
+            'Android, ekran kapalıyken mikrofon bağlantısını sürdürmek için '
+            'sessiz bir devam eden arama bildirimi gösterebilir. Ses kaydı '
+            'tutulmaz. Bağlantı için Google STUN sunucusuyla ağ adresi bilgisi '
+            'paylaşılır; farklı ağlarda bağlantı kurulamayabilir.',
           ),
           actions: [
             TextButton(
@@ -334,8 +334,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   final _localCandidates = <RTCIceCandidate>[];
   final _seenCandidates = <String>{};
   Timer? _ticker;
+  Timer? _connectionTimeout;
+  Timer? _disconnectTimeout;
   DateTime? _started;
-  final _elapsed = Stopwatch();
+  DateTime? _connectedAt;
 
   late bool _speakerOn = widget.video;
   bool _receiveMuted = false, _audioBusy = false;
@@ -351,6 +353,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   String _status = 'Aranıyor…';
   final _uid = CoupleService.uid;
   bool _backgroundStarted = false;
+  bool _backgroundProtected = false;
+  bool _videoSuspendedForBackground = false;
+  AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   StreamSubscription<NativeCallEvent>? _native;
   DateTime _ringUntil = DateTime.now().add(voiceCallRingDuration);
   CollectionReference<Map<String, dynamic>> get _candidates =>
@@ -367,8 +372,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     CallBackground.initialize();
     _native = CallBackground.events.stream.listen((event) {
       if (event.id == widget.reference.id &&
-          ['stop', 'stopped', 'timeout'].contains(event.method)) {
-        _finish('Arama sona erdi.');
+          ['stop', 'stopped', 'timeout', 'dropped'].contains(event.method)) {
+        final reason = switch (event.method) {
+          'timeout' => _started == null ? 'unanswered' : 'connection_timeout',
+          'dropped' =>
+            _connectedAt == null ? 'connection_failed' : 'connection_lost',
+          'stopped' => 'setup_failed',
+          _ => 'call_ended',
+        };
+        _finish(voiceCallEndMessage(reason), reason: reason);
       }
     });
     VoiceCalls.answerRequested.addListener(_answerFromNotification);
@@ -381,13 +393,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_ended || _closing) return;
       if (FirebaseAuth.instance.currentUser?.uid != _uid) {
-        _finish('Hesabın değiştiği için arama sona erdi.');
+        _finish(
+          voiceCallEndMessage('account_changed'),
+          reason: 'account_changed',
+        );
         return;
       }
       if (_started == null && DateTime.now().isAfter(_ringUntil)) {
-        _finish('Yanıt alınamadı.');
-      } else if (mounted) {
-        setState(() {});
+        _finish(voiceCallEndMessage('unanswered'), reason: 'unanswered');
       }
     });
     if (!widget.incoming) _begin();
@@ -460,6 +473,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       widget.reference.id,
       video: widget.video,
     );
+    _backgroundProtected = _backgroundStarted || Platform.isIOS;
     if (_closing || _ended) {
       await _release();
       return;
@@ -506,6 +520,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _peer!.onConnectionState = (state) {
       if (_closing || _ended || !mounted) return;
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _connectionTimeout?.cancel();
+        _disconnectTimeout?.cancel();
+        if (!_connected) {
+          _connectedAt = DateTime.now();
+          if (_backgroundStarted) {
+            unawaited(CallBackground.connected(widget.reference.id));
+          }
+        }
         setState(() {
           _connected = true;
           _status = 'Görüşme sürüyor';
@@ -513,7 +535,25 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
         _finish(
           'Bağlantı kurulamadı. Başka bir internet bağlantısıyla yeniden dene.',
+          reason: 'connection_failed',
         );
+      } else if (state ==
+          RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+        _connected = false;
+        if (_connectedAt == null) {
+          setState(() => _status = 'Bağlanıyor…');
+          return;
+        }
+        _disconnectTimeout?.cancel();
+        setState(() => _status = 'Bağlantı yeniden kuruluyor…');
+        _disconnectTimeout = Timer(voiceCallDisconnectGracePeriod, () {
+          if (!_connected && !_closing && !_ended) {
+            _finish(
+              'Görüşme bağlantısı koptu. İnternet bağlantısını kontrol edip yeniden ara.',
+              reason: 'connection_lost',
+            );
+          }
+        });
       }
     };
     if (widget.incoming) _listenCandidates();
@@ -639,6 +679,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         'offerToReceiveVideo': widget.video,
       });
       await _peer!.setLocalDescription(offer);
+      unawaited(CallRingtone.ringback(widget.reference.id).catchError((_) {}));
       await widget.reference.set({
         'sourceKey': widget.source,
         'sourceType': widget.source.split('/')[0],
@@ -652,7 +693,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       });
       if (_closing || _ended) {
         await widget.reference
-            .update({'state': 'ended', 'endedAt': FieldValue.serverTimestamp()})
+            .update({
+              'state': 'ended',
+              'endReason': 'caller_cancelled',
+              'endedAt': FieldValue.serverTimestamp(),
+            })
             .catchError((_) {});
         _cleanup().catchError((_) {});
         return;
@@ -740,7 +785,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       return;
     }
     if (data['state'] == 'ended') {
-      await _finish('Arama sona erdi.', notify: false);
+      await _recordCallEvent(data['endReason'] as String?);
+      await _finish(
+        voiceCallEndMessage(data['endReason'] as String?),
+        notify: false,
+      );
       return;
     }
     final created = data['createdAt'];
@@ -752,11 +801,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       _started = started is Timestamp
           ? started.toDate()
           : (_started ?? DateTime.now());
-      if (!_elapsed.isRunning) {
-        _elapsed.start();
+      if (_connectionTimeout == null && !_connected) {
         if (_backgroundStarted) {
-          unawaited(CallBackground.connected(widget.reference.id));
+          unawaited(CallBackground.connecting(widget.reference.id));
         }
+        _connectionTimeout = Timer(voiceCallConnectionTimeout, () {
+          if (!_connected && !_closing && !_ended) {
+            _finish(
+              'Yanıtlandı ancak 60 saniye içinde bağlantı kurulamadı. İnternet bağlantısını kontrol edip yeniden dene.',
+              reason: 'connection_timeout',
+            );
+          }
+        });
+      }
+      if (!_connected) {
         unawaited(CallBackground.cancelIncoming(widget.reference.id));
         unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
       }
@@ -777,6 +835,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         error,
         fallback: 'Arama kurulamadı. İnternet ve mikrofon iznini kontrol et.',
       ),
+      reason: 'setup_failed',
     );
   }
 
@@ -804,20 +863,77 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     await CallBackground.stop(widget.reference.id);
   }
 
-  Future<void> _finish(String status, {bool notify = true}) async {
+  Future<void> _recordCallEvent(String? reason) async {
+    if (widget.incoming) return;
+    final text = voiceCallEventText(video: widget.video, reason: reason);
+    if (text == null) return;
+    final parts = widget.source.split('/');
+    try {
+      if (parts.length != 2) {
+        throw StateError('Arama sohbeti tanınamadı.');
+      }
+      if (parts.first == 'chat') {
+        await ChatService.recordCallEvent(parts[1], widget.reference.id, text);
+      } else if (parts.first == 'couple') {
+        await CoupleService.recordCallEvent(
+          parts[1],
+          widget.reference.id,
+          text,
+        );
+      } else {
+        throw StateError('Arama sohbeti tanınamadı.');
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Arama sonucu sohbete gönderilemedi: ${userError(error)}',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _finish(
+    String status, {
+    bool notify = true,
+    String reason = 'call_ended',
+  }) async {
     if (_closing || _ended) return;
     _closing = true;
     unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     if (mounted && !_disposing) setState(() {});
     _ticker?.cancel();
+    _connectionTimeout?.cancel();
+    _disconnectTimeout?.cancel();
     try {
       await _release();
       await _ice?.cancel();
       if (notify) {
-        await widget.reference
-            .update({'state': 'ended', 'endedAt': FieldValue.serverTimestamp()})
-            .timeout(const Duration(seconds: 5))
-            .catchError((_) {});
+        var endedStateSaved = false;
+        try {
+          await widget.reference
+              .update({
+                'state': 'ended',
+                'endReason': reason,
+                'endedAt': FieldValue.serverTimestamp(),
+              })
+              .timeout(const Duration(seconds: 5));
+          endedStateSaved = true;
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Arama durumu kaydedilemedi: ${userError(error)}',
+                ),
+              ),
+            );
+          }
+        }
+        if (endedStateSaved) await _recordCallEvent(reason);
         await CallBackground.notify(
           widget.reference.id,
           'end',
@@ -848,11 +964,23 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached ||
-        (!_backgroundStarted &&
-            (state == AppLifecycleState.paused ||
-                state == AppLifecycleState.hidden))) {
-      _finish('Uygulamadan çıkıldığı için arama sona erdi.');
+    _appLifecycleState = state;
+    if (widget.video && Platform.isIOS) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden) {
+        _videoSuspendedForBackground = true;
+        for (final track
+            in _microphone?.getVideoTracks() ?? <MediaStreamTrack>[]) {
+          track.enabled = false;
+        }
+      } else if (state == AppLifecycleState.resumed &&
+          _videoSuspendedForBackground) {
+        _videoSuspendedForBackground = false;
+        for (final track
+            in _microphone?.getVideoTracks() ?? <MediaStreamTrack>[]) {
+          track.enabled = !_cameraOff;
+        }
+      }
     }
   }
 
@@ -866,16 +994,19 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _ice?.cancel();
     _native?.cancel();
     VoiceCalls.answerRequested.removeListener(_answerFromNotification);
-    if (!_ended && !_closing) _finish('Arama sona erdi.');
+    _connectionTimeout?.cancel();
+    _disconnectTimeout?.cancel();
+    if (!_ended &&
+        !_closing &&
+        !(_backgroundProtected &&
+            _appLifecycleState != AppLifecycleState.resumed)) {
+      _finish('Arama sona erdi.');
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final left = _started == null ? null : _elapsed.elapsed;
-    final time = left == null
-        ? null
-        : '${left.inMinutes}:${(left.inSeconds % 60).toString().padLeft(2, '0')}';
     final showVideo = widget.video && _renderersReady && !_closing && !_ended;
     Widget identity({bool overlay = false}) => Padding(
       padding: const EdgeInsets.all(16),
@@ -901,20 +1032,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             textAlign: TextAlign.center,
             style: overlay ? const TextStyle(color: Colors.white) : null,
           ),
-          if (time != null && !_ended)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                time,
-                style: TextStyle(
-                  color: overlay
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -922,7 +1039,16 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       canPop: _ended,
       onPopInvokedWithResult: (popped, _) async {
         if (!popped) {
-          await _finish('Arama sona erdi.');
+          await _finish(
+            widget.incoming && _started == null
+                ? 'Arama reddedildi.'
+                : 'Arama sona erdi.',
+            reason: widget.incoming && _started == null
+                ? 'rejected'
+                : (!widget.incoming && _started == null
+                      ? 'caller_cancelled'
+                      : 'call_ended'),
+          );
           if (context.mounted) Navigator.pop(context);
         }
       },
@@ -1062,7 +1188,16 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                   ),
                   icon: Icon(_ended ? Icons.close : Icons.call_end),
                   onPressed: () async {
-                    await _finish('Arama sona erdi.');
+                    await _finish(
+                      widget.incoming && _started == null
+                          ? 'Arama reddedildi.'
+                          : 'Arama sona erdi.',
+                      reason: widget.incoming && _started == null
+                          ? 'rejected'
+                          : (!widget.incoming && _started == null
+                                ? 'caller_cancelled'
+                                : 'call_ended'),
+                    );
                     if (context.mounted) Navigator.pop(context);
                   },
                   label: Text(

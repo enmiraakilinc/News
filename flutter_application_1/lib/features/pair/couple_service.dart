@@ -471,6 +471,35 @@ class CoupleService {
     });
   }
 
+  static Future<void> recordCallEvent(
+    String coupleId,
+    String callId,
+    String text,
+  ) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(callId) ||
+        text.trim().isEmpty ||
+        text.length > 200) {
+      throw ArgumentError('Geçersiz arama bildirimi.');
+    }
+    final ref = await _coupleRef();
+    final word = await secret();
+    if (ref == null || ref.id != coupleId || word == null) {
+      throw StateError('Mektup sohbeti açılamadı.');
+    }
+    final letter = ref.collection('letters').doc('call_$callId');
+    await _db.runTransaction((transaction) async {
+      if ((await transaction.get(letter)).exists) return;
+      transaction.set(letter, {
+        'from': uid,
+        'emoji': '📞',
+        'cipher': _encrypt(text.trim(), word),
+        'openDate': FieldValue.serverTimestamp(),
+        'scheduled': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   /// Mektupları canlı dinler (yeni gelince anında güncellenir).
   static Stream<List<Letter>> lettersStream(
     String coupleId,
@@ -665,9 +694,9 @@ class CoupleService {
               String place = '';
               String note = '';
               try {
-                final m = jsonDecode(
-                  _decrypt(data['meta'] as String, secret),
-                ) as Map<String, dynamic>;
+                final m =
+                    jsonDecode(_decrypt(data['meta'] as String, secret))
+                        as Map<String, dynamic>;
                 place = (m['place'] ?? '').toString();
                 note = (m['note'] ?? '').toString();
               } catch (_) {}
