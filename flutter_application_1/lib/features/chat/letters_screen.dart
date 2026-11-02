@@ -547,6 +547,7 @@ class _LettersViewState extends State<_LettersView> {
                       ),
                     ),
                   MessageBubble(
+                    messageId: letter.id,
                     copyOrder: day.millisecondsSinceEpoch,
                     photoMessages: photoMessages,
                     starMessageId: letter.acildi ? letter.id : null,

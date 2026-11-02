@@ -361,30 +361,49 @@ class _ChatTypingLabelState extends State<_ChatTypingLabel> {
               .map((document) => document.id)
               .toList();
           if (typing.isEmpty) return widget.fallback;
-          final names = typing
-              .map((uid) => widget.members?[uid])
-              .whereType<String>()
-              .where((name) => name.isNotEmpty)
-              .toList();
-          final label = names.length == 1
-              ? '${names.first} yazıyor…'
-              : names.length == 2
-              ? '${names[0]} ve ${names[1]} yazıyor…'
-              : names.length > 2
-              ? '${names.length} kişi yazıyor…'
-              : 'Yazıyor…';
-          return Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          );
+          return const _BlinkingTypingLabel();
         },
       );
+}
+
+class _BlinkingTypingLabel extends StatefulWidget {
+  const _BlinkingTypingLabel();
+
+  @override
+  State<_BlinkingTypingLabel> createState() => _BlinkingTypingLabelState();
+}
+
+class _BlinkingTypingLabelState extends State<_BlinkingTypingLabel>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..repeat(reverse: true);
+  late final Animation<double> _opacity = Tween<double>(
+    begin: 0.45,
+    end: 1,
+  ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _opacity,
+    child: Text(
+      'Yazıyor...',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
+  );
 }
 
 class LastSeenSwitch extends StatefulWidget {

@@ -86,12 +86,10 @@ class ChatMessage {
 class ChatService {
   static Future<void> setTyping(String id, bool typing) async {
     await CoupleService.ensureReady();
-    await _db
-        .collection('chats')
-        .doc(id)
-        .collection('typing')
-        .doc(_uid)
-        .set({'typing': typing, 'updatedAt': FieldValue.serverTimestamp()});
+    await _db.collection('chats').doc(id).collection('typing').doc(_uid).set({
+      'typing': typing,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<void> edit(String id, String messageId, String text) async {
@@ -347,26 +345,35 @@ class ChatService {
             return next;
           },
         ).map((snapshot) {
-          final result = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return ChatMessage(
-              id: doc.id,
-              reactions: Map<String, String>.from(data['reactions'] ?? {}),
-              edited: data['editedAt'] != null,
-              scheduled: data['scheduled'] != false,
-              pending: doc.metadata.hasPendingWrites && data['sentAt'] == null,
-              sender: data['sender'] as String,
-              text: data['text'] as String,
-              sentAt:
-                  (data['sentAt'] as Timestamp?)?.toDate() ??
-                  (data['openAt'] as Timestamp?)?.toDate() ??
-                  DateTime.now(),
-              openAt:
-                  (data['openAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-              replyTo: data['replyTo'] as String?,
-              readBy: List<String>.from(data['readBy'] ?? []),
-            );
-          }).toList();
+          final result = snapshot.docs
+              .where((doc) {
+                final hiddenFor = doc.data()['hiddenFor'];
+                return hiddenFor is! List ||
+                    !hiddenFor.whereType<String>().contains(_uid);
+              })
+              .map((doc) {
+                final data = doc.data();
+                return ChatMessage(
+                  id: doc.id,
+                  reactions: Map<String, String>.from(data['reactions'] ?? {}),
+                  edited: data['editedAt'] != null,
+                  scheduled: data['scheduled'] != false,
+                  pending:
+                      doc.metadata.hasPendingWrites && data['sentAt'] == null,
+                  sender: data['sender'] as String,
+                  text: data['text'] as String,
+                  sentAt:
+                      (data['sentAt'] as Timestamp?)?.toDate() ??
+                      (data['openAt'] as Timestamp?)?.toDate() ??
+                      DateTime.now(),
+                  openAt:
+                      (data['openAt'] as Timestamp?)?.toDate() ??
+                      DateTime.now(),
+                  replyTo: data['replyTo'] as String?,
+                  readBy: List<String>.from(data['readBy'] ?? []),
+                );
+              })
+              .toList();
           result.sort((a, b) => b.sentAt.compareTo(a.sentAt));
           return result;
         }),
@@ -379,6 +386,9 @@ class ChatService {
     String? replyTo,
   }) async {
     await CoupleService.ensureReady();
+    if (openAt != null) {
+      throw StateError('Sohbet mesajları ileri bir tarihe zamanlanamaz.');
+    }
     if (text.trim().isEmpty || text.length > 800000) {
       throw Exception('Mesaj çok uzun.');
     }
@@ -397,6 +407,34 @@ class ChatService {
     });
     batch.update(ref, {'updatedAt': FieldValue.serverTimestamp()});
     await batch.commit();
+  }
+
+  static Future<void> recordCallEvent(
+    String id,
+    String callId,
+    String text,
+  ) async {
+    await CoupleService.ensureReady();
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(callId) ||
+        text.trim().isEmpty ||
+        text.length > 200) {
+      throw ArgumentError('Geçersiz arama bildirimi.');
+    }
+    final chat = _db.collection('chats').doc(id);
+    final message = chat.collection('messages').doc('call_$callId');
+    await _db.runTransaction((transaction) async {
+      if ((await transaction.get(message)).exists) return;
+      transaction.set(message, {
+        'sender': _uid,
+        'text': text.trim(),
+        'sentAt': FieldValue.serverTimestamp(),
+        'openAt': FieldValue.serverTimestamp(),
+        'scheduled': false,
+        'readBy': [_uid],
+        'replyTo': null,
+      });
+      transaction.update(chat, {'updatedAt': FieldValue.serverTimestamp()});
+    });
   }
 
   static Future<void> markRead(String id, ChatMessage message) async {
@@ -424,6 +462,17 @@ class ChatService {
       await ChatMedia.remove(ChatMedia.idFrom(text), explicitly: true);
     }
     await ref.delete();
+  }
+
+  static Future<void> deleteMessageForMe(String id, String messageId) async {
+    await _db
+        .collection('chats')
+        .doc(id)
+        .collection('messages')
+        .doc(messageId)
+        .update({
+          'hiddenFor': FieldValue.arrayUnion([_uid]),
+        });
   }
 
   static Future<void> clearMessages(String id) async {

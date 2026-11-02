@@ -222,8 +222,14 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'answer', 'startedAt'])
           && request.resource.data.state == 'accepted' && request.resource.data.startedAt == request.time
           && descriptionValid(request.resource.data.answer, 'answer'))
-        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'endedAt'])
-          && request.resource.data.state == 'ended' && request.resource.data.endedAt == request.time));
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'endedAt', 'endReason'])
+          && request.resource.data.state == 'ended' && request.resource.data.endedAt == request.time
+          && (!request.resource.data.keys().hasAny(['endReason'])
+            || request.resource.data.endReason in [
+              'unanswered', 'rejected', 'caller_cancelled', 'call_ended',
+              'connection_timeout', 'connection_failed', 'connection_lost',
+              'setup_failed', 'account_changed'
+            ])));
       allow delete: if voiceParticipant(resource.data) && request.auth.uid == resource.data.caller
         && (resource.data.state == 'ended' || request.time >= resource.data.createdAt + duration.value(16, 'm'));
       match /candidates/{candidateId} {
@@ -298,6 +304,11 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt'])
             && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 800000
             && request.resource.data.editedAt == request.time)
+          || (resource.data.sender != request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFor'])
+            && request.resource.data.get('hiddenFor', []) is list
+            && request.resource.data.hiddenFor.hasAll(resource.data.get('hiddenFor', []))
+            && request.resource.data.hiddenFor.hasOnly(resource.data.get('hiddenFor', []).concat([request.auth.uid])))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
             && request.resource.data.reactions is map
             && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])

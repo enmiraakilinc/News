@@ -24,6 +24,11 @@ bool searchableMessageOpen(
   return date is Timestamp && !date.toDate().isAfter(now);
 }
 
+bool hiddenForUser(Map<String, dynamic> data, String userId) {
+  final hiddenFor = data['hiddenFor'];
+  return hiddenFor is List && hiddenFor.whereType<String>().contains(userId);
+}
+
 class MessageSearchPager {
   final String source;
   final String? secret;
@@ -49,11 +54,13 @@ class MessageSearchPager {
     final page = await query.get();
     final visible = page.docs
         .where(
-          (d) => searchableMessageOpen(
-            d.data(),
-            pair ? 'openDate' : 'openAt',
-            DateTime.now(),
-          ),
+          (d) =>
+              (pair || !hiddenForUser(d.data(), CoupleService.uid!)) &&
+              searchableMessageOpen(
+                d.data(),
+                pair ? 'openDate' : 'openAt',
+                DateTime.now(),
+              ),
         )
         .toList();
     final decoded = pair

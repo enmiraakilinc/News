@@ -150,6 +150,12 @@ class CallBackground {
     } catch (_) {}
   }
 
+  static Future<void> connecting(String id) async {
+    try {
+      await channel.invokeMethod('connecting', {'id': id});
+    } catch (_) {}
+  }
+
   static Future<void> stop(String id) async {
     try {
       await channel.invokeMethod('stop', {'id': id});

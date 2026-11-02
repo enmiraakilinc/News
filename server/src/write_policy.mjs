@@ -158,6 +158,12 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
     &&equal(b.readBy,[uid])&&(b.replyTo==null||typeof b.replyTo==='string'))return allow();
   if(remove&&a)return allow();
   if(update&&a.openAt instanceof Instant&&!before(now,a.openAt)){
+   const hiddenBefore=list(a.hiddenFor)?a.hiddenFor:[];
+   const hiddenAfter=b.hiddenFor;
+   if(a.sender!==uid&&changes(a,b,['hiddenFor'])&&list(hiddenAfter)
+      &&new Set(hiddenAfter).size===hiddenAfter.length
+      &&hiddenBefore.every(u=>hiddenAfter.includes(u))
+      &&hiddenAfter.every(u=>hiddenBefore.includes(u)||u===uid))return allow();
    if(changes(a,b,['readBy'])&&list(a.readBy)&&list(b.readBy)&&a.readBy.every(u=>b.readBy.includes(u))
       &&b.readBy.every(u=>a.readBy.includes(u)||u===uid))return allow();
    if(a.sender===uid&&changes(a,b,['text','editedAt'])&&str(b.text,1,800000)&&at(b.editedAt,now))return allow();
@@ -185,7 +191,11 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   if(update){
    if(a.state==='ringing'&&a.callee===uid&&!expired(a,now,45000)&&changes(a,b,['state','answer','startedAt'])
       &&b.state==='accepted'&&at(b.startedAt,now)&&description(b.answer,'answer'))return allow();
-   if(changes(a,b,['state','endedAt'])&&b.state==='ended'&&at(b.endedAt,now))return allow();
+   if(changes(a,b,['state','endedAt','endReason'])&&b.state==='ended'&&at(b.endedAt,now)
+      &&(!Object.hasOwn(b,'endReason')||[
+       'unanswered','rejected','caller_cancelled','call_ended','connection_timeout',
+       'connection_failed','connection_lost','setup_failed','account_changed',
+      ].includes(b.endReason)))return allow();
   }
   return deny();
  }

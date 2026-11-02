@@ -20,6 +20,7 @@ import '../../core/utils/user_errors.dart';
 import '../voice_notes/voice_notes_screen.dart';
 
 class MessageBubble extends StatelessWidget {
+  final String? messageId;
   final String? starMessageId;
   final int copyOrder;
   final bool mine;
@@ -38,6 +39,7 @@ class MessageBubble extends StatelessWidget {
   final Map<String, String> reactions;
   const MessageBubble({
     super.key,
+    this.messageId,
     this.starMessageId,
     this.copyOrder = 0,
     required this.mine,
@@ -73,6 +75,7 @@ class MessageBubble extends StatelessWidget {
         !scheduled &&
         !text.startsWith(attachmentPrefix) &&
         !text.startsWith(mediaPrefix);
+    final messageKey = messageId ?? starMessageId ?? 'time_$copyOrder';
     final canExtend = mine && text.startsWith(mediaPrefix);
     final canSelect = canCopy && starMessageId != null && selection != null;
     final selecting = selection?.ids.isNotEmpty == true;
@@ -80,7 +83,7 @@ class MessageBubble extends StatelessWidget {
     void toggleSelection() =>
         selection!.toggle(starMessageId!, text, copyOrder);
     return Dismissible(
-      key: ValueKey('swipe_${identityHashCode(this)}'),
+      key: ValueKey('swipe_$messageKey'),
       direction: onReply == null || selecting
           ? DismissDirection.none
           : DismissDirection.startToEnd,
@@ -195,9 +198,9 @@ class MessageBubble extends StatelessWidget {
                             Icons.reply,
                           ),
                         if (onDelete != null)
-                          const ConversationAction(
+                          ConversationAction(
                             'delete',
-                            'Sil',
+                            mine ? 'Herkesten sil' : 'Kendin için sil',
                             Icons.delete_outline,
                             destructive: true,
                           ),
@@ -797,6 +800,7 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   Future<void> _schedule() async {
+    if (widget.coupleId == null) return;
     final now = DateTime.now();
     final day = await showDatePicker(
       context: context,
@@ -964,7 +968,7 @@ class _ChatComposerState extends State<ChatComposer>
                     ),
                   ],
                 ),
-              if (_scheduled != null)
+              if (widget.coupleId != null && _scheduled != null)
                 Row(
                   children: [
                     const Icon(Icons.schedule, size: 16),
@@ -986,11 +990,12 @@ class _ChatComposerState extends State<ChatComposer>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    onPressed: _sending ? null : _schedule,
-                    icon: const Icon(Icons.schedule_outlined),
-                    tooltip: 'Geleceğe gönder',
-                  ),
+                  if (widget.coupleId != null)
+                    IconButton(
+                      onPressed: _sending ? null : _schedule,
+                      icon: const Icon(Icons.schedule_outlined),
+                      tooltip: 'Geleceğe gönder',
+                    ),
                   Expanded(
                     child: TextField(
                       focusNode: _focus,

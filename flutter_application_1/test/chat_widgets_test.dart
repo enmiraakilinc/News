@@ -171,6 +171,64 @@ void main() {
       expect(copied, 'Ders notu\nİkinci satır');
     },
   );
+  testWidgets('Only secret-word letters offer future delivery', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: ChatComposer(onSend: (_, _) async {}),
+        ),
+      ),
+    );
+    expect(find.byTooltip('Geleceğe gönder'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: ChatComposer(
+            coupleId: 'secret-word-pair',
+            onSend: (_, _) async {},
+          ),
+        ),
+      ),
+    );
+    expect(find.byTooltip('Geleceğe gönder'), findsOneWidget);
+  });
+  testWidgets('Received messages offer delete-for-me', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MessageBubble(
+            mine: false,
+            text: 'Karşı tarafın mesajı',
+            time: '12:00',
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.longPress(find.text('Karşı tarafın mesajı'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kendin için sil'), findsOneWidget);
+    expect(find.text('Herkesten sil'), findsNothing);
+  });
+  testWidgets('Message bubble keeps a stable dismiss key after rebuild', (
+    tester,
+  ) async {
+    Widget bubble() => const MaterialApp(
+      home: Scaffold(
+        body: MessageBubble(
+          mine: false,
+          text: 'Kararlı mesaj',
+          time: '12:00',
+          starMessageId: 'message-id',
+        ),
+      ),
+    );
+    await tester.pumpWidget(bubble());
+    final before = tester.widget<Dismissible>(find.byType(Dismissible)).key;
+    await tester.pumpWidget(bubble());
+    final after = tester.widget<Dismissible>(find.byType(Dismissible)).key;
+    expect(after, before);
+  });
   testWidgets('Sending keeps focus and preserves edits during delivery', (
     tester,
   ) async {
@@ -438,7 +496,7 @@ void main() {
     );
     await tester.longPress(find.text('Mektup'));
     await tester.pumpAndSettle();
-    expect(find.text('Sil'), findsOneWidget);
+    expect(find.text('Herkesten sil'), findsOneWidget);
     await tester.tap(find.text('Yanıtla'));
     await tester.pumpAndSettle();
     expect(replied, isTrue);

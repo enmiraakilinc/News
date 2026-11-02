@@ -5,6 +5,8 @@ class CallRingtone {
   static const channel = MethodChannel('app/call_ringtone');
   static Future<void> ring(String id) =>
       channel.invokeMethod<void>('ring', {'id': id});
+  static Future<void> ringback(String id) =>
+      channel.invokeMethod<void>('ringback', {'id': id});
   static Future<void> stop([String? id]) =>
       channel.invokeMethod<void>('stop', {'id': ?id});
 }

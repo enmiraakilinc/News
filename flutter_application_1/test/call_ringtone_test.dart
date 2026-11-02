@@ -104,4 +104,10 @@ void main() {
       expect(calls.every((c) => c.arguments['id'] == 'a' * 20), isTrue);
     },
   );
+  test('Outgoing ringback is a separate, call-scoped tone', () async {
+    await CallRingtone.ringback('b' * 20);
+    await CallRingtone.stop('b' * 20);
+    expect(calls.map((c) => c.method), ['ringback', 'stop']);
+    expect(calls.every((c) => c.arguments['id'] == 'b' * 20), isTrue);
+  });
 }

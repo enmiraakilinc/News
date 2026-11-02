@@ -162,8 +162,13 @@ void main() {
             .setMockMethodCallHandler(channel, null),
       );
       expect(await CallBackground.start('active-call', video: true), isTrue);
+      await CallBackground.connecting('active-call');
       await CallBackground.connected('active-call');
-      expect(calls.map((c) => c.method), ['start', 'connected']);
+      expect(calls.map((c) => c.method), [
+        'start',
+        'connecting',
+        'connected',
+      ]);
       expect(calls.last.arguments, {'id': 'active-call'});
     },
   );

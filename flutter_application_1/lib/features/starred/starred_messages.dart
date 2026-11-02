@@ -81,7 +81,14 @@ class MessageStars {
         opens.toDate().isAfter(DateTime.now())) {
       return 'Bu mesaj henüz açılmadı.';
     }
-    if (!private) return data['text'] as String;
+    if (!private) {
+      final hiddenFor = data['hiddenFor'];
+      if (hiddenFor is List &&
+          hiddenFor.whereType<String>().contains(CoupleService.uid)) {
+        return 'Bu mesaj yalnızca senin görünümünden silindi.';
+      }
+      return data['text'] as String;
+    }
     final decoded = await compute(decodeLetterBatch, {
       'secret': secret,
       'ciphers': {messageId: data['cipher']},
