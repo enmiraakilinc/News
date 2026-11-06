@@ -12,7 +12,7 @@ export async function internalPush(request,env,{fetch:fetcher=fetch,token}){
  let body;try{body=JSON.parse(raw);}catch{return reject(400);}
  const message=body.message;
  if(!/^[a-f0-9-]{36}$/.test(body.id??'')||typeof message?.token!=='string'||message.token.length<20||message.token.length>4096
-  ||!['wake','voice_call','voice_call_end'].includes(message.data?.type)
+  ||!['wake','voice_call','voice_call_end','chat'].includes(message.data?.type)
   ||Object.values(message.data).some(v=>typeof v!=='string'||v.length>1024)||Object.keys(message.data).length>12
   ||Object.keys(message).some(k=>!['token','data','android'].includes(k))
   ||message.android?.priority!=='HIGH'||!['45s','60s'].includes(message.android?.ttl)

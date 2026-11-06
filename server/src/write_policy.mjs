@@ -177,7 +177,7 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
    if(!await voice(call))return deny();
    if(remove)return allow();
    if(create&&['ringing','accepted'].includes(call.state)
-      &&(call.state==='accepted'||!expired(call,now,45000))
+      &&(call.state==='accepted'||!expired(call,now,60000))
       &&only(b,['owner','candidate','sdpMid','sdpMLineIndex'])&&b.owner===uid&&str(b.candidate,0,2500)
       &&(b.sdpMid===null||typeof b.sdpMid==='string')
       &&(b.sdpMLineIndex===null||Number.isSafeInteger(b.sdpMLineIndex)))return allow();
@@ -187,9 +187,9 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   if(create&&await voice(b)&&only(b,['sourceKey','sourceType','sourceId','caller','callee','state','offer','createdAt','video'])
      &&b.caller===uid&&typeof(b.video??false)==='boolean'&&b.state==='ringing'&&at(b.createdAt,now)&&description(b.offer,'offer'))return allow();
   if(!await voice(a))return deny();
-  if(remove&&a.caller===uid&&(a.state==='ended'||a.state==='ringing'&&expired(a,now,45000)))return allow();
+  if(remove&&a.caller===uid&&(a.state==='ended'||a.state==='ringing'&&expired(a,now,60000)))return allow();
   if(update){
-   if(a.state==='ringing'&&a.callee===uid&&!expired(a,now,45000)&&changes(a,b,['state','answer','startedAt'])
+   if(a.state==='ringing'&&a.callee===uid&&!expired(a,now,60000)&&changes(a,b,['state','answer','startedAt'])
       &&b.state==='accepted'&&at(b.startedAt,now)&&description(b.answer,'answer'))return allow();
    if(changes(a,b,['state','endedAt','endReason'])&&b.state==='ended'&&at(b.endedAt,now)
       &&(!Object.hasOwn(b,'endReason')||[

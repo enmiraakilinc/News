@@ -19,7 +19,7 @@ String userError(
   if (error is FirebaseException) {
     switch (error.code) {
       case 'permission-denied':
-        return 'Bu içeriğe şu anda erişilemiyor. Sohbet bağlantını kontrol et; ekin süresi de dolmuş olabilir.';
+        return 'Bu işlem için erişim iznin yok. Sohbete erişebildiğini veya bu işlemi yapma yetkin olduğunu kontrol et.';
       case 'unavailable':
       case 'network-request-failed':
         return 'Bağlantı kurulamadı. İnternetini kontrol edip yeniden dene.';
@@ -47,7 +47,10 @@ String userError(
     final code = error.code.toLowerCase();
     if (code.contains('permission') ||
         code.contains('access_denied') ||
-        code.contains('accessdenied')) {
+        code.contains('accessdenied') ||
+        code.contains('securityexception') ||
+        code.contains('not_authorized') ||
+        code.contains('notauthorized')) {
       return 'Bu işlem için gerekli izin kapalı. Telefon ayarlarından uygulamanın ilgili iznini açıp yeniden dene.';
     }
     if (code.contains('not_found') || code.contains('no_app')) {

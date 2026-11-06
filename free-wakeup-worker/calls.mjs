@@ -26,7 +26,7 @@ export async function notifyCall(request, env, {fetch: fetcher, token}) {
     if(members.length!==2||!members.includes(caller)||!members.includes(callee))return reply(403,'Bu aramaya erişemezsin.');
     const ringing=body.action==='ring';
     const age=Date.now()-Date.parse(call.createdAt?.timestampValue);
-    if(ringing&&(uid!==caller||call.state?.stringValue!=='ringing'||!Number.isFinite(age)||age < -5000||age>45000))return reply(409,'Arama sona ermiş.');
+    if(ringing&&(uid!==caller||call.state?.stringValue!=='ringing'||!Number.isFinite(age)||age < -5000||age>60000))return reply(409,'Arama sona ermiş.');
     if(!ringing&&call.state?.stringValue!=='ended')return reply(409,'Arama henüz sona ermemiş.');
     const recipient=ringing?callee:(uid===caller?callee:caller);
     const devices=await api(`${base}/chatAccounts/${recipient}:runQuery`,{method:'POST',body:JSON.stringify({structuredQuery:{from:[{collectionId:'callDevices'}],where:{fieldFilter:{field:{fieldPath:'enabled'},op:'EQUAL',value:{booleanValue:true}}},limit:5}})});
@@ -35,7 +35,7 @@ export async function notifyCall(request, env, {fetch: fetcher, token}) {
     for(const entry of await devices.json()){
       const fields=entry.document?.fields;
       if(fields?.enabled?.booleanValue!==true||!fields?.token?.stringValue)continue;
-      const result=await api(`https://fcm.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/messages:send`,{method:'POST',body:JSON.stringify({message:{token:fields.token.stringValue,data:{type:ringing?'voice_call':'voice_call_end',callId:body.id,recipientUid:recipient},android:{priority:'HIGH',ttl:'45s',collapse_key:`call_${body.id}`}}})});
+      const result=await api(`https://fcm.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/messages:send`,{method:'POST',body:JSON.stringify({message:{token:fields.token.stringValue,data:{type:ringing?'voice_call':'voice_call_end',callId:body.id,recipientUid:recipient},android:{priority:'HIGH',ttl:'60s',collapse_key:`call_${body.id}`}}})});
       if(result.ok)count++;
     }
     return reply(200,count?'Arama bildirimi iletildi.':'Uygulama kapalıyken arama alma açık değil; açık uygulamaya arama iletilir.');

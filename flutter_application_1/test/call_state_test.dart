@@ -1,5 +1,6 @@
 import 'package:flutter_application_1/features/calls/call_state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('unanswered and rejected calls have distinct explanations', () {
@@ -35,6 +36,18 @@ void main() {
 
   test('connection timers leave room for setup and brief network recovery', () {
     expect(voiceCallConnectionTimeout, const Duration(seconds: 60));
-    expect(voiceCallDisconnectGracePeriod, const Duration(seconds: 12));
+    expect(voiceCallDisconnectGracePeriod, const Duration(seconds: 30));
+    expect(voiceCallRingDuration, const Duration(seconds: 60));
   });
+
+  test(
+    'missed-call message preference is scoped to each conversation',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      expect(await callEventMessagesEnabled('chat/first'), isTrue);
+      await setCallEventMessagesEnabled('chat/first', false);
+      expect(await callEventMessagesEnabled('chat/first'), isFalse);
+      expect(await callEventMessagesEnabled('chat/second'), isTrue);
+    },
+  );
 }
