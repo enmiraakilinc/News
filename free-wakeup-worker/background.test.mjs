@@ -10,10 +10,10 @@ function callFixture({uid='caller',enabled=true,old=false,invalidTime=false,stat
  const env={FIREBASE_PROJECT_ID:'demo-test',FIREBASE_API_KEY:'public-test'};
  const fetch=async(url,options)=>{
   if(url.includes('accounts:lookup'))return Response.json({users:[{localId:uid}]});
-  if(url.endsWith('/voiceCalls/'+id))return Response.json({fields:{caller:str('caller'),callee:str('recipient'),state:str(state),sourceType:str('chat'),sourceId:str('one'),createdAt:{timestampValue:invalidTime?'bad-date':new Date(Date.now()-(old?60000:1000)).toISOString()}}});
+  if(url.endsWith('/voiceCalls/'+id))return Response.json({fields:{caller:str('caller'),callee:str('recipient'),state:str(state),sourceType:str('chat'),sourceId:str('one'),createdAt:{timestampValue:invalidTime?'bad-date':new Date(Date.now()-(old?61000:1000)).toISOString()}}});
   if(url.endsWith('/chats/one'))return Response.json({fields:{members:{arrayValue:{values:['caller','recipient'].map(str)}}}});
   if(url.endsWith(':runQuery'))return Response.json([{document:{fields:{enabled:{booleanValue:enabled},token:str('fake-token')}}}]);
-  if(url.endsWith('messages:send')){pushes++;const message=JSON.parse(options.body).message;assert.equal(message.data.type,state==='ended'?'voice_call_end':'voice_call');assert(!('name'in message.data));assert.equal(message.android.ttl,'45s');return Response.json({name:'sent'});}
+  if(url.endsWith('messages:send')){pushes++;const message=JSON.parse(options.body).message;assert.equal(message.data.type,state==='ended'?'voice_call_end':'voice_call');assert(!('name'in message.data));assert.equal(message.android.ttl,'60s');return Response.json({name:'sent'});}
   throw Error('unexpected');
  };
  return{env,deps:{fetch,token:async()=>'fake-access'},get pushes(){return pushes;}};

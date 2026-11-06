@@ -17,8 +17,6 @@ import '../../core/security/feature_access.dart';
 import '../../core/notifications/incoming_call_settings.dart';
 import '../../core/security/secure_screen.dart';
 
-const voiceCallRingDuration = Duration(seconds: 45);
-
 class VoiceCalls {
   static final answerRequested = ValueNotifier<String?>(null);
   static bool active = false;
@@ -339,7 +337,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   DateTime? _started;
   DateTime? _connectedAt;
 
-  late bool _speakerOn = widget.video;
+  bool _speakerOn = false;
   bool _receiveMuted = false, _audioBusy = false;
   final _remoteAudioTracks = <String, MediaStreamTrack>{};
   bool _readyToSend = false,
@@ -442,6 +440,23 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       _renderersReady = true;
     }
     if (Platform.isAndroid) {
+      if (widget.video) {
+        try {
+          final bluetoothPermission =
+              await CallBackground.requestBluetoothAudioPermission();
+          if (!bluetoothPermission && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Bluetooth izni verilmedi. Kulaklık yönlendirmesi için Android ayarlarından Bluetooth iznini aç.',
+                ),
+              ),
+            );
+          }
+        } catch (error) {
+          _audioError(error);
+        }
+      }
       await Helper.setAndroidAudioConfiguration(
         AndroidAudioConfiguration.communication,
       );
@@ -533,30 +548,40 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           _status = 'Görüşme sürüyor';
         });
       } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-        _finish(
-          'Bağlantı kurulamadı. Başka bir internet bağlantısıyla yeniden dene.',
-          reason: 'connection_failed',
-        );
+        _connectionDropped();
       } else if (state ==
           RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+        _connectionDropped();
+      } else if (state ==
+          RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
         _connected = false;
-        if (_connectedAt == null) {
-          setState(() => _status = 'Bağlanıyor…');
-          return;
+        if (_started != null) {
+          setState(() => _status = 'Bağlantı yeniden kuruluyor…');
         }
-        _disconnectTimeout?.cancel();
-        setState(() => _status = 'Bağlantı yeniden kuruluyor…');
-        _disconnectTimeout = Timer(voiceCallDisconnectGracePeriod, () {
-          if (!_connected && !_closing && !_ended) {
-            _finish(
-              'Görüşme bağlantısı koptu. İnternet bağlantısını kontrol edip yeniden ara.',
-              reason: 'connection_lost',
-            );
-          }
-        });
       }
     };
     if (widget.incoming) _listenCandidates();
+  }
+
+  void _connectionDropped() {
+    _connected = false;
+    if (_started == null) {
+      setState(() => _status = 'Bağlanıyor…');
+      return;
+    }
+    setState(() => _status = 'Bağlantı yeniden kuruluyor…');
+    _disconnectTimeout ??= Timer(voiceCallDisconnectGracePeriod, () {
+      if (!_connected && !_closing && !_ended) {
+        _finish(
+          _connectedAt == null
+              ? 'Arama bağlantısı kurulamadı. İnternet bağlantısını kontrol edip yeniden ara.'
+              : 'Görüşme bağlantısı koptu. İnternet bağlantısını kontrol edip yeniden ara.',
+          reason: _connectedAt == null
+              ? 'connection_failed'
+              : 'connection_lost',
+        );
+      }
+    });
   }
 
   void _audioError(Object error) {
@@ -864,7 +889,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   Future<void> _recordCallEvent(String? reason) async {
-    if (widget.incoming) return;
+    if (!await callEventMessagesEnabled(widget.source)) return;
     final text = voiceCallEventText(video: widget.video, reason: reason);
     if (text == null) return;
     final parts = widget.source.split('/');
@@ -903,6 +928,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }) async {
     if (_closing || _ended) return;
     _closing = true;
+    if (_started != null || _connectedAt != null) {
+      unawaited(CallRingtone.endTone(widget.reference.id).catchError((_) {}));
+    }
     unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     if (mounted && !_disposing) setState(() {});
     _ticker?.cancel();

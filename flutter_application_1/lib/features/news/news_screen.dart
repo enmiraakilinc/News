@@ -8,6 +8,7 @@ import '../media/message_content.dart';
 import 'news_notes.dart';
 import '../games/sudoku_screen.dart';
 import '../games/sliding_puzzle_screen.dart';
+import '../games/block_blast_screen.dart';
 import '../../core/notifications/notif_prefs.dart';
 import '../study/course_screen.dart';
 import '../../core/notifications/incoming_call_settings.dart';
@@ -206,6 +207,17 @@ class _NewsScreenState extends State<_NewsScreen> {
                     Navigator.push<void>(
                       context,
                       _newsRoute(builder: (_) => const SlidingPuzzleScreen()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.grid_view_outlined),
+                  title: const Text('Blok Bulmacası'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push<void>(
+                      context,
+                      _newsRoute(builder: (_) => const BlockBlastScreen()),
                     );
                   },
                 ),

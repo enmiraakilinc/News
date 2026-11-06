@@ -20,18 +20,23 @@ export class Services {
   if(!auth.uid||![caller,callee].includes(auth.uid))throw new ApiError(403,'permission-denied','Bu aramaya erişemezsin.');
   await requirePair(this.store,str(call,'sourceType')+'/'+str(call,'sourceId'),caller,callee);
   const ringing=body.action==='ring',age=Date.now()-Date.parse(call?.createdAt?.timestampValue);
-  if(ringing&&(auth.uid!==caller||str(call,'state')!=='ringing'||!Number.isFinite(age)||age < -5000||age>45000)||!ringing&&str(call,'state')!=='ended')throw new ApiError(409,'failed-precondition','Arama sona ermiş.');
+  if(ringing&&(auth.uid!==caller||str(call,'state')!=='ringing'||!Number.isFinite(age)||age < -5000||age>60000)||!ringing&&str(call,'state')!=='ended')throw new ApiError(409,'failed-precondition','Arama sona ermiş.');
   if(!await this.store.reserve('call:'+body.id+':'+body.action+':'+auth.uid,3,60000))throw new ApiError(429,'resource-exhausted','Arama isteği zaten iletildi.');
   const recipient=ringing?callee:(auth.uid===caller?callee:caller);
   const devices=await this.store.list('chatAccounts/'+recipient+'/callDevices');
   let count=0;
-  for(const device of devices.filter(d=>bool(d,'enabled')&&str(d,'token')).slice(0,5))
-   if(await this.push({token:str(device,'token'),data:{type:ringing?'voice_call':'voice_call_end',callId:body.id,recipientUid:recipient},android:{priority:'HIGH',ttl:'45s',collapse_key:'call_'+body.id}}))count++;
+  const sends=devices.filter(d=>bool(d,'enabled')&&str(d,'token')).slice(0,5)
+   .map(device=>this.push({token:str(device,'token'),data:{type:ringing?'voice_call':'voice_call_end',callId:body.id,recipientUid:recipient},android:{priority:'HIGH',ttl:'60s',collapse_key:'call_'+body.id}}));
+  count=(await Promise.all(sends)).filter(Boolean).length;
   return {message:count?'Arama iletildi.':'Uygulama dışında arama alma ayarı açık değil; uygulama içinde arama bekleniyor.'};
  }
  async notifyChatMessages(paths,auth,requestId){
   if(!auth.uid||!Array.isArray(paths))return;
+  const targets=[];
+  const seenPaths=new Set();
   for(const path of paths.slice(0,50)){
+   if(seenPaths.has(path))continue;
+   seenPaths.add(path);
    const match=/^chats\/([A-Za-z0-9_-]{1,200})\/messages\/([A-Za-z0-9_-]{1,200})$/.exec(path);
    if(!match)continue;
    try{
@@ -39,20 +44,27 @@ export class Services {
     const [chat,message]=await Promise.all([this.store.get('chats/'+chatId),this.store.get(path)]);
     if(!message||message.scheduled?.booleanValue!==false)continue;
     const recipients=members(chat).filter(uid=>uid!==auth.uid);
-    for(const recipientUid of recipients){
-     const devices=await this.store.list('chatAccounts/'+recipientUid+'/chatDevices');
+    const recipientDevices=await Promise.all(recipients.map(async recipientUid=>({
+     recipientUid,devices:await this.store.list('chatAccounts/'+recipientUid+'/chatDevices'),
+    })));
+    for(const {recipientUid,devices} of recipientDevices){
      for(const device of devices.filter(d=>str(d,'token')).slice(0,5)){
-      const sent=await this.push({
-       token:str(device,'token'),
-       data:{type:'chat',recipientUid,chatId,messageId,eventId:requestId+'_'+messageId},
-       android:{priority:'HIGH',ttl:'60s'},
-      });
-      if(!sent)console.error(JSON.stringify({event:'chat_notification_push_failed'}));
+      targets.push({token:str(device,'token'),recipientUid,chatId,messageId});
      }
     }
    }catch(error){
     console.error(JSON.stringify({event:'chat_notification_failed',code:String(error.code??'unknown').slice(0,50)}));
    }
+  }
+  for(let index=0;index<targets.length;index+=10){
+   const batch=targets.slice(index,index+10);
+   const results=await Promise.allSettled(batch.map(target=>this.push({
+    token:target.token,
+    data:{type:'chat',recipientUid:target.recipientUid,chatId:target.chatId,messageId:target.messageId,eventId:requestId+'_'+target.messageId},
+    android:{priority:'HIGH',ttl:'60s'},
+   })));
+   for(const result of results)if(result.status==='rejected'||!result.value)
+    console.error(JSON.stringify({event:'chat_notification_push_failed'}));
   }
  }
  async nudge(path,body,auth,{scheduled=false}={}){

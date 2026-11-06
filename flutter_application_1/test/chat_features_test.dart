@@ -112,17 +112,6 @@ void main() {
       expect(cache.get('first'), isNull);
     },
   );
-  test('Call duration keeps increasing beyond fifteen minutes', () {
-    final start = DateTime(2026, 10, 15);
-    expect(
-      voiceCallElapsed(start, start.add(const Duration(hours: 2))),
-      const Duration(hours: 2),
-    );
-    expect(
-      voiceCallElapsed(start, start.subtract(const Duration(hours: 1))),
-      Duration.zero,
-    );
-  });
   test(
     'Chat notification preference overrides the legacy general setting independently',
     () async {

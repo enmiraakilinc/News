@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'sliding_puzzle_logic.dart';
 
 class SlidingPuzzleScreen extends StatefulWidget {
   const SlidingPuzzleScreen({super.key});
@@ -48,15 +49,13 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
   }
 
   bool _isAdjacent(int index, int empty) =>
-      (index ~/ 4 == empty ~/ 4 && (index % 4 - empty % 4).abs() == 1) ||
-      (index % 4 == empty % 4 && (index ~/ 4 - empty ~/ 4).abs() == 1);
+      (index ~/ 4 == empty ~/ 4 || index % 4 == empty % 4) && index != empty;
 
   void _move(int index) {
-    final empty = _tiles.indexOf(0);
-    if (!_isAdjacent(index, empty)) return;
+    final moved = slidePuzzleTile(_tiles, index);
+    if (moved == null) return;
     setState(() {
-      _tiles[empty] = _tiles[index];
-      _tiles[index] = 0;
+      _tiles = moved;
       _moves++;
     });
     if (_tiles.asMap().entries.every(

@@ -18,6 +18,8 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var bluetoothPermissionResult: MethodChannel.Result? = null
+    private val bluetoothPermissionRequestCode = 7102
     var microphoneStartAllowed = false; private set
     override fun onResume() { super.onResume(); microphoneStartAllowed = true }
     override fun onPause() { microphoneStartAllowed = false; super.onPause() }
@@ -82,6 +84,13 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == bluetoothPermissionRequestCode) {
+            bluetoothPermissionResult?.success(
+                grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            )
+            bluetoothPermissionResult = null
+            return
+        }
         if (requestCode != 7101 || locationResult == null) return
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) readLocation()
@@ -129,6 +138,22 @@ class MainActivity : FlutterActivity() {
         voiceChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "consumePending" -> result.success(VoiceCallBridge.consume())
+                "requestBluetoothAudioPermission" -> {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                        checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) ==
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        result.success(true)
+                    } else if (bluetoothPermissionResult != null) {
+                        result.error("busy", "Bluetooth izni isteği sürüyor.", null)
+                    } else {
+                        bluetoothPermissionResult = result
+                        requestPermissions(
+                            arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
+                            bluetoothPermissionRequestCode
+                        )
+                    }
+                }
                 "disableIncoming" -> {
                     val manager=getSystemService(Context.NOTIFICATION_SERVICE)as android.app.NotificationManager
                     for(notification in manager.activeNotifications){

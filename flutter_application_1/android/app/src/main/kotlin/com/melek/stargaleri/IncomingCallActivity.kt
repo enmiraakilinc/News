@@ -27,7 +27,7 @@ class IncomingCallActivity : Activity() {
         val created=intent.getLongExtra("created",0)
         val prefs=getSharedPreferences("call_notifications",Context.MODE_PRIVATE)
         val local=getSharedPreferences("FlutterSharedPreferences",Context.MODE_PRIVATE)
-        if(id==null||!Regex("^[A-Za-z0-9]{20}$").matches(id)||uid!=FirebaseAuth.getInstance().currentUser?.uid||nonce==null||prefs.getString("nonce_$id",null)!=nonce||!VoiceCallBridge.enabled(this,intent.getBooleanExtra("video",false))||System.currentTimeMillis()-created !in 0..45000){finish();return}
+        if(id==null||!Regex("^[A-Za-z0-9]{20}$").matches(id)||uid!=FirebaseAuth.getInstance().currentUser?.uid||nonce==null||prefs.getString("nonce_$id",null)!=nonce||!VoiceCallBridge.enabled(this,intent.getBooleanExtra("video",false))||System.currentTimeMillis()-created !in 0..60000){finish();return}
         val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(48,48,48,48);setBackgroundColor(Color.rgb(23,25,35))}
         layout.addView(TextView(this).apply{text=if(intent.getBooleanExtra("video",false))"Gelen görüntülü arama" else "Gelen sesli arama";textSize=30f;setTextColor(Color.WHITE);gravity=Gravity.CENTER})
         val answer=Button(this).apply{text="Yanıtla"}
@@ -48,7 +48,7 @@ class IncomingCallActivity : Activity() {
         listener=NativeDocuments.document("voiceCalls/$id").addSnapshotListener{doc,_ ->
             if(doc!=null&&(!doc.exists()||doc.getString("state")!="ringing"))finish()
         }
-        handler.postDelayed({finish()},(created+45000-System.currentTimeMillis()).coerceIn(1,45000))
+        handler.postDelayed({finish()},(created+60000-System.currentTimeMillis()).coerceIn(1,60000))
         val check=object:Runnable {override fun run(){
             if(FirebaseAuth.getInstance().currentUser?.uid!=uid||prefs.getString("nonce_$id",null)!=nonce||!VoiceCallBridge.enabled(this@IncomingCallActivity,intent.getBooleanExtra("video",false)))finish()
             else handler.postDelayed(this,500)
