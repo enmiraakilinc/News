@@ -32,3 +32,46 @@ test('scheduled and non-chat documents do not send push notifications',async()=>
  await service.notifyChatMessages(['chats/direct/messages/later','couples/pair/letters/letter'],{uid:'sender'},'request-id');
  assert.deepEqual(sent,[]);
 });
+
+test('message pushes fan out concurrently while retaining the generic payload',async()=>{
+ let active=0,maximum=0;
+ const service=new Services({}, {push:async message=>{
+  active++;maximum=Math.max(maximum,active);
+  await new Promise(resolve=>setTimeout(resolve,5));
+  active--;
+  return message.data.type==='chat';
+ }});
+ service.store={
+  get:async path=>path==='chats/direct'?chat:{scheduled:{booleanValue:false}},
+  list:async()=>Array.from({length:5},(_,index)=>({token:encoded('fcm-device-token-'+index+'-123456')})),
+ };
+ await service.notifyChatMessages(['chats/direct/messages/message'],{uid:'sender'},'request-id');
+ assert.equal(maximum,5);
+});
+
+test('multiple message notifications are sent once each in bounded batches',async()=>{
+ const sent=[];let active=0,maximum=0;
+ const service=new Services({}, {push:async message=>{
+  active++;maximum=Math.max(maximum,active);
+  sent.push(message);
+  await new Promise(resolve=>setTimeout(resolve,5));
+  active--;
+  return true;
+ }});
+ service.store={
+  get:async path=>path==='chats/direct'?chat:{scheduled:{booleanValue:false}},
+  list:async()=>Array.from({length:5},(_,index)=>({token:encoded('fcm-device-token-'+index+'-123456')})),
+ };
+ await service.notifyChatMessages([
+  'chats/direct/messages/first',
+  'chats/direct/messages/second',
+  'chats/direct/messages/third',
+  'chats/direct/messages/third',
+ ],{uid:'sender'},'request-id');
+ assert.equal(sent.length,15);
+ assert.equal(maximum,10);
+ assert.deepEqual(
+  sent.map(message=>message.data.messageId).sort(),
+  [...Array(5).fill('first'),...Array(5).fill('second'),...Array(5).fill('third')].sort(),
+ );
+});

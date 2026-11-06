@@ -48,4 +48,21 @@ void main() {
     expect(find.text('Sohbet içeriğini temizle'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('missed-call message switch is available in one-to-one details', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ContactDetailsScreen(
+          contactId: 'peer',
+          fallbackName: 'Arkadaş',
+          sourceKey: 'chat/direct',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Cevapsız arama mesajı gönder'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -110,7 +110,7 @@ object CallRingtone {
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build())
             else @Suppress("DEPRECATION") v.vibrate(longArrayOf(0, 400, 700), 0)
         } catch (_: Exception) {}
-        handler.postDelayed({ stop(id) }, if (preview) 5000 else 45000)
+        handler.postDelayed({ stop(id) }, if (preview) 5000 else 60000)
     }
     fun ringback(c: Context, id: String) {
         if (ringbackId == id) return
@@ -170,6 +170,17 @@ object CallRingtone {
                         val id = call.argument<String>("id") ?: ""
                         require(Regex("^[A-Za-z0-9]{20}$").matches(id))
                         ringback(activity, id); result.success(null)
+                    }
+                    "endTone" -> {
+                        val id = call.argument<String>("id") ?: "end"
+                        stop(id)
+                        try {
+                            ToneGenerator(AudioManager.STREAM_VOICE_CALL, 65).also { tone ->
+                                tone.startTone(ToneGenerator.TONE_PROP_PROMPT, 180)
+                                handler.postDelayed({ tone.release() }, 300)
+                            }
+                        } catch (_: Exception) {}
+                        result.success(null)
                     }
                     "stop" -> { stop(call.argument<String>("id")); result.success(null) }
                     "channelSettings" -> {

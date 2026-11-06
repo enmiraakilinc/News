@@ -7,6 +7,8 @@ class CallRingtone {
       channel.invokeMethod<void>('ring', {'id': id});
   static Future<void> ringback(String id) =>
       channel.invokeMethod<void>('ringback', {'id': id});
+  static Future<void> endTone(String id) =>
+      channel.invokeMethod<void>('endTone', {'id': id});
   static Future<void> stop([String? id]) =>
       channel.invokeMethod<void>('stop', {'id': ?id});
 }

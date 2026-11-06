@@ -2,12 +2,47 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/games/sliding_puzzle_screen.dart';
+import 'package:flutter_application_1/features/games/sliding_puzzle_logic.dart';
 import 'package:flutter_application_1/features/games/sudoku_screen.dart';
+import 'package:flutter_application_1/features/games/block_blast_logic.dart';
+import 'package:flutter_application_1/features/games/block_blast_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('15-tile puzzle shifts every tile between a selected tile and gap', () {
+    final tiles = List<int>.generate(16, (index) => (index + 1) % 16);
+    final moved = slidePuzzleTile(tiles, 12);
+    expect(moved, <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 13, 14, 15]);
+    expect(slidePuzzleTile(tiles, 0), isNull);
+    expect(slidePuzzleTile(tiles, 15), isNull);
+  });
+
+  test('block placement clears full rows and scores the move', () {
+    final state = BlockBlastState(
+      cells: List<bool>.generate(100, (index) => index < 9),
+      pieces: BlockBlastState.newGame().pieces,
+      score: 0,
+      round: 0,
+      gameOver: false,
+    );
+    final next = placeBlock(state, 0, 0, 9)!;
+    expect(next.cells.take(10), everyElement(false));
+    expect(next.score, 11);
+    expect(next.pieces.first, isNull);
+  });
+
+  testWidgets('block puzzle screen shows a board and three pieces', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Puan: 0'), findsOneWidget);
+    expect(find.byType(GridView), findsOneWidget);
+    expect(find.byKey(const ValueKey('block-blast-cell-0')), findsOneWidget);
+  });
 
   testWidgets('Sudoku candidate notes can be entered and checked', (
     tester,

@@ -144,6 +144,10 @@ class CallBackground {
     }
   }
 
+  static Future<bool> requestBluetoothAudioPermission() async =>
+      await channel.invokeMethod<bool>('requestBluetoothAudioPermission') ??
+      false;
+
   static Future<void> connected(String id) async {
     try {
       await channel.invokeMethod('connected', {'id': id});

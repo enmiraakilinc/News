@@ -87,11 +87,17 @@ test('Voice calls restrict signaling, acceptance and candidates to the two real 
   await assertSucceeds(setDoc(doc(owner,path+'/candidates/ice'),candidate));
   await assertSucceeds(getDocs(query(collection(peer,path+'/candidates'),where('owner','==','owner'))));
   await assertSucceeds(updateDoc(doc(peer,path),{state:'ended',endedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(owner,path),{state:'ended',endReason:'rejected',endedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(owner,path),{state:'ended',endReason:'arbitrary',endedAt:serverTimestamp()}));
   await assertFails(setDoc(doc(owner,path+'/candidates/late'),candidate));
   const batch=writeBatch(owner);batch.delete(doc(owner,path+'/candidates/ice'));batch.delete(doc(owner,path));await assertSucceeds(batch.commit());
 });
-test('Expired ringing calls cannot be accepted and client configuration cannot be enabled by clients',async()=>{
-  await env.withSecurityRulesDisabled(async context=>setDoc(doc(context.firestore(),'voiceCalls/expired'),{...callData(),createdAt:Timestamp.fromMillis(Date.now()-60000)}));
+test('Ringing calls can be accepted for 60 seconds, then expire; clients cannot enable configuration',async()=>{
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),'voiceCalls/within-grace'),{...callData(),createdAt:Timestamp.fromMillis(Date.now()-55000)});
+    await setDoc(doc(context.firestore(),'voiceCalls/expired'),{...callData(),createdAt:Timestamp.fromMillis(Date.now()-61000)});
+  });
+  await assertSucceeds(updateDoc(doc(peer,'voiceCalls/within-grace'),{state:'accepted',answer:{type:'answer',sdp:'on-time'},startedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(peer,'voiceCalls/expired'),{state:'accepted',answer:{type:'answer',sdp:'late'},startedAt:serverTimestamp()}));
   await assertFails(setDoc(doc(owner,'config/voice_calls'),{enabled:true}));
 });

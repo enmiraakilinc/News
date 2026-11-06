@@ -19,3 +19,19 @@ test('signed transport rejects tampering, stale requests, arbitrary notification
  assert.equal((await internalPush(request(),env,deps)).status,409);
  assert.equal(forwarded,1);
 });
+
+test('signed transport forwards generic high-priority chat events',async()=>{
+ let forwarded;
+ const env={NEURAL_PUSH_SECRET:secret,FIREBASE_PROJECT_ID:'test',WAKE_RATE:{idFromName:n=>n,get:()=>({fetch:async()=>new Response('',{status:200})})}};
+ const result=await internalPush(request({...body,message:{...body.message,data:{
+  type:'chat',recipientUid:'recipient',chatId:'direct',messageId:'message',eventId:'request_message',
+ }}}),env,{token:async()=>'test-only',fetch:async(_url,options)=>{
+  forwarded=JSON.parse(options.body).message;
+  return new Response('',{status:200});
+ }});
+ assert.equal(result.status,200);
+ assert.deepEqual(forwarded.data,{
+  type:'chat',recipientUid:'recipient',chatId:'direct',messageId:'message',eventId:'request_message',
+ });
+ assert.equal(forwarded.android.priority,'HIGH');
+});

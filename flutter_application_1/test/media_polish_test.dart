@@ -100,18 +100,22 @@ void main() {
       expect(find.byType(Image), findsNothing);
     },
   );
-  test('Firebase errors explain action without leaking technical message', () {
-    final message = userError(
-      FirebaseException(
-        plugin: 'firestore',
-        code: 'permission-denied',
-        message: 'secret internal document path',
-      ),
-    );
-    expect(message, contains('erişilemiyor'));
-    expect(message, isNot(contains('permission-denied')));
-    expect(message, isNot(contains('secret')));
-  });
+  test(
+    'Firebase access errors explain authorization without misleading users',
+    () {
+      final message = userError(
+        FirebaseException(
+          plugin: 'firestore',
+          code: 'permission-denied',
+          message: 'secret internal document path',
+        ),
+      );
+      expect(message, contains('Bu işlem için erişim iznin yok'));
+      expect(message, isNot(contains('ekin')));
+      expect(message, isNot(contains('permission-denied')));
+      expect(message, isNot(contains('secret')));
+    },
+  );
   test(
     'Common action failures give readable guidance without paths or technical details',
     () {
@@ -133,6 +137,15 @@ void main() {
         userError(
           PlatformException(
             code: 'camera_access_denied',
+            message: 'native stack trace',
+          ),
+        ),
+        contains('izin'),
+      );
+      expect(
+        userError(
+          PlatformException(
+            code: 'SecurityException',
             message: 'native stack trace',
           ),
         ),

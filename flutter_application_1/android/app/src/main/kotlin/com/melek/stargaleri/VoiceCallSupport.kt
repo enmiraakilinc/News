@@ -64,7 +64,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
             val call = if (result.isSuccessful) result.result?.data else null
             val created = (call?.get("createdAt") as? com.google.firebase.Timestamp)?.toDate()?.time
             if (finished.get()) return@addOnCompleteListener
-            if (call?.get("callee") != uid || call["state"] != "ringing" || created == null || System.currentTimeMillis()-created !in 0..45000) {
+            if (call?.get("callee") != uid || call["state"] != "ringing" || created == null || System.currentTimeMillis()-created !in 0..60000) {
                 if (finished.compareAndSet(false,true)) { handler.removeCallbacks(timeout); pending.finish() }; return@addOnCompleteListener
             }
             if (call["sourceType"] == "couple" && (local.getString("flutter.couple_id",null) != call["sourceId"] || local.getString("flutter.couple_secret",null).isNullOrEmpty())) {
@@ -89,7 +89,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
         if (VoiceOngoingService.activeId != null) return
         if(!VoiceCallBridge.enabled(context,video))return
         val prefs = context.getSharedPreferences("call_notifications", Context.MODE_PRIVATE)
-        if (prefs.getLong("seen_$id",0L) > System.currentTimeMillis()-45000) return
+        if (prefs.getLong("seen_$id",0L) > System.currentTimeMillis()-60000) return
         val nonce = UUID.randomUUID().toString()
         prefs.edit().putLong("seen_$id",System.currentTimeMillis()).putString("nonce_$id",nonce).apply()
         val ringtoneChannel = CallRingtone.channel(context)
@@ -109,7 +109,7 @@ class VoiceMessageReceiver : BroadcastReceiver() {
             .addAction(Notification.Action.Builder(null,"Arama ekranını aç",screen).build())
             .addAction(Notification.Action.Builder(null,"Reddet",decline).build())
         if(local.getBoolean("flutter.call_fullscreen",true)&&(Build.VERSION.SDK_INT<34||manager.canUseFullScreenIntent()))builder.setFullScreenIntent(screen,true)
-        if(Build.VERSION.SDK_INT>=26)builder.setTimeoutAfter((45000-(System.currentTimeMillis()-created)).coerceAtLeast(1))
+        if(Build.VERSION.SDK_INT>=26)builder.setTimeoutAfter((60000-(System.currentTimeMillis()-created)).coerceAtLeast(1))
         CallRingtone.legacySound(context, builder)
         val notification=builder.build()
         notification.flags=notification.flags or Notification.FLAG_INSISTENT

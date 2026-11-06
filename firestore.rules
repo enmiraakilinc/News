@@ -218,7 +218,7 @@ service cloud.firestore {
         && descriptionValid(request.resource.data.offer, 'offer');
       allow update: if voiceParticipant(resource.data)
         && ((resource.data.state == 'ringing' && request.auth.uid == resource.data.callee
-          && request.time < resource.data.createdAt + duration.value(45, 's')
+          && request.time < resource.data.createdAt + duration.value(60, 's')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'answer', 'startedAt'])
           && request.resource.data.state == 'accepted' && request.resource.data.startedAt == request.time
           && descriptionValid(request.resource.data.answer, 'answer'))

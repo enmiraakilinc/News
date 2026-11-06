@@ -1,5 +1,10 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 const voiceCallConnectionTimeout = Duration(seconds: 60);
-const voiceCallDisconnectGracePeriod = Duration(seconds: 12);
+const voiceCallDisconnectGracePeriod = Duration(seconds: 30);
+const voiceCallRingDuration = Duration(seconds: 60);
 
 String voiceCallEndMessage(String? reason) => switch (reason) {
   'unanswered' => 'Yanıt alınamadı. Karşı taraf aramayı yanıtlamadı.',
@@ -25,4 +30,20 @@ String? voiceCallEventText({required bool video, required String? reason}) {
   };
   if (outcome == null) return null;
   return '📞 ${video ? 'Görüntülü' : 'Sesli'} arama · $outcome';
+}
+
+String _callEventPreferenceKey(String sourceKey) =>
+    'missed_call_messages_${base64Url.encode(utf8.encode(sourceKey))}';
+
+Future<bool> callEventMessagesEnabled(String sourceKey) async =>
+    (await SharedPreferences.getInstance()).getBool(
+      _callEventPreferenceKey(sourceKey),
+    ) ??
+    true;
+
+Future<void> setCallEventMessagesEnabled(String sourceKey, bool enabled) async {
+  await (await SharedPreferences.getInstance()).setBool(
+    _callEventPreferenceKey(sourceKey),
+    enabled,
+  );
 }
