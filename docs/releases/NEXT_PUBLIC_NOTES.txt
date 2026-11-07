@@ -1,1 +1,1 @@
-Günün Sorusu akışı güncellendi; Block Blast parçaları artık sürükle-bırak ile yerleştiriliyor. Genel kararlılık iyileştirmeleri.
+Oyun ligi erişimi ve skor kaydı düzeltildi. Block Blast artık renkli parçaları çerçevesiz sürükleyip yerleştiriyor; son görülmede oynanan oyun gösteriliyor. Görüntülü arama bilgileri ekrana dokununca açılıyor.

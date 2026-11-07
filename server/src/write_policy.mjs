@@ -75,9 +75,10 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   return p[1]===uid&&(remove||only(b,['peers'])&&list(b.peers)&&b.peers.length<=500&&b.peers.every(id)&&new Set(b.peers).size===b.peers.length)?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p.length===4&&p[2]==='presence'){
-  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','online','lastSeenAt'])
+  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','online','lastSeenAt','activity'])
     &&(b.enabled===false&&b.online===false&&!Object.hasOwn(b,'lastSeenAt')
-      ||b.enabled===true&&typeof b.online==='boolean'&&at(b.lastSeenAt,now)))?allow():deny();
+      ||b.enabled===true&&typeof b.online==='boolean'&&at(b.lastSeenAt,now)
+        &&(!Object.hasOwn(b,'activity')||['Sudoku','15 Taş','Block Blast'].includes(b.activity))))?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p[1]===uid&&['personalData','personalFiles','personalConfig'].includes(p[2])){
   if(p.length===4){

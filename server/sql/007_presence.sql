@@ -22,6 +22,9 @@ BEGIN
   END IF;
   RETURN neural.member('couples',parts[2],uid);
  END IF;
+ IF n=6 AND parts[1]='gameLeagues' AND parts[2] ~ '^20[0-9]{2}-Q[1-4]$'
+  AND parts[3]='games' AND parts[4] IN ('sudoku','sliding_puzzle','block_blast')
+  AND parts[5]='entries' THEN RETURN true; END IF;
  IF parts[1]='chats' THEN RETURN (n=2 OR (n=4 AND parts[3] IN ('messages','typing'))) AND neural.member('chats',parts[2],uid); END IF;
  IF n=4 AND parts[1]='chatAccounts' AND parts[3]='presence' AND parts[4]='status' THEN RETURN parts[2]=uid OR neural.share_conversation(parts[2],uid) AND COALESCE(neural.raw_document('chatAccounts/'||parts[2]||'/personalConfig/presence') #> '{fields,peers,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
  IF parts[1]='chatAccounts' THEN
@@ -69,6 +72,10 @@ BEGIN
     COALESCE(d #> '{fields,members,arrayValue,values}' @> jsonb_build_array(jsonb_build_object('stringValue',uid)),false); END IF;
   IF n=4 AND a[3]='typing' THEN RETURN a[4]=uid AND neural.member('chats',a[2],uid); END IF;
   RETURN n=4 AND a[3]='messages' AND neural.member('chats',a[2],uid);
+ END IF;
+ IF a[1]='gameLeagues' THEN
+  RETURN n=6 AND a[2] ~ '^20[0-9]{2}-Q[1-4]$' AND a[3]='games'
+   AND a[4] IN ('sudoku','sliding_puzzle','block_blast') AND a[5]='entries' AND a[6]=uid;
  END IF;
  IF a[1]='chatAccounts' THEN RETURN a[2]=uid AND (
   n=4 AND a[3] IN ('contacts','starredMessages','callDevices','wakeDevices','wakePermissions','chatDevices','personalData','personalFiles','personalConfig','presence')

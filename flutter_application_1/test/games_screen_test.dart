@@ -23,7 +23,7 @@ void main() {
 
   test('block placement clears full rows and scores the move', () {
     final state = BlockBlastState(
-      cells: List<bool>.generate(100, (index) => index < 9),
+      cells: List<bool>.generate(64, (index) => index < 7),
       pieces: [
         const BlockShape([0]),
         const BlockShape([0]),
@@ -33,11 +33,31 @@ void main() {
       round: 0,
       gameOver: false,
     );
-    final next = placeBlock(state, 0, 0, 9)!;
-    expect(next.cells.take(10), everyElement(false));
-    expect(next.clearedCells, containsAll(List<int>.generate(10, (i) => i)));
+    final next = placeBlock(state, 0, 0, 7)!;
+    expect(next.cells.take(8), everyElement(false));
+    expect(next.clearedCells, containsAll(List<int>.generate(8, (i) => i)));
     expect(next.score, 11);
     expect(next.pieces.first, isNull);
+    expect(next.clearedColors.take(8), everyElement(0));
+  });
+
+  test('block pieces retain individual colors on the board', () {
+    final state = BlockBlastState(
+      cells: List<bool>.filled(64, false),
+      cellColors: List<int>.filled(64, 0),
+      pieces: const [
+        BlockShape([0]),
+        BlockShape([0]),
+        BlockShape([0]),
+      ],
+      pieceColors: const [3, 1, 2],
+      score: 0,
+      round: 0,
+      gameOver: false,
+    );
+    final next = placeBlock(state, 0, 2, 4, Random(5))!;
+    expect(next.cells[20], isTrue);
+    expect(next.cellColors[20], 3);
   });
 
   test('block pieces vary between independently generated rounds', () {
@@ -54,7 +74,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Puan: 0'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
     expect(find.byType(GridView), findsOneWidget);
     expect(find.byKey(const ValueKey('block-blast-cell-0')), findsOneWidget);
   });
@@ -68,7 +88,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('block-blast-cell-0')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Puan: 0'), findsOneWidget);
+      expect(find.text('0'), findsOneWidget);
     },
   );
 
@@ -76,13 +96,27 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
     await tester.pumpAndSettle();
     final piece = find.byKey(const ValueKey('block-blast-piece-0'));
-    final cell = find.byKey(const ValueKey('block-blast-cell-0'));
+    final cell = find.byKey(const ValueKey('block-blast-cell-36'));
     final gesture = await tester.startGesture(tester.getCenter(piece));
     await gesture.moveTo(tester.getCenter(cell));
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(find.text('Puan: 0'), findsNothing);
+    expect(find.text('0'), findsNothing);
+  });
+
+  testWidgets('drag feedback contains only the shaped blocks, not its tray', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
+    await tester.pumpAndSettle();
+    final draggable = tester.widget<Draggable<int>>(
+      find.byKey(const ValueKey('block-blast-piece-0')),
+    );
+    final feedback = draggable.feedback as Material;
+    final shape = feedback.child as SizedBox;
+    expect(shape.width, lessThan(96));
+    expect(shape.height, lessThan(96));
   });
 
   testWidgets('Sudoku candidate notes can be entered and checked', (

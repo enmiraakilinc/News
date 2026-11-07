@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+
 import '../chat/chat_service.dart';
 import '../pair/couple_service.dart';
 import '../contacts/contact_names.dart';
@@ -105,9 +107,8 @@ class VoiceCalls {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(userError(error))));
       }
     }
   }
@@ -332,6 +333,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   final _localCandidates = <RTCIceCandidate>[];
   final _seenCandidates = <String>{};
   Timer? _ticker;
+  Timer? _callInfoTimer;
   Timer? _connectionTimeout;
   Timer? _disconnectTimeout;
   Timer? _streamRetry;
@@ -357,6 +359,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   bool _backgroundStarted = false;
   bool _backgroundProtected = false;
   bool _videoSuspendedForBackground = false;
+  bool _showCallInfo = false;
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   StreamSubscription<NativeCallEvent>? _native;
   DateTime _ringUntil = DateTime.now().add(voiceCallRingDuration);
@@ -392,6 +395,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _listenSignaling();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_ended || _closing) return;
+      if (_showCallInfo && mounted) setState(() {});
       if (FirebaseAuth.instance.currentUser?.uid != _uid) {
         _finish(
           voiceCallEndMessage('account_changed'),
@@ -893,9 +897,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       await _flush();
       CallBackground.notify(widget.reference.id, 'ring').catchError((error) {
         if (mounted && !_ended) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(userError(error))));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(userError(error))));
         }
       });
     } catch (error) {
@@ -1163,6 +1166,27 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     await batch.commit();
   }
 
+  void _toggleCallInfo() {
+    _callInfoTimer?.cancel();
+    setState(() => _showCallInfo = !_showCallInfo);
+    if (_showCallInfo) {
+      _callInfoTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted) setState(() => _showCallInfo = false);
+      });
+    }
+  }
+
+  String _callDuration() {
+    final start = _connectedAt ?? _started;
+    if (start == null) return 'Bağlanıyor…';
+    final seconds = DateTime.now()
+        .difference(start)
+        .inSeconds
+        .clamp(0, 1 << 31);
+    final minutes = seconds ~/ 60;
+    return '${minutes.toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appLifecycleState = state;
@@ -1188,6 +1212,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   void dispose() {
     _disposing = true;
+    _callInfoTimer?.cancel();
     unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
@@ -1279,12 +1304,62 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                                 top: 8,
                                 left: 12,
                                 right: 12,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.55),
-                                    borderRadius: BorderRadius.circular(16),
+                                child: GestureDetector(
+                                  onTap: _toggleCallInfo,
+                                  child: AnimatedSize(
+                                    duration: const Duration(milliseconds: 220),
+                                    curve: Curves.easeOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: Container(
+                                      padding: _showCallInfo
+                                          ? const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            )
+                                          : const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.62,
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: _showCallInfo
+                                          ? Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                identity(overlay: true),
+                                                Text(
+                                                  _callDuration(),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.keyboard_arrow_down,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Görüşme bilgileri',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
                                   ),
-                                  child: identity(overlay: true),
                                 ),
                               ),
                               Builder(
@@ -1349,15 +1424,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             children: [
                               CircleAvatar(
                                 radius: 44,
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
                                 child: Icon(
                                   widget.video ? Icons.videocam : Icons.person,
                                   size: 44,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer,
                                 ),
                               ),
                               identity(),
