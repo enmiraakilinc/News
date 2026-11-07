@@ -27,6 +27,8 @@ void main() {
               cameraOff: false,
               audioBusy: false,
               enabled: true,
+              audioRouteLabel: 'Ses çıkışı',
+              onAudioRoute: () {},
               onMicrophone: () => update(() => mic = !mic),
               onSpeaker: () => update(() => speaker = !speaker),
               onReceive: () => update(() => receive = !receive),
@@ -65,6 +67,8 @@ void main() {
               cameraOff: false,
               audioBusy: true,
               enabled: true,
+              audioRouteLabel: 'Ses çıkışı',
+              onAudioRoute: () => routes++,
               onMicrophone: () => microphone++,
               onSpeaker: () => routes++,
               onReceive: () => routes++,
@@ -81,10 +85,14 @@ void main() {
         find.widgetWithIcon(IconButton, Icons.volume_up),
       );
       final receive = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.headphones),
+        find.widgetWithIcon(IconButton, Icons.headphones).first,
+      );
+      final route = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.headphones).last,
       );
       expect(speaker.onPressed, isNull);
       expect(receive.onPressed, isNull);
+      expect(route.onPressed, isNull);
       expect([microphone, camera, switches, routes], [1, 1, 1, 0]);
       expect(tester.takeException(), isNull);
     },
@@ -164,11 +172,7 @@ void main() {
       expect(await CallBackground.start('active-call', video: true), isTrue);
       await CallBackground.connecting('active-call');
       await CallBackground.connected('active-call');
-      expect(calls.map((c) => c.method), [
-        'start',
-        'connecting',
-        'connected',
-      ]);
+      expect(calls.map((c) => c.method), ['start', 'connecting', 'connected']);
       expect(calls.last.arguments, {'id': 'active-call'});
     },
   );

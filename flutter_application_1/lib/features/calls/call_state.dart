@@ -1,9 +1,5 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
-
 const voiceCallConnectionTimeout = Duration(seconds: 60);
-const voiceCallDisconnectGracePeriod = Duration(seconds: 30);
+const voiceCallDisconnectGracePeriod = Duration(seconds: 90);
 const voiceCallRingDuration = Duration(seconds: 60);
 
 String voiceCallEndMessage(String? reason) => switch (reason) {
@@ -22,28 +18,27 @@ String voiceCallEndMessage(String? reason) => switch (reason) {
   _ => 'Karşı taraf aramayı bitirdi.',
 };
 
-String? voiceCallEventText({required bool video, required String? reason}) {
+String voiceCallEventText({
+  required bool video,
+  required String? reason,
+  bool answered = false,
+}) {
   final outcome = switch (reason) {
     'unanswered' => 'Yanıtlanmadı',
     'rejected' => 'Reddedildi',
-    _ => null,
+    'caller_cancelled' => 'Arayan aramayı iptal etti',
+    'connection_timeout' => 'Yanıtlandı · bağlantı kurulamadı',
+    'connection_failed' => 'Yanıtlandı · bağlantı kurulamadı',
+    'connection_lost' => 'Yanıtlandı · bağlantı koptu',
+    'setup_failed' => answered
+        ? 'Yanıtlandı · arama kurulamadı'
+        : 'Arama kurulamadı',
+    'account_changed' => answered
+        ? 'Yanıtlandı · hesap değişti'
+        : 'Hesap değişti',
+    'answered' => 'Yanıtlandı',
+    'call_ended' => answered ? 'Yanıtlandı' : 'Arama sona erdi',
+    _ => answered ? 'Yanıtlandı' : 'Arama sona erdi',
   };
-  if (outcome == null) return null;
   return '📞 ${video ? 'Görüntülü' : 'Sesli'} arama · $outcome';
-}
-
-String _callEventPreferenceKey(String sourceKey) =>
-    'missed_call_messages_${base64Url.encode(utf8.encode(sourceKey))}';
-
-Future<bool> callEventMessagesEnabled(String sourceKey) async =>
-    (await SharedPreferences.getInstance()).getBool(
-      _callEventPreferenceKey(sourceKey),
-    ) ??
-    true;
-
-Future<void> setCallEventMessagesEnabled(String sourceKey, bool enabled) async {
-  await (await SharedPreferences.getInstance()).setBool(
-    _callEventPreferenceKey(sourceKey),
-    enabled,
-  );
 }

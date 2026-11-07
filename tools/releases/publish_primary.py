@@ -8,6 +8,9 @@ sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import gh,sql,remote,REPO,REPO_ID
 from tools.admin.firebase_config import admin_session,PROJECT_ID
 
+PUBLIC_NOTES=(ROOT/'docs/releases/NEXT_PUBLIC_NOTES.txt').read_text(encoding='utf-8-sig').strip()
+if not PUBLIC_NOTES or len(PUBLIC_NOTES)>1000:raise ValueError('Public release notes must contain 1–1000 characters.')
+
 def quote(value):return "'"+value.replace("'","''")+"'"
 
 def publish(version):
@@ -34,8 +37,7 @@ def publish(version):
     releases=json.loads(gh('api',f'repositories/{REPO_ID}/releases?per_page=100'))
     release=next((r for r in releases if r['tag_name']=='v'+version),None)
     if release is None:
-        notes=directory/'RELEASE_NOTES.md'
-        gh('release','create','v'+version,str(apk),'--repo',repo,'--draft','--target',head,'--title',version,'--notes-file',str(notes))
+        gh('release','create','v'+version,str(apk),'--repo',repo,'--draft','--target',head,'--title',version,'--notes',PUBLIC_NOTES)
         release=next(r for r in json.loads(gh('api',f'repositories/{REPO_ID}/releases?per_page=100')) if r['tag_name']=='v'+version)
     asset=next(a for a in release['assets'] if a['name']==apk.name)
     assert asset['size']==report['bytes'] and asset.get('digest')=='sha256:'+report['sha256']
@@ -56,7 +58,7 @@ def publish(version):
     assert proof['sha256']==report['sha256'] and proof['bytes']==report['bytes']
     print('GitHub release and staged VPS APK hashes verified.',flush=True)
     fields={'code':{'integerValue':str(report['code'])},'name':{'stringValue':version},
-        'notes':{'stringValue':'Genel görünüm ve kararlılık iyileştirmeleri.'},
+        'notes':{'stringValue':PUBLIC_NOTES},
         'repository':{'stringValue':repo},'assetId':{'integerValue':str(asset['id'])},'sha256':{'stringValue':report['sha256']}}
     session=admin_session()
     base=f'https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents'

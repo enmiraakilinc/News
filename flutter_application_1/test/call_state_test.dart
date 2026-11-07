@@ -1,6 +1,5 @@
 import 'package:flutter_application_1/features/calls/call_state.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('unanswered and rejected calls have distinct explanations', () {
@@ -12,7 +11,7 @@ void main() {
     );
   });
 
-  test('conversation events are limited to missed and rejected calls', () {
+  test('every call outcome is recorded in its conversation', () {
     expect(
       voiceCallEventText(video: false, reason: 'unanswered'),
       '📞 Sesli arama · Yanıtlanmadı',
@@ -21,10 +20,21 @@ void main() {
       voiceCallEventText(video: true, reason: 'rejected'),
       '📞 Görüntülü arama · Reddedildi',
     );
-    expect(voiceCallEventText(video: false, reason: 'call_ended'), isNull);
     expect(
       voiceCallEventText(video: false, reason: 'caller_cancelled'),
-      isNull,
+      '📞 Sesli arama · Arayan aramayı iptal etti',
+    );
+    expect(
+      voiceCallEventText(video: false, reason: 'call_ended', answered: true),
+      '📞 Sesli arama · Yanıtlandı',
+    );
+    expect(
+      voiceCallEventText(
+        video: true,
+        reason: 'connection_lost',
+        answered: true,
+      ),
+      '📞 Görüntülü arama · Yanıtlandı · bağlantı koptu',
     );
   });
 
@@ -36,18 +46,7 @@ void main() {
 
   test('connection timers leave room for setup and brief network recovery', () {
     expect(voiceCallConnectionTimeout, const Duration(seconds: 60));
-    expect(voiceCallDisconnectGracePeriod, const Duration(seconds: 30));
+    expect(voiceCallDisconnectGracePeriod, const Duration(seconds: 90));
     expect(voiceCallRingDuration, const Duration(seconds: 60));
   });
-
-  test(
-    'missed-call message preference is scoped to each conversation',
-    () async {
-      SharedPreferences.setMockInitialValues({});
-      expect(await callEventMessagesEnabled('chat/first'), isTrue);
-      await setCallEventMessagesEnabled('chat/first', false);
-      expect(await callEventMessagesEnabled('chat/first'), isFalse);
-      expect(await callEventMessagesEnabled('chat/second'), isTrue);
-    },
-  );
 }

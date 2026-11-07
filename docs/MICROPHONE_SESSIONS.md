@@ -23,7 +23,7 @@ Sesli mesajlarda da aynı kanal kullanılır. Kayıt uygulama açıkken başlat�
 - android/app/src/main/kotlin/com/melek/stargaleri/MicrophoneSessionService.kt: bildirim kanalı, Android servis yaşam döngüsü, güç kilidi ve dosyasız mikrofon girdisi.
 - lib/core/security/microphone_session.dart: Flutter platform köprüsü ve kullanıcı kanal ayarı yönlendirmesi.
 - lib/features/voice_notes/microphone_session_screen.dart: başlatma/durdurma ve durum ekranı.
-- lib/features/voice_notes/voice_notes_screen.dart: mevcut sesli kayıtla servis bağlantısı.
+- lib/features/voice_notes/voice_notes_screen.dart: sohbet sesli mesajı ve kişisel not ses kaydının servis bağlantısı.
 - test/microphone_session_test.dart ve test/voice_notes_test.dart: kullanıcı ayarı, ekran kilidi, sayfadan çıkış ve durdurma testleri.
 
 Uygulama yolları flutter_application_1/ altındadır. Kontroller: ilgili 17 Flutter testi başarılı; Dart analizi temiz; Android release Kotlin derlemesi başarılı. Fiziksel telefon testi yerine geçmez.

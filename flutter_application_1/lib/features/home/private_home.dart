@@ -17,13 +17,13 @@ import '../../core/security/secure_screen.dart';
 import '../questions/question_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../../core/theme/app_theme.dart';
-import '../voice_notes/voice_notes_screen.dart';
 import '../voice_notes/microphone_session_screen.dart';
 import '../wishes/wishes_screen.dart';
 import '../pair/badge_service.dart';
 import '../chat/chat_unread.dart';
 import '../settings/app_settings_screen.dart';
 import '../study/course_screen.dart';
+import '../games/game_league_screen.dart';
 
 import '../../app/app_runtime.dart';
 import '../media/full_image_screen.dart';
@@ -1168,12 +1168,7 @@ class _CounterScreenState extends State<CounterScreen> {
                     const TimelineScreen(),
                     kNotifTimeline,
                   ),
-                  _ozellikKart(
-                    "🎙️",
-                    "Sesli Notlar",
-                    const VoiceNotesScreen(),
-                    kNotifVoice,
-                  ),
+                  _ozellikKart("🏆", "Oyun Ligleri", const GameLeagueScreen()),
                   _ozellikKart(
                     "MIC",
                     "Mikrofon oturumu",

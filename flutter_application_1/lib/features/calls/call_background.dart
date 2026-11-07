@@ -17,6 +17,28 @@ class NativeCallEvent {
   NativeCallEvent(this.method, this.id);
 }
 
+class CallAudioOutput {
+  final int id;
+  final String type;
+  final String label;
+  final bool selected;
+
+  const CallAudioOutput({
+    required this.id,
+    required this.type,
+    required this.label,
+    required this.selected,
+  });
+
+  factory CallAudioOutput.fromMap(Map<Object?, Object?> data) =>
+      CallAudioOutput(
+        id: data['id'] as int,
+        type: data['type'] as String,
+        label: data['label'] as String,
+        selected: data['selected'] as bool? ?? false,
+      );
+}
+
 class CallBackground {
   static const channel = MethodChannel('app/voice_call');
   static final events = StreamController<NativeCallEvent>.broadcast();
@@ -146,6 +168,17 @@ class CallBackground {
 
   static Future<bool> requestBluetoothAudioPermission() async =>
       await channel.invokeMethod<bool>('requestBluetoothAudioPermission') ??
+      false;
+
+  static Future<List<CallAudioOutput>> audioOutputs() async {
+    final outputs = await channel.invokeListMethod<Map<Object?, Object?>>(
+      'audioOutputs',
+    );
+    return outputs?.map(CallAudioOutput.fromMap).toList() ?? [];
+  }
+
+  static Future<bool> selectAudioOutput(int id) async =>
+      await channel.invokeMethod<bool>('selectAudioOutput', {'id': id}) ??
       false;
 
   static Future<void> connected(String id) async {

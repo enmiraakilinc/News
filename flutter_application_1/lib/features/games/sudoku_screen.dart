@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'game_league_service.dart';
 
 class SudokuPuzzle {
   final List<int> solution;
@@ -83,7 +85,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
   bool _candidateMode = false;
   bool _drawingMode = false;
   bool _completionPromptShown = false;
+  bool _leagueScoreSubmitted = false;
+  DateTime _startedAt = DateTime.now();
   final List<List<Offset>> _drawingStrokes = [];
+  final Set<int> _incorrectCells = {};
   Future<void> _saving = Future.value();
   @override
   void initState() {
@@ -109,9 +114,20 @@ class _SudokuScreenState extends State<SudokuScreen> {
         setState(() {
           _puzzle = SudokuPuzzle(solution, clues);
           _board = board;
+          final startedAt = d['startedAt'];
+          _startedAt = startedAt is int
+              ? DateTime.fromMillisecondsSinceEpoch(startedAt)
+              : DateTime.now();
+          _leagueScoreSubmitted = List.generate(
+            81,
+            (i) => board[i] == solution[i],
+          ).every((solved) => solved);
           _candidates
             ..clear()
             ..addAll(_readCandidates(d['candidates']));
+          _drawingStrokes
+            ..clear()
+            ..addAll(_readDrawingStrokes(d['drawings']));
         });
       }
     } catch (_) {
@@ -127,10 +143,13 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _board = List.of(puzzle.clues);
       _candidates.clear();
       _invalidCandidates.clear();
+      _incorrectCells.clear();
       _selected = null;
       _candidateMode = false;
       _drawingMode = false;
       _completionPromptShown = false;
+      _leagueScoreSubmitted = false;
+      _startedAt = DateTime.now();
       _drawingStrokes.clear();
     });
     _save();
@@ -155,15 +174,50 @@ class _SudokuScreenState extends State<SudokuScreen> {
     return result;
   }
 
+  List<List<Offset>> _readDrawingStrokes(Object? value) {
+    if (value is! List) return [];
+    final strokes = <List<Offset>>[];
+    for (final item in value) {
+      if (item is! List) continue;
+      final stroke = <Offset>[];
+      for (final point in item) {
+        if (point is! Map ||
+            point['x'] is! num ||
+            point['y'] is! num) {
+          continue;
+        }
+        final x = (point['x'] as num).toDouble();
+        final y = (point['y'] as num).toDouble();
+        if (x.isFinite &&
+            y.isFinite &&
+            x >= 0 &&
+            x <= 1 &&
+            y >= 0 &&
+            y <= 1) {
+          stroke.add(Offset(x, y));
+        }
+      }
+      if (stroke.isNotEmpty) strokes.add(stroke);
+    }
+    return strokes;
+  }
+
   void _save() {
     final data = jsonEncode({
       'solution': _puzzle!.solution,
       'clues': _puzzle!.clues,
       'board': List.of(_board),
+      'startedAt': _startedAt.millisecondsSinceEpoch,
       'candidates': {
         for (final entry in _candidates.entries)
           '${entry.key}': entry.value.toList()..sort(),
       },
+      'drawings': [
+        for (final stroke in _drawingStrokes)
+          [
+            for (final point in stroke) {'x': point.dx, 'y': point.dy},
+          ],
+      ],
     });
     _saving = _saving.catchError((_) {}).then((_) async {
       await (await SharedPreferences.getInstance()).setString(
@@ -196,9 +250,14 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _board[cell] = n;
       _candidates.remove(cell);
       _invalidCandidates.clear();
+      _incorrectCells.clear();
     });
     _save();
     if (_isSolved) {
+      if (!_leagueScoreSubmitted) {
+        _leagueScoreSubmitted = true;
+        unawaited(_recordLeagueScore());
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showCompletionPrompt();
       });
@@ -211,6 +270,25 @@ class _SudokuScreenState extends State<SudokuScreen> {
         81,
         (i) => _board[i] == _puzzle!.solution[i],
       ).every((solved) => solved);
+
+  Future<void> _recordLeagueScore() async {
+    final seconds = DateTime.now().difference(_startedAt).inSeconds.clamp(
+      1,
+      999999,
+    );
+    try {
+      await GameLeagueService.recordBestScore(
+        game: 'sudoku',
+        score: 1000000 - seconds,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lig puanı kaydedilemedi: $error')),
+        );
+      }
+    }
+  }
 
   void _checkCandidates() {
     _invalidCandidates
@@ -242,6 +320,31 @@ class _SudokuScreenState extends State<SudokuScreen> {
     );
   }
 
+  void _checkPuzzle() {
+    final incorrect = <int>{};
+    for (var cell = 0; cell < _board.length; cell++) {
+      if (_board[cell] != 0 &&
+          (_board[cell] != _puzzle!.solution[cell] ||
+              !SudokuPuzzle.allowed(_board, cell, _board[cell]))) {
+        incorrect.add(cell);
+      }
+    }
+    setState(() {
+      _incorrectCells
+        ..clear()
+        ..addAll(incorrect);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          incorrect.isEmpty
+              ? 'Yerleştirilen sayılar doğru.'
+              : '${incorrect.length} hücredeki sayı yanlış; kırmızı hücreleri gözden geçir.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _restartCurrentPuzzle() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -267,10 +370,13 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _board = List.of(_puzzle!.clues);
       _candidates.clear();
       _invalidCandidates.clear();
+      _incorrectCells.clear();
       _selected = null;
       _candidateMode = false;
       _drawingMode = false;
       _completionPromptShown = false;
+      _leagueScoreSubmitted = false;
+      _startedAt = DateTime.now();
       _drawingStrokes.clear();
     });
     _save();
@@ -311,7 +417,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
             icon: const Icon(Icons.delete_outline),
             onPressed: _drawingStrokes.isEmpty
                 ? null
-                : () => setState(_drawingStrokes.clear),
+                : () {
+                    setState(_drawingStrokes.clear);
+                    _save();
+                  },
           ),
         IconButton(
           tooltip: 'Bu bulmacayı baştan başlat',
@@ -379,8 +488,13 @@ class _SudokuScreenState extends State<SudokuScreen> {
                       }),
                     ),
                     OutlinedButton.icon(
-                      onPressed: _checkCandidates,
+                      onPressed: _checkPuzzle,
                       icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Çözümü denetle'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _checkCandidates,
+                      icon: const Icon(Icons.rule_outlined),
                       label: const Text('Adayları denetle'),
                     ),
                   ],
@@ -389,8 +503,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
                   const SizedBox(height: 4),
                   const Center(
                     child: Text(
-                      'Parmağınla veya kalemle çiz. Çizimler kontrol amaçlıdır; '
-                      'sayılar otomatik tanınmaz.',
+                    'Parmağınla tahtanın üzerine not al. Çizimler saklanır; '
+                    'çözüm denetimi girilen sayıları kontrol eder.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -415,6 +529,20 @@ class _SudokuScreenState extends State<SudokuScreen> {
                               final conflict =
                                   _board[i] != 0 &&
                                   !SudokuPuzzle.allowed(_board, i, _board[i]);
+                              final selected = _selected == i;
+                              final selectedRow =
+                                  _selected != null && _selected! ~/ 9 == i ~/ 9;
+                              final selectedColumn =
+                                  _selected != null && _selected! % 9 == i % 9;
+                              final sameBox =
+                                  _selected != null &&
+                                  _selected! ~/ 27 == i ~/ 27 &&
+                                  _selected! % 9 ~/ 3 == i % 9 ~/ 3;
+                              final sameNumber =
+                                  _selected != null &&
+                                  _board[_selected!] != 0 &&
+                                  _board[_selected!] == _board[i];
+                              final colors = Theme.of(context).colorScheme;
                               return Semantics(
                                 label:
                                     'Satır ${i ~/ 9 + 1}, sütun ${i % 9 + 1}',
@@ -427,10 +555,16 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                   child: Container(
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
-                                      color: _selected == i
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.primaryContainer
+                                      color:
+                                          _incorrectCells.contains(i) || conflict
+                                          ? colors.errorContainer
+                                          : selected
+                                          ? colors.primaryContainer
+                                          : selectedRow ||
+                                                selectedColumn ||
+                                                sameBox ||
+                                                sameNumber
+                                          ? colors.surfaceContainerHighest
                                           : null,
                                       border: Border(
                                         top: BorderSide(
@@ -452,8 +586,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                               fontWeight: fixed
                                                   ? FontWeight.bold
                                                   : FontWeight.normal,
-                                              color: conflict
-                                                  ? Colors.red
+                                              color:
+                                                  _incorrectCells.contains(i) ||
+                                                      conflict
+                                                  ? colors.error
                                                   : fixed
                                                   ? null
                                                   : Theme.of(
@@ -499,6 +635,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                           );
                                         });
                                       },
+                                      onPanEnd: (_) => _save(),
                                       child: CustomPaint(
                                         key: const ValueKey(
                                           'sudoku-drawing-layer',

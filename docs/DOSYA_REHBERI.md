@@ -158,7 +158,7 @@ Bu bölümdeki yollar `flutter_application_1/lib/features/` içindedir. Aynı kl
 | `media/image_util.dart` | Görsel boyutlandırma/sıkıştırma yardımcıları. Her görselin aynı kalitede saklandığı varsayılmamalı. |
 | `media/video_parts.dart` | Video parçalara ayırma işleminin Dart–Android bağlantısı. Güncel 100 MiB tek mesaj gönderimiyle aynı işlem değildir. |
 | `media/chat_audio_player.dart` | Sohbette ses oynatma ve oynatıcı kontrolleri. |
-| `voice_notes/voice_notes_screen.dart` | Ortak alandaki sesli notlar ekranı; sohbet ses oynatıcısından ayrı. |
+| `voice_notes/voice_notes_screen.dart` | Sohbet için sesli mesaj kaydı ve kişisel notlara ses ekleme akışı. Gizli alandaki eski paylaşımlı sesli notlar menüden kaldırıldı; bu dosya hâlâ bu kayıt akışlarında kullanılır. |
 | `location/location_share.dart` | Konum paylaşımı ve ilgili veri/izin işlemleri. |
 | `location/offline_location_map.dart` | Dış harita servisine konum göndermeden konumun uygulama içindeki gösterimi. |
 
@@ -186,7 +186,7 @@ Arama/alarm sorunlarında yalnızca Dart dosyasına bakmak yetmeyebilir: Kotlin 
 | `study/course_note_text.dart` | Ders notu ve duyurularında seçilebilir metin; dokunarak HTTP/HTTPS bağlantısı açma ve anlaşılır bağlantı hataları. |
 | `study/course_video.dart` | Ders videoları: bir haftalık erişim, kişisel yerel dosya veya çifte özel şifreli parçalar; uygulama içi oynatma için okuma ve temizlik. |
 | `media/photo_gallery.dart` | Sohbet fotoğraflarında sağa/sola kaydırmalı, yakınlaştırmalı korumalı görüntüleyici. Yalnızca görüntülenen fotoğrafı yükler. |
-| `questions/question_screen.dart` | Günün sorusu ekranı ve ilgili soru/cevap akışı. |
+| `questions/question_screen.dart` | Seçilen çocukluk sorusundan başlayan, her takvim günü bir kez ilerleyen Günün Sorusu sırası. Havuz bitince yeniden başlamaz; günlük cevap belgeleri silinmez. |
 | `timeline/timeline_screen.dart` | Anılar/zaman çizelgesi ekranı. |
 | `wishes/wishes_screen.dart` | Ortak dilekler ekranı. |
 | `counter/counter_page.dart` | Gün/tarih sayacı ekranı. Tarih girişinin ortak parçası `core/widgets/date_input.dart` içindedir. |
@@ -292,7 +292,8 @@ Hepsi `flutter_application_1/test/` altında. Adı ilgili özelliğe göre seçi
 | `startup_gate_test.dart` | Açılış/yükleme geçidi. |
 | `sudoku_and_settings_test.dart` | Sudoku ve ilgili ayar davranışları. |
 | `update_dialog_test.dart` | Güncelleme penceresi. |
-| `voice_notes_test.dart` | Sesli notlar. |
+| `voice_notes_test.dart` | Sohbet sesli mesajı ve kişisel sesli not kaydının mikrofon, ön dinleme ve onay akışları. |
+| `daily_questions_test.dart` | Seçilen sorudan başlayan takvim sırası, günlük ilerleme ve soru havuzu sonu. |
 | `wakeup_settings_test.dart` | Uyandırma tercihleri ve cihaz/kişi ayrımı. |
 
 Test adları başlangıç rehberidir; kesin olarak ne doğrulandığını dosyadaki test açıklamaları söyler. Testlerin geçmesi Samsung telefondaki tüm kamera/arama/bildirim davranışlarının fiziksel cihazda doğrulandığı anlamına gelmez.

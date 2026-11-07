@@ -126,8 +126,8 @@ const server=http.createServer(async(request,response)=>{
   const url=new URL(request.url,'https://158.180.38.94');
   if(request.method==='POST'&&url.pathname==='/presence'){
    const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);await ready();
-   await bodyOf(request,1024);
-   send(response,200,await recordPresence(pool,auth));return;
+   const body=await bodyOf(request,1024);
+   send(response,200,await recordPresence(pool,auth,body));return;
   }
   if(request.method==='POST'&&url.pathname==='/v1/media/chunks'){
    const auth=await authenticate(request);rateLimit(auth.uid,request.socket.remoteAddress);await ready();

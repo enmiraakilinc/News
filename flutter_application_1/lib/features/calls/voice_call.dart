@@ -334,11 +334,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Timer? _ticker;
   Timer? _connectionTimeout;
   Timer? _disconnectTimeout;
+  Timer? _streamRetry;
   DateTime? _started;
   DateTime? _connectedAt;
 
   bool _speakerOn = false;
+  Offset? _localVideoPosition;
   bool _receiveMuted = false, _audioBusy = false;
+  List<CallAudioOutput> _audioOutputs = [];
+  CallAudioOutput? _selectedAudioOutput;
   final _remoteAudioTracks = <String, MediaStreamTrack>{};
   bool _readyToSend = false,
       _remoteSet = false,
@@ -385,9 +389,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _answerFromNotification(),
     );
-    _signaling = widget.reference.snapshots().listen((doc) {
-      _changed(doc).catchError(_fail);
-    }, onError: _fail);
+    _listenSignaling();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_ended || _closing) return;
       if (FirebaseAuth.instance.currentUser?.uid != _uid) {
@@ -425,6 +427,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     await FeatureAccess.require('calls');
     await FeatureAccess.require('microphone');
     if (_closing || _ended) return;
+    var bluetoothAudioPermission = true;
     if (widget.video) {
       await FeatureAccess.require('camera');
       if (_closing || _ended) return;
@@ -440,22 +443,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       _renderersReady = true;
     }
     if (Platform.isAndroid) {
-      if (widget.video) {
-        try {
-          final bluetoothPermission =
-              await CallBackground.requestBluetoothAudioPermission();
-          if (!bluetoothPermission && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Bluetooth izni verilmedi. Kulaklık yönlendirmesi için Android ayarlarından Bluetooth iznini aç.',
-                ),
+      try {
+        bluetoothAudioPermission =
+            await CallBackground.requestBluetoothAudioPermission();
+        if (!bluetoothAudioPermission && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Bluetooth kulaklık kullanmak için Bluetooth iznini aç. Telefon ve hoparlör seçenekleri yine kullanılabilir.',
               ),
-            );
-          }
-        } catch (error) {
-          _audioError(error);
+            ),
+          );
         }
+      } catch (error) {
+        _audioError(error);
       }
       await Helper.setAndroidAudioConfiguration(
         AndroidAudioConfiguration.communication,
@@ -479,6 +480,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     }
     if (Platform.isAndroid || Platform.isIOS) {
       await Helper.setSpeakerphoneOn(_speakerOn);
+    }
+    if (Platform.isAndroid && bluetoothAudioPermission) {
+      await _refreshAudioOutputs(preferExternal: true);
     }
     if (widget.video) {
       _localVideo.srcObject = _microphone;
@@ -604,13 +608,144 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     setState(() => _audioBusy = true);
     try {
       final next = !_speakerOn;
-      await Helper.setSpeakerphoneOn(next);
-      if (mounted && !_ended) setState(() => _speakerOn = next);
+      final speaker = _audioOutputs.where((output) => output.type == 'speaker');
+      if (Platform.isAndroid && speaker.isNotEmpty) {
+        final output = next
+            ? speaker.first
+            : _audioOutputs.firstWhere(
+                (device) => device.type == 'earpiece',
+                orElse: () => _audioOutputs.firstWhere(
+                  (device) => device.type != 'speaker',
+                  orElse: () => speaker.first,
+                ),
+              );
+        if (!await CallBackground.selectAudioOutput(output.id)) {
+          throw StateError('Ses çıkışı seçilemedi.');
+        }
+        if (mounted && !_ended) {
+          setState(() {
+            _speakerOn = output.type == 'speaker';
+            _selectedAudioOutput = output;
+          });
+        }
+      } else {
+        await Helper.setSpeakerphoneOn(next);
+        if (mounted && !_ended) setState(() => _speakerOn = next);
+      }
     } catch (error) {
       _audioError(error);
     } finally {
       if (mounted) setState(() => _audioBusy = false);
     }
+  }
+
+  Future<void> _refreshAudioOutputs({bool preferExternal = false}) async {
+    final outputs = await CallBackground.audioOutputs();
+    if (!preferExternal) {
+      final selected = outputs.where((output) => output.selected).firstOrNull;
+      if (mounted) {
+        setState(() {
+          _audioOutputs = outputs;
+          _selectedAudioOutput = selected;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _audioOutputs = outputs);
+    final preferred = outputs.where(
+      (output) =>
+          output.type == 'bluetooth' ||
+          output.type == 'wired' ||
+          output.type == 'usb',
+    );
+    if (preferred.isNotEmpty) {
+      await _selectAudioOutput(preferred.first);
+    }
+  }
+
+  Future<void> _selectAudioOutput(CallAudioOutput output) async {
+    if (_audioBusy || _microphone == null || _ended || _closing) return;
+    setState(() => _audioBusy = true);
+    try {
+      if (!await CallBackground.selectAudioOutput(output.id)) {
+        throw StateError('Ses çıkışı artık kullanılamıyor.');
+      }
+      if (mounted && !_ended) {
+        setState(() {
+          _selectedAudioOutput = output;
+          _speakerOn = output.type == 'speaker';
+          _audioOutputs = _audioOutputs
+              .map(
+                (candidate) => CallAudioOutput(
+                  id: candidate.id,
+                  type: candidate.type,
+                  label: candidate.label,
+                  selected: candidate.id == output.id,
+                ),
+              )
+              .toList();
+        });
+      }
+    } catch (error) {
+      _audioError(error);
+    } finally {
+      if (mounted) setState(() => _audioBusy = false);
+    }
+  }
+
+  Future<void> _showAudioOutputs() async {
+    try {
+      if (!await CallBackground.requestBluetoothAudioPermission()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bluetooth izni verilmedi.')),
+          );
+        }
+        return;
+      }
+      await _refreshAudioOutputs();
+    } catch (error) {
+      _audioError(error);
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: _audioOutputs.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Kullanılabilir ses çıkışı bulunamadı. Kulaklığın bağlı ve Bluetooth izninin açık olduğundan emin ol.',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final output in _audioOutputs)
+                    ListTile(
+                      leading: Icon(switch (output.type) {
+                        'speaker' => Icons.volume_up,
+                        'earpiece' => Icons.phone_in_talk,
+                        'bluetooth' || 'wired' || 'usb' => Icons.headphones,
+                        _ => Icons.volume_up_outlined,
+                      }),
+                      title: Text(output.label),
+                      trailing:
+                          output.selected ||
+                              _selectedAudioOutput?.id == output.id
+                          ? const Icon(Icons.check)
+                          : null,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _selectAudioOutput(output);
+                      },
+                    ),
+                ],
+              ),
+      ),
+    );
   }
 
   Future<void> _toggleReceive() async {
@@ -654,6 +789,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   }
 
   void _listenCandidates() {
+    _ice?.cancel();
     _ice = _candidates
         .where('owner', isEqualTo: widget.peer)
         .snapshots()
@@ -675,7 +811,33 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
               _remoteCandidates.add(candidate);
             }
           }
-        }, onError: _fail);
+        }, onError: _handleStreamError);
+  }
+
+  void _listenSignaling() {
+    _signaling?.cancel();
+    _signaling = widget.reference.snapshots().listen((doc) {
+      _changed(doc).catchError(_fail);
+    }, onError: _handleStreamError);
+  }
+
+  void _handleStreamError(Object error) {
+    if (error is FirebaseException &&
+        const {'unavailable', 'deadline-exceeded'}.contains(error.code)) {
+      if (mounted && !_closing && !_ended) {
+        setState(
+          () => _status = 'Bağlantı kesildi; görüşme yeniden bağlanıyor…',
+        );
+      }
+      _streamRetry ??= Timer(const Duration(seconds: 3), () {
+        _streamRetry = null;
+        if (_closing || _ended) return;
+        _listenSignaling();
+        if (_ice != null) _listenCandidates();
+      });
+      return;
+    }
+    _fail(error);
   }
 
   Future<void> _sendCandidate(RTCIceCandidate candidate) => _candidates
@@ -810,7 +972,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       return;
     }
     if (data['state'] == 'ended') {
-      await _recordCallEvent(data['endReason'] as String?);
+      await _recordCallEvent(
+        data['endReason'] as String?,
+        answered: data['startedAt'] is Timestamp,
+      );
       await _finish(
         voiceCallEndMessage(data['endReason'] as String?),
         notify: false,
@@ -888,10 +1053,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     await CallBackground.stop(widget.reference.id);
   }
 
-  Future<void> _recordCallEvent(String? reason) async {
-    if (!await callEventMessagesEnabled(widget.source)) return;
-    final text = voiceCallEventText(video: widget.video, reason: reason);
-    if (text == null) return;
+  Future<void> _recordCallEvent(String? reason, {bool answered = false}) async {
+    final text = voiceCallEventText(
+      video: widget.video,
+      reason: reason,
+      answered: answered,
+    );
     final parts = widget.source.split('/');
     try {
       if (parts.length != 2) {
@@ -936,6 +1103,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _ticker?.cancel();
     _connectionTimeout?.cancel();
     _disconnectTimeout?.cancel();
+    _streamRetry?.cancel();
     try {
       await _release();
       await _ice?.cancel();
@@ -961,7 +1129,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             );
           }
         }
-        if (endedStateSaved) await _recordCallEvent(reason);
+        if (endedStateSaved) {
+          await _recordCallEvent(
+            reason,
+            answered: _started != null || _connectedAt != null,
+          );
+        }
         await CallBackground.notify(
           widget.reference.id,
           'end',
@@ -1024,6 +1197,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     VoiceCalls.answerRequested.removeListener(_answerFromNotification);
     _connectionTimeout?.cancel();
     _disconnectTimeout?.cancel();
+    _streamRetry?.cancel();
     if (!_ended &&
         !_closing &&
         !(_backgroundProtected &&
@@ -1113,20 +1287,56 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                                   child: identity(overlay: true),
                                 ),
                               ),
-                              Positioned(
-                                right: 12,
-                                bottom: 12,
-                                width: 82,
-                                height: (constraints.maxHeight * 0.35)
-                                    .clamp(0, 112)
-                                    .toDouble(),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: RTCVideoView(
-                                    _localVideo,
-                                    mirror: true,
-                                  ),
-                                ),
+                              Builder(
+                                builder: (context) {
+                                  final previewHeight =
+                                      (constraints.maxHeight * 0.35)
+                                          .clamp(0, 112)
+                                          .toDouble();
+                                  final maxLeft = (constraints.maxWidth - 82)
+                                      .clamp(0, double.infinity)
+                                      .toDouble();
+                                  final maxTop =
+                                      (constraints.maxHeight - previewHeight)
+                                          .clamp(0, double.infinity)
+                                          .toDouble();
+                                  return Positioned(
+                                    left: _localVideoPosition?.dx,
+                                    top: _localVideoPosition?.dy,
+                                    right: _localVideoPosition == null
+                                        ? 12
+                                        : null,
+                                    bottom: _localVideoPosition == null
+                                        ? 12
+                                        : null,
+                                    width: 82,
+                                    height: previewHeight,
+                                    child: GestureDetector(
+                                      onPanUpdate: (details) {
+                                        final previous =
+                                            _localVideoPosition ??
+                                            Offset(maxLeft - 12, maxTop - 12);
+                                        setState(() {
+                                          _localVideoPosition = Offset(
+                                            (previous.dx + details.delta.dx)
+                                                .clamp(0, maxLeft)
+                                                .toDouble(),
+                                            (previous.dy + details.delta.dy)
+                                                .clamp(0, maxTop)
+                                                .toDouble(),
+                                          );
+                                        });
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: RTCVideoView(
+                                          _localVideo,
+                                          mirror: true,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -1183,6 +1393,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                     cameraOff: _cameraOff,
                     audioBusy: _audioBusy,
                     enabled: !_closing,
+                    audioRouteLabel:
+                        _selectedAudioOutput?.label ?? 'Ses çıkışı',
+                    onAudioRoute: Platform.isAndroid ? _showAudioOutputs : null,
                     onMicrophone: _toggleMicrophone,
                     onSpeaker: _toggleSpeaker,
                     onReceive: _toggleReceive,

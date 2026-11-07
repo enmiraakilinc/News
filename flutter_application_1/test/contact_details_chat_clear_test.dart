@@ -62,7 +62,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Cevapsız arama mesajı gönder'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Arama sonuçları sohbete eklenir'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Arama sonuçları sohbete eklenir'), findsOneWidget);
+    expect(find.text('Cevapsız arama mesajı gönder'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

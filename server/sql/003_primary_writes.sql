@@ -49,6 +49,10 @@ BEGIN
   IF n=4 AND a[3]='typing' THEN RETURN a[4]=uid AND neural.member('chats',a[2],uid); END IF;
   RETURN n=4 AND a[3]='messages' AND neural.member('chats',a[2],uid);
  END IF;
+ IF a[1]='gameLeagues' THEN
+  RETURN n=6 AND a[2] ~ '^20[0-9]{2}-Q[1-4]$' AND a[3]='games'
+   AND a[4] IN ('sudoku','sliding_puzzle','block_blast') AND a[5]='entries' AND a[6]=uid;
+ END IF;
  IF a[1]='chatAccounts' THEN RETURN a[2]=uid AND (
   n=4 AND a[3] IN ('contacts','starredMessages','callDevices','wakeDevices','wakePermissions','personalData','personalFiles','personalConfig','presence')
   OR n=6 AND a[3]='personalFiles' AND a[5]='chunks'); END IF;

@@ -9,7 +9,9 @@ class CallControls extends StatelessWidget {
       cameraOff,
       audioBusy,
       enabled;
+  final String audioRouteLabel;
   final VoidCallback onMicrophone, onSpeaker, onReceive;
+  final VoidCallback? onAudioRoute;
   final VoidCallback? onCamera, onSwitchCamera;
   const CallControls({
     super.key,
@@ -20,9 +22,11 @@ class CallControls extends StatelessWidget {
     required this.cameraOff,
     required this.audioBusy,
     required this.enabled,
+    required this.audioRouteLabel,
     required this.onMicrophone,
     required this.onSpeaker,
     required this.onReceive,
+    required this.onAudioRoute,
     this.onCamera,
     this.onSwitchCamera,
   });
@@ -55,6 +59,14 @@ class CallControls extends StatelessWidget {
             : 'Karşı tarafın sesini kapat',
         onPressed: enabled && !audioBusy ? onReceive : null,
       ),
+      if (onAudioRoute != null)
+        _CallControl(
+          label: audioRouteLabel,
+          active: null,
+          icon: Icons.headphones,
+          tooltip: 'Ses çıkışını seç',
+          onPressed: enabled && !audioBusy ? onAudioRoute : null,
+        ),
       if (video)
         _CallControl(
           label: 'Kamera',
