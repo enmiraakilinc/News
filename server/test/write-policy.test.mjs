@@ -45,6 +45,13 @@ test('league entries are public scores but writable only by their owner and neve
   {...entry,score:1000001}));
  await denied(run('gameLeagues/invalid/games/block_blast/entries/alice',null,entry));
 });
+test('presence activity is limited to known foreground activities',async()=>{
+ const path='chatAccounts/alice/presence/status';
+ const active={enabled:true,online:true,lastSeenAt:now};
+ await run(path,null,{...active,activity:'Block Blast'});
+ await run(path,null,active);
+ await denied(run(path,null,{...active,activity:'Private message contents'}));
+});
 test('chat membership never grants access to another couple',async()=>{
  await run('couples/pair/letters/a',null,{cipher:'encrypted'});
  await denied(run('couples/pair/letters/a',null,{cipher:'encrypted'},{uid:'outsider'}));

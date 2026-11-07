@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../contacts/chat_presence.dart';
 import 'game_league_service.dart';
 
 class SudokuPuzzle {
@@ -93,7 +94,14 @@ class _SudokuScreenState extends State<SudokuScreen> {
   @override
   void initState() {
     super.initState();
+    ChatPresence.setActivity('Sudoku');
     _load();
+  }
+
+  @override
+  void dispose() {
+    ChatPresence.clearActivity('Sudoku');
+    super.dispose();
   }
 
   Future<void> _load() async {

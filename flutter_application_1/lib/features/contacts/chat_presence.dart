@@ -1,22 +1,37 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 import '../pair/couple_service.dart';
+
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
     show FirebaseFirestorePlatform;
+
 import '../../core/data/oracle_firestore_bridge.dart';
 
 class ChatPresence {
   static final changes = ValueNotifier<int>(0);
+  static String? _activity;
+
+  static void setActivity(String? activity) {
+    if (_activity == activity) return;
+    _activity = activity;
+    changes.value++;
+  }
+
+  static void clearActivity(String activity) {
+    if (_activity == activity) setActivity(null);
+  }
+
   static DocumentReference<Map<String, dynamic>> ref(String uid) =>
       FirebaseFirestore.instance.doc('chatAccounts/$uid/presence/status');
   static Future<bool> enabled() async {
     final uid = CoupleService.uid;
     if (uid == null) return false;
     try {
-      return (await ref(
-            uid,
-          ).get(const GetOptions(source: Source.server))).data()?['enabled'] ==
+      return (await ref(uid).get(const GetOptions(source: Source.server)))
+              .data()?['enabled'] ==
           true;
     } catch (_) {
       return false;
@@ -25,22 +40,24 @@ class ChatPresence {
 
   static Future<void> record({required bool online}) async {
     final uid = CoupleService.uid;
+    final activity = online ? _activity : null;
     final platform = FirebaseFirestorePlatform.instance;
     if (uid != null && platform is OracleFirestoreBridge && platform.primary) {
-      await platform.primaryTransport.post(
-        '/presence',
-        {'online': online},
-        timeout: const Duration(seconds: 5),
-      );
+      await platform.primaryTransport.post('/presence', {
+        'online': online,
+        'activity': activity,
+      }, timeout: const Duration(seconds: 5));
       return;
     }
     if (uid == null || CoupleService.uid != uid) return;
     final status = ref(uid);
-    final data = (await status.get(const GetOptions(source: Source.server))).data();
+    final data = (await status.get(const GetOptions(source: Source.server)))
+        .data();
     if (data?['enabled'] != true) return;
     await status.update({
       'online': online,
       'lastSeenAt': FieldValue.serverTimestamp(),
+      'activity': activity ?? FieldValue.delete(),
     });
   }
 
@@ -243,9 +260,13 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
           final now = DateTime.now();
           final online =
               data?['online'] == true && isPresenceOnline(date, now: now);
-          final text = online
-              ? 'Çevrimiçi'
-              : formatLastSeen(date, now: now) ?? widget.fallback;
+          final text = formatPresenceLabel(
+            online: online,
+            activity: data?['activity'] as String?,
+            lastSeenAt: date,
+            fallback: widget.fallback,
+            now: now,
+          );
           return Tooltip(
             message: text,
             child: Text(
@@ -260,6 +281,18 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
           );
         },
       );
+}
+
+String formatPresenceLabel({
+  required bool online,
+  required String? activity,
+  required DateTime? lastSeenAt,
+  required String fallback,
+  DateTime? now,
+}) {
+  if (online && activity != null) return '$activity oynuyor';
+  if (online) return 'Çevrimiçi';
+  return formatLastSeen(lastSeenAt, now: now) ?? fallback;
 }
 
 String? formatLastSeen(DateTime? date, {DateTime? now}) {
