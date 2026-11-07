@@ -1,2 +1,1 @@
-Aramalar, bildirimler ve oyunlarda iyileştirmeler; Günün Sorusu akışı güncellendi.
-Build code: 2090
+Günün Sorusu akışı güncellendi; Block Blast parçaları artık sürükle-bırak ile yerleştiriliyor. Genel kararlılık iyileştirmeleri.

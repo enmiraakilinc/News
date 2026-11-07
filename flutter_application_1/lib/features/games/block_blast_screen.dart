@@ -192,7 +192,6 @@ class _BlockBlastScreenState extends State<BlockBlastScreen> {
                               );
                               return InkWell(
                                 key: ValueKey('block-blast-cell-$index'),
-                                onTap: () => _place(index),
                                 child: clearing
                                     ? TweenAnimationBuilder<double>(
                                         key: ValueKey(
