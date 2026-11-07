@@ -89,13 +89,15 @@ service cloud.firestore {
           /databases/$(database)/documents/chatAccounts/$(userId)/personalConfig/presence
         ).data.peers);
       allow create, update: if girisYapti() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['enabled', 'online', 'lastSeenAt'])
+        && request.resource.data.keys().hasOnly(['enabled', 'online', 'lastSeenAt', 'activity'])
         && ((request.resource.data.enabled == false
             && request.resource.data.online == false
-            && !request.resource.data.keys().hasAny(['lastSeenAt']))
+            && !request.resource.data.keys().hasAny(['lastSeenAt', 'activity']))
           || (request.resource.data.enabled == true
             && request.resource.data.online is bool
-            && request.resource.data.lastSeenAt == request.time));
+            && request.resource.data.lastSeenAt == request.time
+            && (!request.resource.data.keys().hasAny(['activity'])
+              || request.resource.data.activity in ['Sudoku', '15 Taş', 'Block Blast'])));
     }
 
     match /chatAccounts/{userId}/starredMessages/{starId} {

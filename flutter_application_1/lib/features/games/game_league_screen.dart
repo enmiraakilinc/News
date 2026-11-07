@@ -53,32 +53,95 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
     final end = GameLeagueService.seasonEnd();
     final game = GameLeagueService.games.firstWhere((item) => item.id == _game);
     return Scaffold(
-      appBar: AppBar(title: const Text('Oyun Ligleri')),
+      backgroundColor: const Color(0xFF0B1533),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0B1533),
+        foregroundColor: Colors.white,
+        title: const Text(
+          'OYUN LİGLERİ',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.1),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              '$season sezonu',
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF243F7B), Color(0xFF172650)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFF41598D)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFC857).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      color: Color(0xFFFFC857),
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          game.label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$season sezonu · ${_remaining(end)}',
+                          style: const TextStyle(
+                            color: Color(0xFFB9C8E8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(_remaining(end), textAlign: TextAlign.center),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
+              spacing: 9,
+              runSpacing: 6,
               children: [
                 for (final option in GameLeagueService.games)
                   ChoiceChip(
                     label: Text(option.label),
                     selected: _game == option.id,
+                    showCheckmark: false,
+                    backgroundColor: const Color(0xFF142044),
+                    selectedColor: const Color(0xFF31529A),
+                    labelStyle: TextStyle(
+                      color: _game == option.id
+                          ? Colors.white
+                          : const Color(0xFFB9C8E8),
+                      fontWeight: FontWeight.w700,
+                    ),
                     onSelected: (_) => setState(() => _selectGame(option.id)),
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: _mine,
               builder: (context, mineSnapshot) {
@@ -109,33 +172,47 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Card(
+                          color: const Color(0xFF142044),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: const BorderSide(color: Color(0xFF293B68)),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
+                            padding: const EdgeInsets.all(18),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                Text(
-                                  game.label,
-                                  style: Theme.of(context).textTheme.titleLarge,
+                                _LeagueStat(
+                                  label: 'SIRALAMAN',
+                                  value: rank == null ? '—' : '#$rank',
+                                  color: const Color(0xFF49D5E8),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  myScore == null
-                                      ? 'Bu sezon henüz puanın yok.'
-                                      : rank == null
-                                      ? 'Puanın: $myScore · İlk 100 dışında'
-                                      : 'Sıran: $rank · Puanın: $myScore',
-                                  textAlign: TextAlign.center,
+                                Container(
+                                  width: 1,
+                                  height: 42,
+                                  color: const Color(0xFF33466F),
+                                ),
+                                _LeagueStat(
+                                  label: 'EN İYİ PUANIN',
+                                  value: myScore == null ? '—' : '$myScore',
+                                  color: const Color(0xFFFFC857),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'İlk 10 oyuncu',
-                          style: Theme.of(context).textTheme.titleMedium,
+                        const SizedBox(height: 14),
+                        const Text(
+                          'LİG SIRALAMASI',
+                          style: TextStyle(
+                            color: Color(0xFFB9C8E8),
+                            fontSize: 12,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         if (entries == null)
                           const Center(child: CircularProgressIndicator())
                         else if (entries.isEmpty)
@@ -158,6 +235,7 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                             ),
                         if (myScore != null && rank == null)
                           Card(
+                            color: const Color(0xFF172650),
                             child: ListTile(
                               leading: const CircleAvatar(child: Text('…')),
                               title: Text(myData?['displayName'] as String? ?? 'Sen'),
@@ -172,9 +250,9 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
               },
             ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               'Puanlar her oyun için ayrı tutulur. Yeni sezon başladığında sıralama yeniden başlar.',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(color: Color(0xFF90A5D1), fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ],
@@ -199,11 +277,82 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
     required int rank,
     required bool highlighted,
   }) => Card(
-    color: highlighted ? Theme.of(context).colorScheme.primaryContainer : null,
-    child: ListTile(
-      leading: CircleAvatar(child: Text('$rank')),
-      title: Text(entry.displayName),
-      trailing: Text('${entry.score} puan'),
+    color: highlighted
+        ? const Color(0xFF263F78)
+        : const Color(0xFF142044),
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(
+        color: highlighted
+            ? const Color(0xFF49D5E8)
+            : const Color(0xFF293B68),
+      ),
     ),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: switch (rank) {
+          1 => const Color(0xFFFFC857),
+          2 => const Color(0xFFCBD5E1),
+          3 => const Color(0xFFCE8B60),
+          _ => const Color(0xFF26365F),
+        },
+        foregroundColor: const Color(0xFF0B1533),
+        child: Text(
+          '$rank',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      title: Text(
+        entry.displayName,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      trailing: Text(
+        '${entry.score} pt',
+        style: const TextStyle(
+          color: Color(0xFFFFC857),
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ),
+  );
+}
+
+class _LeagueStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _LeagueStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF90A5D1),
+          fontSize: 9,
+          letterSpacing: 1,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        value,
+        style: TextStyle(
+          color: color,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ],
   );
 }

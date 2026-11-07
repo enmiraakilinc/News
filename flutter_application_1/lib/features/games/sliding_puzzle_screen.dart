@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import '../contacts/chat_presence.dart';
 import 'game_league_service.dart';
 import 'sliding_puzzle_logic.dart';
 
@@ -22,7 +23,14 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
   @override
   void initState() {
     super.initState();
+    ChatPresence.setActivity('15 Taş');
     _shuffle();
+  }
+
+  @override
+  void dispose() {
+    ChatPresence.clearActivity('15 Taş');
+    super.dispose();
   }
 
   void _shuffle() {

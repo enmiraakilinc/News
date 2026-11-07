@@ -1,6 +1,7 @@
 import 'dart:math';
 
-const blockBlastBoardSize = 10;
+const blockBlastBoardSize = 8;
+const blockBlastPaletteSize = 6;
 
 class BlockShape {
   final List<int> cells;
@@ -31,11 +32,14 @@ List<BlockShape?> _randomPieces(Random random) {
 
 class BlockBlastState {
   final List<bool> cells;
+  final List<int> cellColors;
   final List<BlockShape?> pieces;
+  final List<int> pieceColors;
   final int score;
   final int round;
   final bool gameOver;
   final List<int> clearedCells;
+  final List<int> clearedColors;
 
   const BlockBlastState({
     required this.cells,
@@ -44,16 +48,29 @@ class BlockBlastState {
     required this.round,
     required this.gameOver,
     this.clearedCells = const [],
+    this.cellColors = const [],
+    this.pieceColors = const [],
+    this.clearedColors = const [],
   });
 
-  factory BlockBlastState.newGame([Random? random]) => BlockBlastState(
-    cells: List<bool>.filled(blockBlastBoardSize * blockBlastBoardSize, false),
-    pieces: _randomPieces(random ?? Random()),
-    score: 0,
-    round: 0,
-    gameOver: false,
-  );
+  factory BlockBlastState.newGame([Random? random]) {
+    final rng = random ?? Random();
+    return BlockBlastState(
+      cells: List<bool>.filled(blockBlastBoardSize * blockBlastBoardSize, false),
+      cellColors: List<int>.filled(blockBlastBoardSize * blockBlastBoardSize, 0),
+      pieces: _randomPieces(rng),
+      pieceColors: _randomPieceColors(rng),
+      score: 0,
+      round: 0,
+      gameOver: false,
+    );
+  }
 }
+
+List<int> _randomPieceColors(Random random) =>
+    (List<int>.generate(blockBlastPaletteSize, (index) => index)..shuffle(random))
+        .take(3)
+        .toList(growable: false);
 
 bool canPlaceBlock(
   BlockBlastState state,
@@ -89,9 +106,19 @@ BlockBlastState? placeBlock(
   if (shape == null || !canPlaceBlock(state, shape, row, column)) return null;
 
   final cells = List<bool>.of(state.cells);
+  final cellColors = state.cellColors.length == state.cells.length
+      ? List<int>.of(state.cellColors)
+      : List<int>.filled(state.cells.length, 0);
+  final pieceColor = state.pieceColors.length == state.pieces.length
+      ? state.pieceColors[pieceIndex]
+      : 0;
   for (final cell in shape.cells) {
-    cells[(row + cell ~/ 10) * blockBlastBoardSize + column + cell % 10] = true;
+    final target =
+        (row + cell ~/ 10) * blockBlastBoardSize + column + cell % 10;
+    cells[target] = true;
+    cellColors[target] = pieceColor;
   }
+  final clearedColors = List<int>.of(cellColors);
   final fullRows = <int>[
     for (var r = 0; r < blockBlastBoardSize; r++)
       if (List<bool>.generate(
@@ -121,16 +148,22 @@ BlockBlastState? placeBlock(
   for (var r = 0; r < blockBlastBoardSize; r++) {
     for (var c = 0; c < blockBlastBoardSize; c++) {
       if (clearedCells.contains(r * blockBlastBoardSize + c)) {
-        cells[r * blockBlastBoardSize + c] = false;
+        final index = r * blockBlastBoardSize + c;
+        cells[index] = false;
+        cellColors[index] = 0;
       }
     }
   }
 
   var pieces = List<BlockShape?>.of(state.pieces)..[pieceIndex] = null;
+  var pieceColors = state.pieceColors.length == state.pieces.length
+      ? List<int>.of(state.pieceColors)
+      : List<int>.filled(state.pieces.length, 0);
   var round = state.round;
   if (pieces.every((piece) => piece == null)) {
     round++;
     pieces = _randomPieces(random ?? Random());
+    pieceColors = _randomPieceColors(random ?? Random());
   }
   final nextState = BlockBlastState(
     cells: cells,
@@ -142,6 +175,9 @@ BlockBlastState? placeBlock(
     round: round,
     gameOver: false,
     clearedCells: clearedCells.toList(growable: false),
+    cellColors: cellColors,
+    pieceColors: pieceColors,
+    clearedColors: clearedColors,
   );
   final hasAnyMove = nextState.pieces.whereType<BlockShape>().any(
     (piece) => _hasAvailablePosition(nextState, piece),
@@ -153,6 +189,9 @@ BlockBlastState? placeBlock(
     round: nextState.round,
     gameOver: !hasAnyMove,
     clearedCells: nextState.clearedCells,
+    cellColors: nextState.cellColors,
+    pieceColors: nextState.pieceColors,
+    clearedColors: nextState.clearedColors,
   );
 }
 
