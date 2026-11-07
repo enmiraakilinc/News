@@ -59,6 +59,19 @@ void main() {
     expect(find.byKey(const ValueKey('block-blast-cell-0')), findsOneWidget);
   });
 
+  testWidgets(
+    'block pieces must be dragged rather than tapped onto the board',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('block-blast-piece-0')));
+      await tester.tap(find.byKey(const ValueKey('block-blast-cell-0')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Puan: 0'), findsOneWidget);
+    },
+  );
+
   testWidgets('block pieces can be dragged onto the board', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
     await tester.pumpAndSettle();
