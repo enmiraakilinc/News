@@ -23,19 +23,25 @@ class ChatPresence {
     }
   }
 
-  static Future<void> record() async {
+  static Future<void> record({required bool online}) async {
     final uid = CoupleService.uid;
     final platform = FirebaseFirestorePlatform.instance;
     if (uid != null && platform is OracleFirestoreBridge && platform.primary) {
       await platform.primaryTransport.post(
         '/presence',
-        {},
+        {'online': online},
         timeout: const Duration(seconds: 5),
       );
       return;
     }
-    if (uid == null || !await enabled() || CoupleService.uid != uid) return;
-    await ref(uid).update({'lastSeenAt': FieldValue.serverTimestamp()});
+    if (uid == null || CoupleService.uid != uid) return;
+    final status = ref(uid);
+    final data = (await status.get(const GetOptions(source: Source.server))).data();
+    if (data?['enabled'] != true) return;
+    await status.update({
+      'online': online,
+      'lastSeenAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static DocumentReference<Map<String, dynamic>> preferences(String uid) =>
@@ -84,6 +90,7 @@ class ChatPresence {
       tx.set(config, {'peers': allowed.toList()..sort()});
       tx.set(status, {
         'enabled': allowed.isNotEmpty,
+        'online': false,
         if (allowed.isNotEmpty) 'lastSeenAt': FieldValue.serverTimestamp(),
       });
     });
@@ -102,6 +109,7 @@ class ChatPresenceSession extends StatefulWidget {
 class _ChatPresenceSessionState extends State<ChatPresenceSession>
     with WidgetsBindingObserver {
   Timer? _timer;
+  Future<void> _presenceQueue = Future<void>.value();
   bool _foreground = true;
   @override
   void initState() {
@@ -117,23 +125,28 @@ class _ChatPresenceSessionState extends State<ChatPresenceSession>
   void _refresh() {
     _timer?.cancel();
     if (!_foreground) return;
-    unawaited(_record());
+    unawaited(_record(online: true));
     _timer = Timer.periodic(
       const Duration(minutes: 1),
-      (_) => unawaited(_record()),
+      (_) => unawaited(_record(online: true)),
     );
   }
 
-  Future<void> _record() async {
-    try {
-      await ChatPresence.record();
-    } catch (_) {}
+  Future<void> _record({required bool online}) async {
+    _presenceQueue = _presenceQueue.then((_) async {
+      try {
+        await ChatPresence.record(online: online);
+      } catch (error) {
+        debugPrint('Chat presence update failed: $error');
+      }
+    });
+    await _presenceQueue;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    if (!_foreground) unawaited(_record());
+    if (!_foreground) unawaited(_record(online: false));
     _refresh();
   }
 
@@ -142,7 +155,7 @@ class _ChatPresenceSessionState extends State<ChatPresenceSession>
     _timer?.cancel();
     ChatPresence.changes.removeListener(_refresh);
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_record());
+    unawaited(_record(online: false));
     super.dispose();
   }
 
@@ -228,7 +241,8 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
           final stamp = (data?['enabled'] == true) ? data!['lastSeenAt'] : null;
           final date = stamp is Timestamp ? stamp.toDate().toLocal() : null;
           final now = DateTime.now();
-          final online = isPresenceOnline(date, now: now);
+          final online =
+              data?['online'] == true && isPresenceOnline(date, now: now);
           final text = online
               ? 'Çevrimiçi'
               : formatLastSeen(date, now: now) ?? widget.fallback;
@@ -251,6 +265,11 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
 String? formatLastSeen(DateTime? date, {DateTime? now}) {
   if (date == null) return null;
   final current = now ?? DateTime.now();
+  final age = current.difference(date);
+  if (!age.isNegative && age < const Duration(minutes: 2)) return 'Az önce';
+  if (!age.isNegative && age < const Duration(hours: 1)) {
+    return '${age.inMinutes} dk önce';
+  }
   final time =
       '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   if (DateUtils.isSameDay(date, current)) return 'Bugün $time';

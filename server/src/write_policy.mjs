@@ -75,7 +75,9 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   return p[1]===uid&&(remove||only(b,['peers'])&&list(b.peers)&&b.peers.length<=500&&b.peers.every(id)&&new Set(b.peers).size===b.peers.length)?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p.length===4&&p[2]==='presence'){
-  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','lastSeenAt'])&&(b.enabled===false&&!Object.hasOwn(b,'lastSeenAt')||b.enabled===true&&at(b.lastSeenAt,now)))?allow():deny();
+  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','online','lastSeenAt'])
+    &&(b.enabled===false&&b.online===false&&!Object.hasOwn(b,'lastSeenAt')
+      ||b.enabled===true&&typeof b.online==='boolean'&&at(b.lastSeenAt,now)))?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p[1]===uid&&['personalData','personalFiles','personalConfig'].includes(p[2])){
   if(p.length===4){
@@ -113,6 +115,21 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
  }
  if(p[0]==='chatProfiles'&&p.length===2){
   return b&&p[1]===uid&&only(b,['name','emoji','photo'])&&str(b.name,1,40)&&image(b)?allow():deny();
+ }
+ if(p[0]==='gameLeagues'&&p.length===6&&p[2]==='games'&&p[4]==='entries'){
+  const game=p[3],season=/^20\d{2}-Q[1-4]$/.test(p[1]);
+  const maxScore=game==='sliding_puzzle'?10000:game==='sudoku'?1000000:10000000;
+  const profile=await read('chatProfiles/'+uid);
+  if(!season||!['sudoku','sliding_puzzle','block_blast'].includes(game)
+     ||p[5]!==uid||!profile||!str(profile.name,1,40))return deny();
+  if(create&&only(b,['uid','displayName','score','updatedAt'])
+     &&b.uid===uid&&b.displayName===profile.name&&integer(b.score,1,maxScore)
+     &&at(b.updatedAt,now))return allow();
+  if(update&&a.uid===uid&&only(b,['uid','displayName','score','updatedAt'])
+     &&b.uid===uid&&b.displayName===profile.name&&integer(b.score,1,maxScore)
+     &&b.score>=a.score&&at(b.updatedAt,now)
+     &&changes(a,b,['displayName','score','updatedAt']))return allow();
+  return deny();
  }
  if(['chatContactLabels','coupleContactLabels'].includes(p[0])&&p.length===4&&p[2]==='names'&&p[3]===uid){
   if(!await member(p[0]==='chatContactLabels'?'chats':'couples',p[1]))return deny();

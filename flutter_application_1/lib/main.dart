@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'app/app_shell.dart';
 import 'app/app_runtime.dart';
@@ -14,6 +15,7 @@ export 'features/media/full_image_screen.dart';
 void callbackDispatcher() => runBackgroundDispatcher();
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessaging.onBackgroundMessage(handleFirebaseBackgroundMessage);
   runApp(const SystemGalleryApp());
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(initializeBackground(callbackDispatcher));

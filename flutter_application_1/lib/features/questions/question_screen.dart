@@ -5,109 +5,6 @@ import '../pair/paired_gate.dart';
 
 /// Her gün değişen, ikinizin de cevaplayacağı sorular.
 const List<String> kSorular = [
-  "Bugün seni en çok ne mutlu etti?",
-  "Bugün canını sıkan bir şey oldu mu?",
-  "Bugün seni güldüren şey neydi?",
-  "Bugünü bir emojiyle anlatsan?",
-  "Bugün kendinle gurur duyduğun bir şey?",
-  "Bugün beni özledin mi, ne zaman?",
-  "Bugün için birbirimize teşekkür etsek, ne için?",
-  "Bugün en çok neye şaşırdın?",
-  "Bugün kendine nasıl iyi baktın?",
-  "Bugün minnettar olduğun üç şey ne?",
-  "Bugün en çok neyi ertelemek istedin?",
-  "Bugün seni yoran şey neydi?",
-  "Bugün kendini nasıl hissettin, tek cümleyle?",
-  "Bugün birine iyilik yaptın mı, neydi?",
-  "Bugünün en güzel 10 dakikası hangisiydi?",
-  "Bugün seni düşündüren bir şey oldu mu?",
-  "Bugün öğrendiğin yeni bir şey var mı?",
-  "Bugün seni rahatlatan bir an oldu mu?",
-  "Bugün bir şeyi başarmış hissettin mi?",
-  "Bugün en çok neye güldük?",
-  "Bugün en çok neyi merak ettin?",
-  "Bugün kendini şanslı hissettin mi, neden?",
-  "Bugün seni etkileyen bir söz duydun mu?",
-  "Bugün pes etmek istedin mi, neden vazgeçmedin?",
-  "Bugün seni gülümseten küçük bir detay?",
-  "Bugün en çok neye ihtiyacın vardı?",
-  "Bugün nefes aldığın bir an oldu mu?",
-  "Bugün bir şeye üzüldün mü?",
-  "Bugün küçük bir mutluluk yakaladın mı?",
-  "Bugün bana sarılmak istedin mi, ne zaman?",
-  "Bugün kendine ne söylemek istersin?",
-  "Bugünü bir cümleyle özetlesen?",
-  "Bugün seni en çok ne düşündürdü?",
-  "Bugün seni şaşırtan bir insan oldu mu?",
-  "Bugün en çok neyi kaçırdın?",
-  "Bugün bana ne anlatmak istedin ama unuttun?",
-  "Bugün kimi aradın, neden?",
-  "Bugünün rengi ne olurdu?",
-  "Bugün bir şeyi geri alabilseydin ne olurdu?",
-  "Bugün hangi anı tekrar yaşamak isterdin?",
-  "Bugün kendine bir hediye alsan ne alırdın?",
-  "Bugün bana bir söz verecek olsan ne olurdu?",
-  "Beni ilk gördüğünde ne düşünmüştün?",
-  "İlk buluşmamızı hatırlıyor musun, nasıldı?",
-  "İlk mesajımı hatırlıyor musun, ne yazmıştım?",
-  "En güzel anımız hangisiydi?",
-  "Beni en çok hangi anımızda sevdin?",
-  "Sence beni en iyi anladığın an hangisiydi?",
-  "Sence ilişkimizin en güçlü yanı ne?",
-  "Sence birlikte en iyi kararımız neydi?",
-  "Beraber en çok ne yaparken mutluyuz sence?",
-  "Sence ilişkimizde neyi daha çok yapmalıyız?",
-  "Birlikte izlediğimiz en güzel film hangisiydi?",
-  "Şu an yanımda olsan ne yapardık?",
-  "Sence en iyi anlaştığımız konu ne?",
-  "Seni son ne zaman gerçekten dinlediğimi hissettin?",
-  "Bana en çok hangi konuda güveniyorsun?",
-  "Seni en çok ne zaman özlüyorum sence?",
-  "Beni en çok hangi halimle sevdin?",
-  "Sence beni en çok ne değiştirdi?",
-  "Beni en çok hangi sözüm etkiledi sence?",
-  "Seni en çok ne zaman huzurlu görüyorum sence?",
-  "Seni en çok ne zaman özel hissettiriyorum?",
-  "Beraber yapmadığımız ama yapmamız gereken ne?",
-  "Beraber ilk kez ne yapmalıyız?",
-  "Beraber bir gelenek başlatsak ne olsun?",
-  "Birlikte bir alışkanlık edinsek ne olsun?",
-  "Birlikte öğrenmek istediğin bir şey var mı?",
-  "Bir şarkı bize ait olsa hangisi olurdu?",
-  "Bir kitap olsak adı ne olurdu?",
-  "Beraber bir liste yapsak ilk madde ne olur?",
-  "Bende en sevdiğin özellik ne?",
-  "Beni bir kelimeyle anlatsan?",
-  "Sence beni en iyi tarif eden üç kelime?",
-  "Beni bir renk yapsan hangi renk olurdum?",
-  "Beni bir yemeğe benzetsen hangisi olurdum?",
-  "Beni tarif eden bir şarkı olsa hangisi olurdu?",
-  "Bana bir lakap taksan ne olurdu?",
-  "Bana bir çiçek verseydin hangisi olurdu?",
-  "Beni gülümseten hangi huyum var sence?",
-  "Sence beni en iyi ne anlatır: sözlerim mi, halim mi?",
-  "Bana bir tavsiye versen ne olurdu?",
-  "Bana yazacağın kısa bir not olsa ne yazardın?",
-  "Bana teşekkür etmek istediğin bir şey var mı?",
-  "Bana kızdığın ama söylemediğin bir şey var mı?",
-  "Bana söylemek isteyip de söyleyemediğin bir şey var mı?",
-  "Bana sürpriz yapacak olsan ne yapardın?",
-  "Bana bir gün ayırsan planın ne olurdu?",
-  "Beni en çok ne zaman gururlandırıyorsun?",
-  "Sana kendini özel hissettiren neydi?",
-  "Seni en çok ne rahatlatıyor?",
-  "Seni en çok ne motive ediyor?",
-  "Seni en çok ne heyecanlandırıyor?",
-  "Seni en çok ne üzer?",
-  "Seni en çok kim güldürür?",
-  "Seni en çok ne güldürür, saçma bile olsa?",
-  "Seni en çok ne zaman güçlü hissediyorsun?",
-  "Bir şeyden korkuyorsan, o ne?",
-  "Hayatta en çok neye değer veriyorsun?",
-  "Sence en romantik an nedir?",
-  "En son ne zaman kahkaha attın?",
-  "Çocukken hayalindeki meslek neydi?",
-  "En sevdiğin çocukluk anın ne?",
   "Çocukken doğru sandığın ama sonradan değişen bir fikrin neydi?",
   "Küçükken ailenden öğrendiğin ve hâlâ kullandığın bir alışkanlık var mı?",
   "Çocukken zorlanıp bugün kolayca yapabildiğin bir şey ne?",
@@ -214,10 +111,17 @@ const List<String> kSorular = [
   "Ortak bir hayalimizin ilk küçük adımını bu hafta nasıl atabiliriz?",
 ];
 
-int _todayQIndex() {
-  final now = DateTime.now();
-  final gunSayisi = now.difference(DateTime(now.year, 1, 1)).inDays;
-  return gunSayisi % kSorular.length;
+final DateTime kQuestionScheduleStart = DateTime(2026, 11, 7);
+
+int? questionIndexForDate(DateTime date) {
+  final day = DateTime.utc(date.year, date.month, date.day);
+  final start = DateTime.utc(
+    kQuestionScheduleStart.year,
+    kQuestionScheduleStart.month,
+    kQuestionScheduleStart.day,
+  );
+  final index = day.difference(start).inDays;
+  return index >= 0 && index < kSorular.length ? index : null;
 }
 
 class QuestionScreen extends StatelessWidget {
@@ -239,7 +143,21 @@ class _QuestionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final qIndex = _todayQIndex();
+    final qIndex = questionIndexForDate(DateTime.now());
+    if (qIndex == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Günün Sorusu')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Günlük soru listesi tamamlandı.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
     final soru = kSorular[qIndex];
 
     return Scaffold(

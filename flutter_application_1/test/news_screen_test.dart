@@ -172,7 +172,6 @@ void main() {
       find.text('Webb, gezegen çarpışmalarının izlerini araştırdı'),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.byType(TextField), 300);
     expect(
       Theme.of(tester.element(find.byType(TextField))).brightness,
       Brightness.light,
@@ -193,7 +192,21 @@ void main() {
     expect(find.text('Haber bildirimleri'), findsNothing);
     expect(find.text('Kendime Notlar'), findsOneWidget);
     expect(find.text('Sudoku'), findsOneWidget);
+    final drawerScroll = find.descendant(
+      of: find.byType(Drawer),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Ders Notlarım'),
+      300,
+      scrollable: drawerScroll,
+    );
     expect(find.text('Ders Notlarım'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Haber ve hatırlatıcı ayarları'),
+      300,
+      scrollable: drawerScroll,
+    );
     await tester.tap(find.text('Haber ve hatırlatıcı ayarları'));
     await tester.pumpAndSettle();
     expect(find.text('Haberler'), findsOneWidget);
@@ -223,7 +236,16 @@ void main() {
       expect(spaceTitle, findsOneWidget);
       await tester.tap(spaceTitle);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Uzay yorumu'), 300);
+      await tester.scrollUntilVisible(
+        find.text('Uzay yorumu'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(Scaffold).last,
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('Uzay yorumu'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -253,7 +275,6 @@ void main() {
         find.text('Webb, gezegen çarpışmalarının izlerini araştırdı'),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.byType(TextField), 300);
       expect(
         Theme.of(tester.element(find.byType(TextField))).brightness,
         Brightness.dark,
@@ -269,14 +290,19 @@ void main() {
       find.text('Webb, gezegen çarpışmalarının izlerini araştırdı'),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.byType(TextField), 300);
   }
+
+  Finder articleScroll(WidgetTester tester) => find
+      .descendant(
+        of: find.byType(Scaffold).last,
+        matching: find.byType(Scrollable),
+      )
+      .first;
 
   testWidgets('Normal yorum kaydedilir', (tester) async {
     await openArticle(tester, (_) => false);
     await tester.enterText(find.byType(TextField), 'Güzel bir yazı');
-    await tester.ensureVisible(find.text('Yorum gönder'));
-    await tester.tap(find.text('Yorum gönder'));
+    await tester.tap(find.text('Yorum yap'));
     await tester.pumpAndSettle();
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getStringList('neural_comments_0'), ['Güzel bir yazı']);
@@ -288,6 +314,11 @@ void main() {
       'neural_comments_0': ['Eski yorum'],
     });
     await openArticle(tester, (_) => false);
+    await tester.scrollUntilVisible(
+      find.byTooltip('Yorum seçenekleri'),
+      300,
+      scrollable: articleScroll(tester),
+    );
     await tester.ensureVisible(find.byTooltip('Yorum seçenekleri'));
     await tester.tap(find.byTooltip('Yorum seçenekleri'));
     await tester.pumpAndSettle();
@@ -318,8 +349,7 @@ void main() {
         return value == pin;
       });
       await tester.enterText(find.byType(TextField), pin);
-      await tester.ensureVisible(find.text('Yorum gönder'));
-      await tester.tap(find.text('Yorum gönder'));
+      await tester.tap(find.text('Yorum yap'));
       await tester.pumpAndSettle();
       expect(received, pin);
       expect(find.byType(TextField), findsNothing);

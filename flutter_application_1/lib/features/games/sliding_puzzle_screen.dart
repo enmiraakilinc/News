@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'game_league_service.dart';
 import 'sliding_puzzle_logic.dart';
 
 class SlidingPuzzleScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
   late List<int> _tiles;
   int _moves = 0;
   bool _completionShown = false;
+  bool _leagueScoreSubmitted = false;
 
   @override
   void initState() {
@@ -45,6 +48,7 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
     setState(() {
       _moves = 0;
       _completionShown = false;
+      _leagueScoreSubmitted = false;
     });
   }
 
@@ -61,7 +65,26 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
     if (_tiles.asMap().entries.every(
       (entry) => entry.value == (entry.key + 1) % 16,
     )) {
+      if (!_leagueScoreSubmitted) {
+        _leagueScoreSubmitted = true;
+        unawaited(_recordLeagueScore());
+      }
       _showCompletion();
+    }
+  }
+
+  Future<void> _recordLeagueScore() async {
+    try {
+      await GameLeagueService.recordBestScore(
+        game: 'sliding_puzzle',
+        score: (10000 - _moves).clamp(1, 10000),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lig puanı kaydedilemedi: $error')),
+        );
+      }
     }
   }
 

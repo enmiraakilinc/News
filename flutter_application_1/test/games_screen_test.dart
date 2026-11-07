@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/games/sliding_puzzle_screen.dart';
@@ -23,15 +24,29 @@ void main() {
   test('block placement clears full rows and scores the move', () {
     final state = BlockBlastState(
       cells: List<bool>.generate(100, (index) => index < 9),
-      pieces: BlockBlastState.newGame().pieces,
+      pieces: [
+        const BlockShape([0]),
+        const BlockShape([0]),
+        const BlockShape([0]),
+      ],
       score: 0,
       round: 0,
       gameOver: false,
     );
     final next = placeBlock(state, 0, 0, 9)!;
     expect(next.cells.take(10), everyElement(false));
+    expect(next.clearedCells, containsAll(List<int>.generate(10, (i) => i)));
     expect(next.score, 11);
     expect(next.pieces.first, isNull);
+  });
+
+  test('block pieces vary between independently generated rounds', () {
+    final first = BlockBlastState.newGame(Random(1));
+    final second = BlockBlastState.newGame(Random(2));
+    expect(
+      first.pieces.map((shape) => shape?.cells).toList(),
+      isNot(second.pieces.map((shape) => shape?.cells).toList()),
+    );
   });
 
   testWidgets('block puzzle screen shows a board and three pieces', (
@@ -42,6 +57,19 @@ void main() {
     expect(find.text('Puan: 0'), findsOneWidget);
     expect(find.byType(GridView), findsOneWidget);
     expect(find.byKey(const ValueKey('block-blast-cell-0')), findsOneWidget);
+  });
+
+  testWidgets('block pieces can be dragged onto the board', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
+    await tester.pumpAndSettle();
+    final piece = find.byKey(const ValueKey('block-blast-piece-0'));
+    final cell = find.byKey(const ValueKey('block-blast-cell-0'));
+    final gesture = await tester.startGesture(tester.getCenter(piece));
+    await gesture.moveTo(tester.getCenter(cell));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('Puan: 0'), findsNothing);
   });
 
   testWidgets('Sudoku candidate notes can be entered and checked', (
@@ -139,6 +167,70 @@ void main() {
       find.byKey(const ValueKey('sudoku-drawing-layer')),
     );
     expect((cleared.painter as SudokuDrawingPainter).strokes, isEmpty);
+  });
+
+  testWidgets('Sudoku drawings persist when reopening the puzzle', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SudokuScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sudoku-drawing-mode')));
+    await tester.pumpAndSettle();
+    final surface = find.byKey(const ValueKey('sudoku-drawing-surface'));
+    await tester.ensureVisible(surface);
+    final rect = tester.getRect(surface);
+    await tester.dragFrom(
+      rect.topLeft + const Offset(20, 20),
+      const Offset(90, 75),
+    );
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    final saved = jsonDecode(prefs.getString('sudoku_game')!) as Map;
+    expect(saved['drawings'], hasLength(1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MaterialApp(home: SudokuScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sudoku-drawing-mode')));
+    await tester.pumpAndSettle();
+    final drawing = tester.widget<CustomPaint>(
+      find.byKey(const ValueKey('sudoku-drawing-layer')),
+    );
+    expect((drawing.painter as SudokuDrawingPainter).strokes, hasLength(1));
+  });
+
+  testWidgets('Sudoku solution check highlights entered wrong numbers', (
+    tester,
+  ) async {
+    final puzzle = SudokuPuzzle.generate(Random(3));
+    final board = List<int>.of(puzzle.clues);
+    final cell = puzzle.clues.indexWhere((number) => number == 0);
+    board[cell] = puzzle.solution[cell] % 9 + 1;
+    SharedPreferences.setMockInitialValues({
+      'sudoku_game': jsonEncode({
+        'solution': puzzle.solution,
+        'clues': puzzle.clues,
+        'board': board,
+        'startedAt': DateTime.now().millisecondsSinceEpoch,
+      }),
+    });
+    await tester.pumpWidget(const MaterialApp(home: SudokuScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Çözümü denetle'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('1 hücredeki sayı yanlış; kırmızı hücreleri gözden geçir.'),
+      findsOneWidget,
+    );
+    final cellTile = find.byKey(ValueKey('sudoku-cell-$cell'));
+    final decoration = tester.widget<Container>(
+      find.descendant(of: cellTile, matching: find.byType(Container)).first,
+    );
+    expect(
+      (decoration.decoration! as BoxDecoration).color,
+      Theme.of(tester.element(cellTile)).colorScheme.errorContainer,
+    );
   });
 
   testWidgets('Completing Sudoku offers to start another puzzle', (

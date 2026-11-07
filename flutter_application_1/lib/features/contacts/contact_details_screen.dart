@@ -11,7 +11,6 @@ import '../../core/theme/chat_theme.dart';
 import '../../core/notifications/notif_prefs.dart';
 import 'shared_contact_label.dart';
 import '../calls/voice_call.dart';
-import '../calls/call_state.dart';
 import '../media/shared_conversation_media_screen.dart';
 
 class ContactChatHeader extends StatelessWidget {
@@ -334,7 +333,13 @@ class ContactDetailsScreen extends StatelessWidget {
                   contactId: contactId,
                   fallback: fallbackName,
                 ),
-                MissedCallMessagesSwitch(sourceKey: sourceKey),
+                const ListTile(
+                  leading: Icon(Icons.call_missed_outgoing),
+                  title: Text('Arama sonuçları sohbete eklenir'),
+                  subtitle: Text(
+                    'Yanıtlanan, yanıtlanmayan, reddedilen ve bağlantısı kesilen aramalar otomatik kaydedilir.',
+                  ),
+                ),
               ],
               if (members != null) ...[
                 const ListTile(title: Text('Grup üyeleri')),
@@ -375,78 +380,6 @@ class ContactDetailsScreen extends StatelessWidget {
         ],
       ),
     ),
-  );
-}
-
-class MissedCallMessagesSwitch extends StatefulWidget {
-  final String sourceKey;
-  const MissedCallMessagesSwitch({super.key, required this.sourceKey});
-
-  @override
-  State<MissedCallMessagesSwitch> createState() =>
-      _MissedCallMessagesSwitchState();
-}
-
-class _MissedCallMessagesSwitchState extends State<MissedCallMessagesSwitch> {
-  bool _enabled = true;
-  bool _ready = false;
-  bool _saving = false;
-  String? _loadError;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPreference();
-  }
-
-  Future<void> _loadPreference() async {
-    try {
-      final value = await callEventMessagesEnabled(widget.sourceKey);
-      if (mounted) {
-        setState(() {
-          _enabled = value;
-          _ready = true;
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _loadError = userError(error));
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SwitchListTile(
-    secondary: const Icon(Icons.call_missed_outgoing),
-    title: const Text('Cevapsız arama mesajı gönder'),
-    subtitle: Text(
-      _loadError ?? 'Yanıtlanmayan aramaları bu sohbetin mesajlarına ekle.',
-    ),
-    value: _enabled,
-    onChanged: !_ready || _saving
-        ? null
-        : (value) async {
-            final previousValue = _enabled;
-            setState(() {
-              _enabled = value;
-              _saving = true;
-            });
-            try {
-              await setCallEventMessagesEnabled(widget.sourceKey, value);
-            } catch (error) {
-              if (context.mounted) {
-                setState(() => _enabled = previousValue);
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(userError(error))));
-              }
-            } finally {
-              if (context.mounted) setState(() => _saving = false);
-            }
-          },
   );
 }
 

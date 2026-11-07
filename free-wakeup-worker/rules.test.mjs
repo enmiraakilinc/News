@@ -165,6 +165,26 @@ test('Only recipient may enable its device/relationship; token and config stay p
   await assertFails(setDoc(doc(owner,'config/wakeup'),{enabled:true,endpoint:'https://example.invalid'}));
 });
 
+test('Last-seen sharing is owner-controlled and online state is explicit',async()=>{
+  const config='chatAccounts/owner/personalConfig/presence';
+  const status='chatAccounts/owner/presence/status';
+  await assertSucceeds(setDoc(doc(owner,config),{peers:['peer']}));
+  await assertFails(setDoc(doc(peer,config),{peers:['owner']}));
+  await assertSucceeds(setDoc(doc(owner,status),{
+    enabled:true,online:true,lastSeenAt:serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(peer,status)));
+  await assertFails(getDoc(doc(outsider,status)));
+  await assertSucceeds(updateDoc(doc(owner,status),{
+    online:false,lastSeenAt:serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(owner,status),{online:'false'}));
+  await assertSucceeds(setDoc(doc(owner,status),{enabled:false,online:false}));
+  await assertFails(setDoc(doc(owner,status),{
+    enabled:false,online:false,lastSeenAt:serverTimestamp(),
+  }));
+});
+
 test('Chat gallery requests require the real sender, membership and fresh photo/video; only sender can approve',async()=>{
   const id='AbCdEfGhIjKlMnOpQrSt', expired='AbCdEfGhIjKlMnOpQrSu';
   await env.withSecurityRulesDisabled(async ctx=>{

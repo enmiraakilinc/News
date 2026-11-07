@@ -3,6 +3,8 @@ package com.melek.stargaleri
 import android.view.WindowManager
 import android.os.Bundle
 import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -31,6 +33,84 @@ class MainActivity : FlutterActivity() {
     private var locationListener: LocationListener? = null
     private val locationHandler = Handler(Looper.getMainLooper())
     private var locationTimeout: Runnable? = null
+
+    @Suppress("DEPRECATION")
+    private fun audioOutputs(): List<Map<String, Any>> {
+        val manager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val devices = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            manager.availableCommunicationDevices
+        } else {
+            manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).filter {
+                it.type in setOf(
+                    AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+                    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_USB_HEADSET
+                )
+            }
+        }
+        return devices.map { device ->
+            val type = when (device.type) {
+                AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "earpiece"
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "speaker"
+                AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "wired"
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "bluetooth"
+                AudioDeviceInfo.TYPE_USB_HEADSET -> "usb"
+                else -> "other"
+            }
+            val fallback = when (type) {
+                "earpiece" -> "Telefon"
+                "speaker" -> "Hoparlör"
+                "wired" -> "Kablolu kulaklık"
+                "bluetooth" -> "Bluetooth kulaklık"
+                "usb" -> "USB kulaklık"
+                else -> "Ses çıkışı"
+            }
+            mapOf(
+                "id" to device.id,
+                "type" to type,
+                "label" to device.productName.toString().takeIf { it.isNotBlank() } .orEmpty().ifBlank { fallback },
+                "selected" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    manager.communicationDevice?.id == device.id
+                } else {
+                    type == "bluetooth" && manager.isBluetoothScoOn ||
+                        type == "speaker" && manager.isSpeakerphoneOn
+                }
+            )
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun selectAudioOutput(id: Int): Boolean {
+        val manager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val device = manager.availableCommunicationDevices.firstOrNull { it.id == id }
+                ?: return false
+            return manager.setCommunicationDevice(device)
+        }
+        val device = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull { it.id == id }
+            ?: return false
+        when (device.type) {
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> {
+                manager.isSpeakerphoneOn = false
+                manager.startBluetoothSco()
+                manager.isBluetoothScoOn = true
+            }
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> {
+                manager.stopBluetoothSco()
+                manager.isBluetoothScoOn = false
+                manager.isSpeakerphoneOn = true
+            }
+            else -> {
+                manager.stopBluetoothSco()
+                manager.isBluetoothScoOn = false
+                manager.isSpeakerphoneOn = false
+            }
+        }
+        return true
+    }
 
     private fun finishLocation(location: Location?, code: String = "unavailable") {
         val result = locationResult ?: return
@@ -152,6 +232,26 @@ class MainActivity : FlutterActivity() {
                             arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
                             bluetoothPermissionRequestCode
                         )
+                    }
+                }
+                "audioOutputs" -> {
+                    try {
+                        result.success(audioOutputs())
+                    } catch (_: SecurityException) {
+                        result.error("permission_denied", "Bluetooth kulaklıkları görmek için Bluetooth izni gerekli.", null)
+                    }
+                }
+                "selectAudioOutput" -> {
+                    val id = call.argument<Int>("id")
+                    if (id == null) {
+                        result.error("invalid", "Ses çıkışı bulunamadı.", null)
+                    } else {
+                        try {
+                            if (selectAudioOutput(id)) result.success(true)
+                            else result.error("unavailable", "Bu ses çıkışı artık bağlı değil.", null)
+                        } catch (_: SecurityException) {
+                            result.error("permission_denied", "Ses çıkışını seçmek için Bluetooth izni gerekli.", null)
+                        }
                     }
                 }
                 "disableIncoming" -> {

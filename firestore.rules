@@ -75,6 +75,29 @@ service cloud.firestore {
         && (request.resource.data.get('avatarEmoji', '') == '' || request.resource.data.get('avatarPhoto', '') == '');
     }
 
+    match /chatAccounts/{userId}/personalConfig/presence {
+      allow get: if girisYapti() && request.auth.uid == userId;
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['peers'])
+        && request.resource.data.peers is list
+        && request.resource.data.peers.size() <= 500;
+    }
+
+    match /chatAccounts/{userId}/presence/status {
+      allow get: if girisYapti() && (request.auth.uid == userId
+        || request.auth.uid in get(
+          /databases/$(database)/documents/chatAccounts/$(userId)/personalConfig/presence
+        ).data.peers);
+      allow create, update: if girisYapti() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['enabled', 'online', 'lastSeenAt'])
+        && ((request.resource.data.enabled == false
+            && request.resource.data.online == false
+            && !request.resource.data.keys().hasAny(['lastSeenAt']))
+          || (request.resource.data.enabled == true
+            && request.resource.data.online is bool
+            && request.resource.data.lastSeenAt == request.time));
+    }
+
     match /chatAccounts/{userId}/starredMessages/{starId} {
       allow read, delete: if girisYapti() && request.auth.uid == userId;
       allow create, update: if girisYapti() && request.auth.uid == userId
@@ -138,6 +161,33 @@ service cloud.firestore {
         && request.resource.data.get('photo', '') is string
         && request.resource.data.get('photo', '').size() <= 32768
         && (request.resource.data.get('emoji', '') == '' || request.resource.data.get('photo', '') == '');
+    }
+
+    match /gameLeagues/{seasonId}/games/{gameId}/entries/{userId} {
+      function validLeagueEntry(data) {
+        return seasonId.matches('^20[0-9]{2}-Q[1-4]$')
+          && gameId in ['sudoku', 'sliding_puzzle', 'block_blast']
+          && data.keys().hasOnly(['uid', 'displayName', 'score', 'updatedAt'])
+          && data.uid == userId
+          && data.displayName == get(
+            /databases/$(database)/documents/chatProfiles/$(userId)
+          ).data.name
+          && data.score is int && data.score > 0
+          && data.score <= (gameId == 'sliding_puzzle' ? 10000
+            : (gameId == 'sudoku' ? 1000000 : 10000000));
+      }
+
+      allow get, list: if girisYapti()
+        && seasonId.matches('^20[0-9]{2}-Q[1-4]$')
+        && gameId in ['sudoku', 'sliding_puzzle', 'block_blast'];
+      allow create: if girisYapti() && userId == request.auth.uid
+        && validLeagueEntry(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+      allow update: if girisYapti() && userId == request.auth.uid
+        && validLeagueEntry(request.resource.data)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.score >= resource.data.score;
+      allow delete: if false;
     }
 
     match /chatInvites/{code} {
