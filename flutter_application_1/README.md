@@ -1,17 +1,39 @@
-# flutter_application_1
+# Neural Haber — Flutter uygulaması
 
-A new Flutter project.
+Bu klasör Android uygulamasının Flutter projesidir. Uygulama sohbet, sesli ve
+görüntülü arama, kişisel notlar, Günün Sorusu, oyunlar ve bildirim özelliklerini
+içerir. Sunucu/Worker ve yayın araçları proje kökündeki diğer klasörlerdedir;
+bu klasörden yapılan bir derleme canlı sunucuya veya mağazaya yayın yapmaz.
 
-## Getting Started
+## Geliştirme ve kontroller
 
-This project is a starting point for a Flutter application.
+Komutları bu klasörde çalıştır:
 
-A few resources to get you started if this is your first Flutter project:
+```sh
+flutter pub get
+flutter analyze
+flutter test
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Android debug APK:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+flutter build apk --debug
+```
+
+İmzalı release APK için proje kökündeki `tools/releases/build.ps1` akışını ve
+[yayın rehberini](../docs/PRIVATE_UPDATES.md) kullan. Sürüm numarası
+`pubspec.yaml` içindeki `version` alanındadır. Release derlemek, dosyayı
+yayımlamakla aynı şey değildir; yayın adımları ayrıca yetki ve açık onay ister.
+
+## Kaynak yapısı
+
+- `lib/app/`: uygulama başlangıcı ve çalışma zamanı.
+- `lib/core/`: ortak veri, güvenlik, bildirim, tema ve yardımcı servisler.
+- `lib/features/`: ekranlar ve özelliklere ait servisler.
+- `android/`: Android izinleri ve Kotlin platform bağlantıları.
+- `test/`: uygulama davranışlarını denetleyen Flutter testleri.
+
+Detaylı dosya haritası ve yayın sınırları için proje kökündeki
+[dosya rehberine](../docs/DOSYA_REHBERI.md) ve
+[mimari belgesine](../docs/ARCHITECTURE.md) bak.

@@ -17,6 +17,13 @@ test('address books are owner-only',()=>{
  queryAllowed({path:'chatAccounts/alice/chatDevices'},'alice');
  assert.throws(()=>queryAllowed({path:'chatAccounts/bob/chatDevices'},'alice'));
 });
+test('season game leaderboards are readable only through supported collections',()=>{
+ queryAllowed({path:'gameLeagues/2026-Q2/games/sudoku/entries',limit:100},'alice');
+ queryAllowed({path:'gameLeagues/2026-Q2/games/sliding_puzzle/entries'},'alice');
+ assert.throws(()=>queryAllowed({path:'gameLeagues/2026-Q2/games/unknown/entries'},'alice'));
+ assert.throws(()=>queryAllowed({path:'gameLeagues/2026-Q2/entries'},'alice'));
+ assert.throws(()=>queryAllowed({path:'gameLeagues/2026-Q2/games/block_blast/entries'},null));
+});
 test('chat and call inboxes require the authenticated identity filter',()=>{
  assert.throws(()=>queryAllowed({path:'chats'},'alice'));
  assert.throws(()=>queryAllowed({path:'chats',filters:[{field:['members'],op:'array-contains',value:value('bob')}]},'alice'));

@@ -31,6 +31,20 @@ test('chat notification device tokens are scoped to their owner',async()=>{
  await denied(run('chatAccounts/alice/chatDevices/'+'invalid',null,token));
  await denied(run('chatAccounts/alice/chatDevices/'+'a'.repeat(32),null,{...token,extra:true}));
 });
+test('league entries are public scores but writable only by their owner and never decrease',async()=>{
+ const entry={uid:'alice',displayName:'Alice',score:40,updatedAt:now};
+ const path='gameLeagues/2026-Q2/games/block_blast/entries/alice';
+ await run(path,null,entry);
+ await run(path,entry,{...entry,score:41,updatedAt:now});
+ await run(path,entry,{...entry,displayName:'Alice Updated',updatedAt:now},
+  {read:async p=>p==='chatProfiles/alice'?{name:'Alice Updated'}:source[p]});
+ await denied(run(path,entry,{...entry,score:39,updatedAt:now}));
+ await denied(run(path,null,{...entry,uid:'bob'},{uid:'bob'}));
+ await denied(run(path,null,{...entry,score:10000001}));
+ await denied(run('gameLeagues/2026-Q2/games/sudoku/entries/alice',null,
+  {...entry,score:1000001}));
+ await denied(run('gameLeagues/invalid/games/block_blast/entries/alice',null,entry));
+});
 test('chat membership never grants access to another couple',async()=>{
  await run('couples/pair/letters/a',null,{cipher:'encrypted'});
  await denied(run('couples/pair/letters/a',null,{cipher:'encrypted'},{uid:'outsider'}));
@@ -184,13 +198,14 @@ test('extended download consent uses the new expiry and preserves approval',asyn
 });
 
 test('last seen is owner-controlled, opt-in and timestamp-bound',async()=>{
- const p='chatAccounts/alice/presence/status',active={enabled:true,lastSeenAt:now};
+ const p='chatAccounts/alice/presence/status',active={enabled:true,online:true,lastSeenAt:now};
  await run(p,null,active);
- await run(p,active,{enabled:false});
- await denied(run(p,active,{enabled:false,lastSeenAt:now}));
+ await run(p,active,{enabled:false,online:false});
+ await run(p,active,{...active,online:false,lastSeenAt:now});
  await denied(run(p,null,active,{uid:'bob'}));
  await denied(run(p,active,{...active,lastSeenAt:now.add(-1000)}));
- await denied(run(p,{enabled:false},{enabled:false,lastSeenAt:now}));
+ await denied(run(p,{enabled:false,online:false},{enabled:false,online:true,lastSeenAt:now}));
+ await denied(run(p,{enabled:false,online:false},{enabled:false,online:false,lastSeenAt:now}));
 });
 test('only the owner can grant last-seen visibility to named peers',async()=>{
  const p='chatAccounts/alice/personalConfig/presence';

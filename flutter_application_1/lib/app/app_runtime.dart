@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
@@ -333,6 +335,28 @@ Future<void> _checkStorageWarning() async {
   } catch (_) {}
 }
 
+@pragma('vm:entry-point')
+Future<void> handleFirebaseBackgroundMessage(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+  await initializeLocalNotifications();
+  if (message.data['type'] != 'chat' ||
+      !await chatNotificationsEnabled()) {
+    return;
+  }
+  final recipient = message.data['recipientUid'];
+  if (recipient is! String) return;
+  final user = await FirebaseAuth.instance
+      .authStateChanges()
+      .first
+      .timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => FirebaseAuth.instance.currentUser,
+      );
+  if (user?.uid != recipient) return;
+  await _showChatNotification();
+}
+
 /// Firebase Cloud Messaging kurulumu — anlık güncelleme bildirimleri için.
 Future<void> _initFcm() async {
   try {
@@ -355,20 +379,7 @@ Future<void> _initFcm() async {
             !await chatNotificationsEnabled()) {
           return;
         }
-        await flutterLocalNotificationsPlugin.show(
-          kNotifChats.id,
-          'Güncelleme',
-          await notifText(kNotifChats),
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              'updates',
-              'Güncellemeler',
-              importance: Importance.defaultImportance,
-              priority: Priority.defaultPriority,
-              autoCancel: true,
-            ),
-          ),
-        );
+        await _showChatNotification();
         return;
       }
       final n = m.notification;
@@ -393,4 +404,21 @@ Future<void> _initFcm() async {
   } catch (_) {
     // İzin yok / hata — sessizce geç.
   }
+}
+
+Future<void> _showChatNotification() async {
+  await flutterLocalNotificationsPlugin.show(
+    kNotifChats.id,
+    'Güncelleme',
+    await notifText(kNotifChats),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'updates',
+        'Güncellemeler',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        autoCancel: true,
+      ),
+    ),
+  );
 }

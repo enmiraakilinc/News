@@ -24,6 +24,11 @@ void main() {
       formatLastSeen(DateTime(2026, 11, 1, 9, 5), now: now),
       'Bugün 09:05',
     );
+    expect(formatLastSeen(DateTime(2026, 11, 1, 23, 44), now: now), 'Az önce');
+    expect(
+      formatLastSeen(DateTime(2026, 11, 1, 23, 15), now: now),
+      '30 dk önce',
+    );
     expect(
       formatLastSeen(DateTime(2026, 10, 31, 23, 10), now: now),
       'Dün 23:10',

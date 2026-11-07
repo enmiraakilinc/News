@@ -22,6 +22,8 @@ export function queryAllowed(q,uid) {
    &&(q.filters??[]).some(f=>JSON.stringify(f.field)===JSON.stringify(['typing'])
     &&f.op==='=='&&f.value?.booleanValue===true) ||
   root==='voiceCalls'&&eq('callee',uid) ||
+  p[0]==='gameLeagues'&&p.length===5&&/^20\d{2}-Q[1-4]$/.test(p[1])
+   &&p[2]==='games'&&['sudoku','sliding_puzzle','block_blast'].includes(p[3])&&p[4]==='entries' ||
   root==='chatMedia'&&['owner','chatId','coupleId'].some(k=>(q.filters??[]).some(f=>JSON.stringify(f.field)===JSON.stringify([k])&&f.op==='=='&&typeof f.value?.stringValue==='string')) ||
   root==='mediaDownloadRequests'&&(eq('ownerUid',uid)||eq('requesterUid',uid)) ||
   p[0]==='couples'&&p.length>=3 ||

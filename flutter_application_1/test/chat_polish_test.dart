@@ -114,7 +114,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            bottomNavigationBar: ChatComposer(onSend: (_, _) async {}),
+            bottomNavigationBar: ChatComposer(
+              coupleId: 'couple',
+              onSend: (_, _) async {},
+            ),
           ),
         ),
       );

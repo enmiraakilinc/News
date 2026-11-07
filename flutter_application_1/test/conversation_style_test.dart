@@ -258,7 +258,7 @@ void main() {
       await tester.longPress(find.text('Olur, ben de örnek kodları ekledim.'));
       await tester.pumpAndSettle();
       expect(find.text('Düzenle'), findsOneWidget);
-      expect(find.text('Sil'), findsOneWidget);
+      expect(find.text('Herkesten sil'), findsOneWidget);
       expect(tester.takeException(), isNull, reason: '$name menu');
       await screenshot('actions_$name');
       await tester.tap(find.byTooltip('❤️ ifadesini bırak'));
