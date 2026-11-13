@@ -7,6 +7,7 @@ import '../contacts/contact_names.dart';
 import '../pair/couple_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/utils/random_id.dart';
 import '../wakeup/wakeup_service.dart';
 
 /// Passwords are handled by Firebase Auth, never stored in preferences/Firestore.
@@ -37,15 +38,7 @@ class ChatAccount {
 
   static String emailForCode(String code) => '${normalizeCode(code)}@$domain';
 
-  static String newCode() {
-    final random = Random.secure();
-    return displayCode(
-      List.generate(
-        16,
-        (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-      ).join(),
-    );
-  }
+  static String newCode() => displayCode(randomHex(16));
 
   /// Immutable owner-only alias. Existing Firebase identity/password remain intact.
   /// Resolver throttling and owner-only rules are verified separately before release.

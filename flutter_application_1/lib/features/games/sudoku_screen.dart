@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../contacts/chat_presence.dart';
 import 'game_league_service.dart';
+import '../contacts/chat_presence.dart';
 
 class SudokuPuzzle {
   final List<int> solution;
@@ -100,7 +100,9 @@ class _SudokuScreenState extends State<SudokuScreen> {
 
   @override
   void dispose() {
-    ChatPresence.clearActivity('Sudoku');
+    if (ChatPresence.activity.value == 'Sudoku') {
+      ChatPresence.setActivity(null);
+    }
     super.dispose();
   }
 
@@ -278,6 +280,35 @@ class _SudokuScreenState extends State<SudokuScreen> {
         81,
         (i) => _board[i] == _puzzle!.solution[i],
       ).every((solved) => solved);
+
+  String? _conflictDescription(int cell) {
+    final number = _board[cell];
+    if (number == 0) return null;
+    final row = cell ~/ 9, column = cell % 9;
+    final conflicts = <String>{
+      if (List.generate(9, (i) => i).any(
+        (i) => i != column && _board[row * 9 + i] == number,
+      ))
+        'satır ${row + 1}',
+      if (List.generate(9, (i) => i).any(
+        (i) => i != row && _board[i * 9 + column] == number,
+      ))
+        'sütun ${column + 1}',
+      if (List.generate(81, (i) => i).any(
+        (i) =>
+            i != cell &&
+            i ~/ 27 == row ~/ 3 &&
+            i % 9 ~/ 3 == column ~/ 3 &&
+            _board[i] == number,
+      ))
+        '3×3 kutu',
+    };
+    if (conflicts.isEmpty) return null;
+    return '$number sayısı ${conflicts.join(' ve ')} ile çakışıyor.';
+  }
+
+  String? get _selectedConflict =>
+      _selected == null ? null : _conflictDescription(_selected!);
 
   Future<void> _recordLeagueScore() async {
     final seconds = DateTime.now().difference(_startedAt).inSeconds.clamp(
@@ -473,6 +504,18 @@ class _SudokuScreenState extends State<SudokuScreen> {
                 const Text(
                   'Her satır, sütun ve 3×3 kutuda 1–9 birer kez bulunmalı. İlerlemen bu telefonda saklanır.',
                 ),
+                if (_selectedConflict != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _selectedConflict!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 Wrap(
                   alignment: WrapAlignment.center,

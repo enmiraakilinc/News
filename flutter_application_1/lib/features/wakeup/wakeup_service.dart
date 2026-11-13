@@ -1,7 +1,6 @@
 import '../reminders/reminder_service.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
+import '../../core/utils/random_id.dart';
 import '../../core/utils/user_errors.dart';
 
 class WakeupService {
@@ -21,11 +21,7 @@ class WakeupService {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('wakeup_device_id');
     if (saved != null) return saved;
-    final random = Random.secure();
-    final value = List.generate(
-      16,
-      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-    ).join();
+    final value = randomHex(16);
     await prefs.setString('wakeup_device_id', value);
     return value;
   }

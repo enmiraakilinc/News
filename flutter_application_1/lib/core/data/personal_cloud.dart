@@ -1,6 +1,6 @@
+import 'dart:math';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart'
     show Blob, GetOptions, Source, Timestamp, FieldValue;
 import 'package:crypto/crypto.dart';
@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../../features/pair/couple_service.dart';
 import '../../features/media/chat_media.dart';
 import 'oracle_media_batch.dart';
+import '../utils/random_id.dart';
 import 'oracle_personal_store.dart';
 
 /// Account-only data. Sharing a couple secret or chat invite grants no access.
@@ -26,11 +27,7 @@ class PersonalCloud {
   Future<String> _secret() => _secretFuture ??= () async {
     _guard();
     final ref = _root.collection('personalConfig').doc('sync');
-    final random = Random.secure();
-    final candidate = List.generate(
-      32,
-      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-    ).join();
+    final candidate = randomHex(32);
     final value = await _db.runTransaction<String>((transaction) async {
       final current = await transaction.get(ref);
       if (current.exists) return current.data()!['secret'] as String;

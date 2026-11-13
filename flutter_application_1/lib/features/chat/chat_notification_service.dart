@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:math';
+
+import '../../core/utils/random_id.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -55,11 +56,5 @@ class ChatNotificationService {
     );
   }
 
-  static String _newDeviceId() {
-    final random = Random.secure();
-    return List.generate(
-      16,
-      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-    ).join();
-  }
+  static String _newDeviceId() => randomHex(16);
 }

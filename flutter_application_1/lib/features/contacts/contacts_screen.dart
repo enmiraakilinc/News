@@ -5,11 +5,13 @@ import '../chat/letters_screen.dart';
 import '../../core/theme/chat_theme.dart';
 import '../media/message_content.dart';
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chat/chat_service.dart';
 import '../chat/chat_widgets.dart';
+import '../chat/chat_unread.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/sync_state.dart';
 import 'profile_avatar.dart';
@@ -18,8 +20,37 @@ import '../media/chat_media.dart';
 import 'contact_details_screen.dart';
 import '../../core/utils/user_errors.dart';
 import '../../core/notifications/notif_prefs.dart';
-import '../chat/chat_unread.dart';
 import '../account/chat_account_screen.dart';
+
+class _UnreadMessagesDivider extends StatelessWidget {
+  const _UnreadMessagesDivider();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: const ValueKey('unread-messages-divider'),
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            'Okunmamış mesajlar',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+      ],
+    ),
+  );
+}
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({
@@ -716,7 +747,59 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
+  final _messageKeys = <String, GlobalKey>{};
+  String? _highlightId;
+  GlobalKey _messageKey(String id) =>
+      _messageKeys.putIfAbsent(id, GlobalKey.new);
+
+  void _watchConversation() {
+    final resumed =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    unawaited(
+      ActiveConversation.set(
+        resumed ? 'chat/${widget.conversation.id}' : null,
+      ),
+    );
+  }
+
+  void _showQuoted(String? id) {
+    if (id == null) return;
+    final target = _messageKey(id).currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 280),
+        alignment: 0.35,
+      );
+    }
+    setState(() => _highlightId = id);
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted && _highlightId == id) setState(() => _highlightId = null);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _watchConversation();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _watchConversation();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(ActiveConversation.set(null));
+    super.dispose();
+  }
+
   int _messageLimit = 100;
   late Stream<List<ChatMessage>> _stream = ChatService.messages(
     widget.conversation.id,
@@ -868,14 +951,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
             if (message.unlocked) message.text,
         ];
         final byId = {for (final message in messages) message.id: message};
+        final unreadDivider = unreadDividerIndex(messages);
+        final hasMoreMessages = messages.length >= _messageLimit;
         if (messages.isEmpty) {
           return const Center(child: Text('İlk mektubunu aşağıdan gönder.'));
         }
         return ListView.builder(
           reverse: true,
           padding: const EdgeInsets.all(12),
-          itemCount:
-              messages.length + (messages.length >= _messageLimit ? 1 : 0),
+          itemCount: messages.length +
+              (hasMoreMessages ? 1 : 0) +
+              (unreadDivider == null ? 0 : 1),
           findChildIndexCallback: (key) {
             if (key is! ValueKey<String> ||
                 !key.value.startsWith('chat-message-')) {
@@ -883,10 +969,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
             }
             final id = key.value.substring('chat-message-'.length);
             final index = messages.indexWhere((message) => message.id == id);
-            return index < 0 ? null : index;
+            if (index < 0) return null;
+            return index +
+                (unreadDivider != null && index >= unreadDivider ? 1 : 0);
           },
           itemBuilder: (context, index) {
-            if (index == messages.length) {
+            if (index == unreadDivider) {
+              return const _UnreadMessagesDivider();
+            }
+            final messageIndex =
+                unreadDivider != null && index > unreadDivider
+                ? index - 1
+                : index;
+            if (messageIndex == messages.length) {
               return TextButton.icon(
                 onPressed: () => setState(() {
                   _messageLimit += 100;
@@ -899,7 +994,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 label: const Text('Eski mesajları yükle'),
               );
             }
-            final message = messages[index];
+            final message = messages[messageIndex];
             if (message.unlocked) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) _read(message);
@@ -907,8 +1002,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
             }
             final original = byId[message.replyTo];
             final date = message.sentAt;
-            final previous = index + 1 < messages.length
-                ? messages[index + 1].sentAt
+            final previous = messageIndex + 1 < messages.length
+                ? messages[messageIndex + 1].sentAt
                 : null;
             final dateLabel =
                 previous == null ||
@@ -918,6 +1013,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
             return Column(
               key: ValueKey('chat-message-${message.id}'),
               children: [
+                KeyedSubtree(
+                  key: _messageKey(message.id),
+                  child: const SizedBox.shrink(),
+                ),
                 if (dateLabel)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -931,6 +1030,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   ),
                 MessageBubble(
                   messageId: message.id,
+                  highlighted: _highlightId == message.id,
+                  onQuoteTap: original == null
+                      ? null
+                      : () => _showQuoted(original.id),
                   copyOrder: date.millisecondsSinceEpoch,
                   photoMessages: photoMessages,
                   starMessageId: message.unlocked ? message.id : null,

@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-
 import '../chat/chat_service.dart';
 import '../pair/couple_service.dart';
 import '../contacts/contact_names.dart';
-import '../../core/utils/user_errors.dart';
 import 'call_background.dart';
 import 'call_controls.dart';
 import 'call_audio.dart';
@@ -107,8 +104,11 @@ class VoiceCalls {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(userError(error))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(voiceCallFailureMessage(error, video: video)),
+          ),
+        );
       }
     }
   }
@@ -205,7 +205,11 @@ class _VoiceCallInboxState extends State<VoiceCallInbox>
     if (_seen.length > 100) _seen.remove(_seen.first);
     if (VoiceCalls.active) {
       await doc.reference
-          .update({'state': 'ended', 'endedAt': FieldValue.serverTimestamp()})
+          .update({
+            'state': 'ended',
+            'endReason': 'call_ended',
+            'endedAt': FieldValue.serverTimestamp(),
+          })
           .catchError((_) {});
       return;
     }
@@ -333,10 +337,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   final _localCandidates = <RTCIceCandidate>[];
   final _seenCandidates = <String>{};
   Timer? _ticker;
-  Timer? _callInfoTimer;
   Timer? _connectionTimeout;
   Timer? _disconnectTimeout;
   Timer? _streamRetry;
+  Timer? _callInfoTimer;
   DateTime? _started;
   DateTime? _connectedAt;
 
@@ -352,7 +356,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       _closing = false,
       _ended = false,
       _muted = false,
-      _connected = false;
+      _connected = false,
+      _candidateErrorShown = false;
+  static final _missedRecorded = <String>{};
   Future<void>? _remoteDescription;
   String _status = 'Aranıyor…';
   final _uid = CoupleService.uid;
@@ -392,10 +398,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _answerFromNotification(),
     );
-    _listenSignaling();
+    if (widget.incoming) _listenSignaling();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_ended || _closing) return;
-      if (_showCallInfo && mounted) setState(() {});
       if (FirebaseAuth.instance.currentUser?.uid != _uid) {
         _finish(
           voiceCallEndMessage('account_changed'),
@@ -405,7 +410,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       }
       if (_started == null && DateTime.now().isAfter(_ringUntil)) {
         _finish(voiceCallEndMessage('unanswered'), reason: 'unanswered');
+        return;
       }
+      if (_connectedAt != null && mounted) setState(() {});
     });
     if (!widget.incoming) _begin();
   }
@@ -424,6 +431,26 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       VoiceCalls.answerRequested.value = null;
       _accept();
     }
+  }
+
+  void _toggleCallInfo() {
+    _callInfoTimer?.cancel();
+    setState(() => _showCallInfo = !_showCallInfo);
+    if (_showCallInfo) {
+      _callInfoTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _showCallInfo = false);
+      });
+    }
+  }
+
+  String _callDuration() {
+    final started = _connectedAt;
+    if (started == null) return _status;
+    final seconds = DateTime.now().difference(started).inSeconds;
+    final hours = (seconds ~/ 3600).toString().padLeft(2, '0');
+    final minutes = (seconds ~/ 60 % 60).toString().padLeft(2, '0');
+    final remainder = (seconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$remainder';
   }
 
   Future<void> _prepare() async {
@@ -482,16 +509,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       await _release();
       return;
     }
-    if (Platform.isAndroid || Platform.isIOS) {
-      await Helper.setSpeakerphoneOn(_speakerOn);
-    }
-    if (Platform.isAndroid && bluetoothAudioPermission) {
-      await _refreshAudioOutputs(preferExternal: true);
-    }
-    if (widget.video) {
-      _localVideo.srcObject = _microphone;
-      if (mounted) setState(() {});
-    }
     _backgroundStarted = await CallBackground.start(
       widget.reference.id,
       video: widget.video,
@@ -519,6 +536,16 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     for (final track in _microphone!.getVideoTracks()) {
       await _peer!.addTrack(track, _microphone!);
     }
+    if (widget.video) {
+      _localVideo.srcObject = _microphone;
+      if (mounted) setState(() {});
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      await Helper.setSpeakerphoneOn(_speakerOn);
+    }
+    if (Platform.isAndroid && bluetoothAudioPermission) {
+      await _refreshAudioOutputs(preferExternal: true);
+    }
     _peer!.onTrack = (event) {
       if (_closing || _ended) return;
       if (event.track.kind == 'audio') {
@@ -535,7 +562,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _peer!.onIceCandidate = (candidate) {
       if (_closing || _ended || candidate.candidate == null) return;
       if (_readyToSend) {
-        _sendCandidate(candidate).catchError(_fail);
+        _sendCandidate(candidate).catchError((Object error) {
+          if (_candidateErrorShown || _closing || _ended || !mounted) return;
+          _candidateErrorShown = true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(voiceCallFailureMessage(error, video: widget.video)),
+            ),
+          );
+        });
       } else {
         _localCandidates.add(candidate);
       }
@@ -555,6 +590,18 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           _connected = true;
           _status = 'Görüşme sürüyor';
         });
+        if (Platform.isAndroid || Platform.isIOS) {
+          unawaited(
+            Helper.setSpeakerphoneOn(_speakerOn).catchError((Object error) {
+              _audioError(error);
+            }),
+          );
+        }
+        for (final track in _remoteAudioTracks.values) {
+          unawaited(
+            setCallReceiveMuted([track], _receiveMuted).catchError(_audioError),
+          );
+        }
       } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
         _connectionDropped();
       } else if (state ==
@@ -579,16 +626,13 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     }
     setState(() => _status = 'Bağlantı yeniden kuruluyor…');
     _disconnectTimeout ??= Timer(voiceCallDisconnectGracePeriod, () {
-      if (!_connected && !_closing && !_ended) {
-        _finish(
-          _connectedAt == null
-              ? 'Arama bağlantısı kurulamadı. İnternet bağlantısını kontrol edip yeniden ara.'
-              : 'Görüşme bağlantısı koptu. İnternet bağlantısını kontrol edip yeniden ara.',
-          reason: _connectedAt == null
-              ? 'connection_failed'
-              : 'connection_lost',
-        );
-      }
+      if (_started == null || _connected || _closing || _ended) return;
+      _finish(
+        _connectedAt == null
+            ? voiceCallEndMessage('connection_failed')
+            : voiceCallEndMessage('connection_lost'),
+        reason: _connectedAt == null ? 'connection_failed' : 'connection_lost',
+      );
     });
   }
 
@@ -597,10 +641,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            userError(
-              error,
-              fallback: 'Ses ayarı değiştirilemedi. Yeniden dene.',
-            ),
+            voiceCallFailureMessage(error, video: widget.video),
           ),
         ),
       );
@@ -882,6 +923,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         'createdAt': FieldValue.serverTimestamp(),
         if (widget.video) 'video': true,
       });
+      _listenSignaling();
       if (_closing || _ended) {
         await widget.reference
             .update({
@@ -897,8 +939,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       await _flush();
       CallBackground.notify(widget.reference.id, 'ring').catchError((error) {
         if (mounted && !_ended) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(userError(error))));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(
+            SnackBar(
+              content: Text(
+                voiceCallFailureMessage(error, video: widget.video),
+              ),
+            ),
+          );
         }
       });
     } catch (error) {
@@ -967,22 +1016,23 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   Future<void> _changed(DocumentSnapshot<Map<String, dynamic>> doc) async {
     if (_closing || _ended) return;
+    if (!doc.exists) return;
     final data = doc.data();
-    if (data == null) {
-      if (widget.incoming || _readyToSend) {
-        await _finish('Arama sona erdi.', notify: false);
+    if (data == null || data.isEmpty || data['state'] == null) return;
+    if (doc.metadata.isFromCache && data['state'] != 'accepted') return;
+    final reason = data['endReason'];
+    final endedAt = data['endedAt'];
+    final explicitEnd =
+        data['state'] == 'ended' ||
+        data['state'] == 'rejected' ||
+        reason == 'rejected';
+    if (explicitEnd) {
+      if (endedAt is! Timestamp ||
+          reason is! String ||
+          !voiceCallTerminalReasons.contains(reason)) {
+        return;
       }
-      return;
-    }
-    if (data['state'] == 'ended') {
-      await _recordCallEvent(
-        data['endReason'] as String?,
-        answered: data['startedAt'] is Timestamp,
-      );
-      await _finish(
-        voiceCallEndMessage(data['endReason'] as String?),
-        notify: false,
-      );
+      await _finish(voiceCallEndMessage(reason), notify: false);
       return;
     }
     final created = data['createdAt'];
@@ -1001,7 +1051,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         _connectionTimeout = Timer(voiceCallConnectionTimeout, () {
           if (!_connected && !_closing && !_ended) {
             _finish(
-              'Yanıtlandı ancak 60 saniye içinde bağlantı kurulamadı. İnternet bağlantısını kontrol edip yeniden dene.',
+              voiceCallEndMessage('connection_timeout'),
               reason: 'connection_timeout',
             );
           }
@@ -1012,7 +1062,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
       }
       if (!widget.incoming && _peer != null && !_remoteSet) {
-        await _setRemote(data['answer'] as Map);
+        final answer = data['answer'];
+        if (answer is! Map) return;
+        await _setRemote(answer);
       }
       if (mounted) {
         setState(
@@ -1024,10 +1076,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   void _fail(Object error) {
     _finish(
-      userError(
-        error,
-        fallback: 'Arama kurulamadı. İnternet ve mikrofon iznini kontrol et.',
-      ),
+      voiceCallFailureMessage(error, video: widget.video),
       reason: 'setup_failed',
     );
   }
@@ -1083,7 +1132,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Arama sonucu sohbete gönderilemedi: ${userError(error)}',
+              'Arama sonucu sohbete gönderilemedi: ${voiceCallFailureMessage(error, video: widget.video)}',
             ),
           ),
         );
@@ -1104,6 +1153,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     if (mounted && !_disposing) setState(() {});
     _ticker?.cancel();
+    _callInfoTimer?.cancel();
     _connectionTimeout?.cancel();
     _disconnectTimeout?.cancel();
     _streamRetry?.cancel();
@@ -1126,22 +1176,27 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Arama durumu kaydedilemedi: ${userError(error)}',
+                  'Arama durumu kaydedilemedi: ${voiceCallFailureMessage(error, video: widget.video)}',
                 ),
               ),
             );
           }
         }
-        if (endedStateSaved) {
-          await _recordCallEvent(
-            reason,
-            answered: _started != null || _connectedAt != null,
-          );
+        if (endedStateSaved &&
+            reason == 'unanswered' &&
+            !widget.incoming &&
+            _missedRecorded.add(widget.reference.id)) {
+          await _recordCallEvent('unanswered');
+          await CallBackground.notify(
+            widget.reference.id,
+            'missed',
+          ).catchError((_) {});
+        } else {
+          await CallBackground.notify(
+            widget.reference.id,
+            'end',
+          ).catchError((_) {});
         }
-        await CallBackground.notify(
-          widget.reference.id,
-          'end',
-        ).catchError((_) {});
       }
     } finally {
       _ended = true;
@@ -1164,27 +1219,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     }
     batch.delete(widget.reference);
     await batch.commit();
-  }
-
-  void _toggleCallInfo() {
-    _callInfoTimer?.cancel();
-    setState(() => _showCallInfo = !_showCallInfo);
-    if (_showCallInfo) {
-      _callInfoTimer = Timer(const Duration(seconds: 4), () {
-        if (mounted) setState(() => _showCallInfo = false);
-      });
-    }
-  }
-
-  String _callDuration() {
-    final start = _connectedAt ?? _started;
-    if (start == null) return 'Bağlanıyor…';
-    final seconds = DateTime.now()
-        .difference(start)
-        .inSeconds
-        .clamp(0, 1 << 31);
-    final minutes = seconds ~/ 60;
-    return '${minutes.toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
   @override
@@ -1212,10 +1246,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   void dispose() {
     _disposing = true;
-    _callInfoTimer?.cancel();
     unawaited(CallRingtone.stop(widget.reference.id).catchError((_) {}));
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _callInfoTimer?.cancel();
     _signaling?.cancel();
     _ice?.cancel();
     _native?.cancel();
@@ -1227,7 +1261,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         !_closing &&
         !(_backgroundProtected &&
             _appLifecycleState != AppLifecycleState.resumed)) {
-      _finish('Arama sona erdi.');
+      final reason = widget.incoming && _started == null
+          ? 'rejected'
+          : (!widget.incoming && _started == null
+                ? 'caller_cancelled'
+                : 'call_ended');
+      _finish(voiceCallEndMessage(reason), reason: reason);
     }
     super.dispose();
   }
@@ -1301,63 +1340,40 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                                 ),
                               ),
                               Positioned(
-                                top: 8,
-                                left: 12,
-                                right: 12,
+                                top: 0,
+                                left: 0,
+                                right: 0,
                                 child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
                                   onTap: _toggleCallInfo,
-                                  child: AnimatedSize(
+                                  child: AnimatedOpacity(
                                     duration: const Duration(milliseconds: 220),
-                                    curve: Curves.easeOutCubic,
-                                    alignment: Alignment.topCenter,
+                                    opacity: _showCallInfo ? 1 : 0,
                                     child: Container(
-                                      padding: _showCallInfo
-                                          ? const EdgeInsets.symmetric(
-                                              vertical: 8,
-                                            )
-                                          : const EdgeInsets.symmetric(
-                                              vertical: 10,
-                                            ),
+                                      margin: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: Colors.black.withValues(
-                                          alpha: 0.62,
+                                          alpha: 0.55,
                                         ),
                                         borderRadius: BorderRadius.circular(16),
                                       ),
-                                      child: _showCallInfo
-                                          ? Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                identity(overlay: true),
-                                                Text(
-                                                  _callDuration(),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : const Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.keyboard_arrow_down,
-                                                  color: Colors.white,
-                                                  size: 20,
-                                                ),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Görüşme bilgileri',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          identity(overlay: true),
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
                                             ),
+                                            child: Text(
+                                              _callDuration(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1424,15 +1440,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             children: [
                               CircleAvatar(
                                 radius: 44,
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.primaryContainer,
                                 child: Icon(
                                   widget.video ? Icons.videocam : Icons.person,
                                   size: 44,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onPrimaryContainer,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
                                 ),
                               ),
                               identity(),

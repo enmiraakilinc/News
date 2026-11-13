@@ -71,10 +71,6 @@ class MicrophoneSession {
     return false;
   }
 
-  static Future<void> requestStop() async {
-    if (supported) await channel.invokeMethod<void>('requestStop');
-  }
-
   static Future<void> stop(String mode) async {
     if (!supported) return;
     try {
@@ -82,10 +78,5 @@ class MicrophoneSession {
     } finally {
       if (mode == 'voice') _voiceStop = null;
     }
-  }
-
-  static Future<Map<String, dynamic>> status() async {
-    if (!supported) return {};
-    return await channel.invokeMapMethod<String, dynamic>('status') ?? {};
   }
 }

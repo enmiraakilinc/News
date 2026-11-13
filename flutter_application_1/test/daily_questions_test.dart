@@ -12,22 +12,31 @@ void main() {
         'Çocukken doğru sandığın ama sonradan değişen bir fikrin neydi?',
       );
       expect(kSorular.toSet(), hasLength(kSorular.length));
-      for (final removedQuestion in [
-        'En sevdiğin aile anın hangisi?',
-        'Hiç unutamadığın bir yolculuk var mı?',
-        'Küçük bir hayalin ne?',
-        'Hiç kimseye anlatmadığın bir hayalin var mı?',
-        'Hayatında değiştirmek istediğin bir alışkanlık var mı?',
-        'En sevdiğin şarkı hangisi, neden?',
-        'En sevdiğin mevsim hangisi, neden?',
-        'En sevdiğin yemek hangisi, kim yapınca?',
-        'En sevdiğin koku hangisi?',
-        'En sevdiğin kitap hangisi?',
-        'En sevdiğin dizi karakteri kim, neden?',
-        'En sevdiğin oyun ya da hobin hangisi?',
-      ]) {
-        expect(kSorular, isNot(contains(removedQuestion)));
-      }
+      expect(
+        kSorular,
+        isNot(
+          contains(
+            anyOf(
+              anyOf(
+                'En sevdiğin aile anın hangisi?',
+                'Hiç unutamadığın bir yolculuk var mı?',
+                'Küçük bir hayalin ne?',
+                'Hiç kimseye anlatmadığın bir hayalin var mı?',
+                'Hayatında değiştirmek istediğin bir alışkanlık var mı?',
+                'En sevdiğin şarkı hangisi, neden?',
+              ),
+              anyOf(
+                'En sevdiğin mevsim hangisi, neden?',
+                'En sevdiğin yemek hangisi, kim yapınca?',
+                'En sevdiğin koku hangisi?',
+                'En sevdiğin kitap hangisi?',
+                'En sevdiğin dizi karakteri kim, neden?',
+                'En sevdiğin oyun ya da hobin hangisi?',
+              ),
+            ),
+          ),
+        ),
+      );
       expect(
         kSorular,
         contains(

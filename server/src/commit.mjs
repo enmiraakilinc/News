@@ -68,8 +68,9 @@ export async function commit(pool,body,auth){
     const permission=await db.query('SELECT neural.can_read($1,$2::jsonb,$3) AS allowed',
       [condition.path,row?JSON.stringify(row.document):null,auth.uid]);
     const knownMissing=!row&&/^(chats|voiceCalls)\/[^/]+$/.test(condition.path);
-    if(!permission.rows[0].allowed&&!knownMissing)
-     throw new ApiError(403,'permission-denied','İşlemdeki kayda erişim iznin yok.');
+    const voiceSignaling=/^voiceCalls\/[^/]+(\/candidates\/[^/]+)?$/.test(condition.path);
+    if(!permission.rows[0].allowed&&!knownMissing&&!voiceSignaling)
+     throw new ApiError(403,'permission-denied','Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).');
     if((row?.version??null)!==condition.version)throw new ApiError(409,'aborted','Kayıt değişti; işlem yeniden denenmeli.');
    }
    for(const op of body.operations)after.set(op.path,applyWrite(await read(op.path),op,now));

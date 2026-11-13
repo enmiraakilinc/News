@@ -83,6 +83,50 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
       widget.repository.folders(parent: widget.parent?.id);
   late Stream<List<LessonFolder>> _stream = _folders();
   bool _busy = false;
+  Future<void> _rename(LessonFolder folder) async {
+    final controller = TextEditingController(text: folder.title);
+    final title = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          widget.parent == null ? 'Ders klasörünü düzenle' : 'Konu klasörünü düzenle',
+        ),
+        content: TextField(
+          controller: controller,
+          maxLength: 100,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Klasör adı'),
+          onSubmitted: (value) => Navigator.pop(ctx, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
+    if (title == null || title.trim().isEmpty || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.repository.renameFolder(folder.id, title);
+      if (mounted) setState(() => _stream = _folders());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _create() async {
     final controller = TextEditingController();
     final title = await showDialog<String>(
@@ -324,6 +368,13 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton(
+                        tooltip: widget.parent == null
+                            ? 'Ders adını düzenle'
+                            : 'Konu adını düzenle',
+                        onPressed: _busy ? null : () => _rename(folders[i]),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
                       CourseFolderColorButton(
                         repository: widget.repository,
                         folder: folders[i],
@@ -685,15 +736,25 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                 color: courseFolderColors[folder.color],
               ),
               title: Text(folder.title),
-              trailing: CourseFolderColorButton(
-                repository: widget.repository,
-                folder: folder,
-                enabled: !_busy,
-                onChanged: () => setState(
-                  () => _topics = widget.repository.folders(
-                    parent: widget.folder.id,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Konu adını düzenle',
+                    onPressed: _busy ? null : () => _renameTopic(folder),
+                    icon: const Icon(Icons.edit_outlined),
                   ),
-                ),
+                  CourseFolderColorButton(
+                    repository: widget.repository,
+                    folder: folder,
+                    enabled: !_busy,
+                    onChanged: () => setState(
+                      () => _topics = widget.repository.folders(
+                        parent: widget.folder.id,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               onTap: () => Navigator.push<void>(
                 context,
@@ -709,6 +770,54 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _renameTopic(LessonFolder folder) async {
+    final controller = TextEditingController(text: folder.title);
+    final title = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Konu klasörünü düzenle'),
+        content: TextField(
+          controller: controller,
+          maxLength: 100,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Klasör adı'),
+          onSubmitted: (value) => Navigator.pop(ctx, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
+    if (title == null || title.trim().isEmpty || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.repository.renameFolder(folder.id, title);
+      if (mounted) {
+        setState(
+          () => _topics = widget.repository.folders(
+            parent: widget.folder.id,
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override

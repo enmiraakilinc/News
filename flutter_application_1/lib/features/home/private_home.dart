@@ -17,7 +17,6 @@ import '../../core/security/secure_screen.dart';
 import '../questions/question_screen.dart';
 import '../timeline/timeline_screen.dart';
 import '../../core/theme/app_theme.dart';
-import '../voice_notes/microphone_session_screen.dart';
 import '../wishes/wishes_screen.dart';
 import '../pair/badge_service.dart';
 import '../chat/chat_unread.dart';
@@ -1170,22 +1169,22 @@ class _CounterScreenState extends State<CounterScreen> {
                   ),
                   _ozellikKart("🏆", "Oyun Ligleri", const GameLeagueScreen()),
                   _ozellikKart(
-                    "MIC",
-                    "Mikrofon oturumu",
-                    const MicrophoneSessionScreen(),
-                  ),
-                  _ozellikKart(
                     "🌠",
                     "Ortak Dilekler",
                     const WishesScreen(),
                     kNotifWishes,
                   ),
-                  _ozellikKart(
-                    '📚',
-                    'Ders Notları',
-                    const SharedCoursesScreen(),
-                  ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 72,
+                child: _ozellikKart(
+                  '📚',
+                  'Ders Notları',
+                  const SharedCoursesScreen(),
+                ),
               ),
 
               const SizedBox(height: 16),

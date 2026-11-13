@@ -153,8 +153,20 @@ class OracleOutbox {
         b.keys.any((y) => x == y || x.startsWith('$y/') || y.startsWith('$x/')),
   );
 
+  void _wake() {
+    if (_closed || _retry != null || _records.every((r) => r.running)) return;
+    _retry = Timer(const Duration(seconds: 2), () {
+      _retry = null;
+      _pump();
+    });
+  }
+
   void _pump() {
-    if (_closed || !enabled || !isCurrent()) return;
+    if (_closed) return;
+    if (!enabled || !isCurrent()) {
+      _wake();
+      return;
+    }
     final active = _records.where((r) => r.running).toList();
     final now = DateTime.now();
     while (active.length < 2) {
@@ -180,12 +192,7 @@ class OracleOutbox {
       active.add(selected);
       unawaited(_send(selected));
     }
-    if (_records.any((r) => !r.running)) {
-      _retry ??= Timer(const Duration(seconds: 2), () {
-        _retry = null;
-        _pump();
-      });
-    }
+    _wake();
   }
 
   Future<void> _send(OraclePendingWrite record) async {

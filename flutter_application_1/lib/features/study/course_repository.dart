@@ -69,6 +69,8 @@ abstract class CourseRepository {
   Future<void> removeNote(String course, String note);
   Future<void> removeCourse(String course);
   Future<void> pinFolder(String id, bool pinned);
+  Future<void> renameFolder(String id, String title) =>
+      Future.error(UnsupportedError('Klasör adı değiştirilemiyor.'));
   Future<void> pinNote(String course, String note, bool pinned);
   Future<void> colorFolder(String id, String? color) =>
       Future.error(UnsupportedError('Klasör rengi değiştirilemiyor.'));
@@ -311,6 +313,19 @@ class LocalCourseRepository extends CourseRepository {
   }
 
   @override
+  Future<void> renameFolder(String id, String title) async {
+    final clean = title.trim();
+    if (clean.isEmpty || clean.length > 100) {
+      throw Exception('Klasör adı 1–100 karakter olmalı.');
+    }
+    final data = await _read();
+    final folder = data[id] as Map?;
+    if (folder == null) throw Exception('Klasör bulunamadı.');
+    folder['title'] = clean;
+    await _write(data);
+  }
+
+  @override
   Future<void> colorFolder(String id, String? color) async {
     final data = await _read();
     final folder = data[id] as Map?;
@@ -534,6 +549,23 @@ class SharedCourseRepository extends CourseRepository {
   Future<void> pinFolder(String id, bool pinned) async {
     await CoupleService.ensureReady();
     await _courses.doc(id).update({'pinned': pinned});
+  }
+
+  @override
+  Future<void> renameFolder(String id, String title) async {
+    final clean = title.trim();
+    if (clean.isEmpty || clean.length > 100) {
+      throw Exception('Klasör adı 1–100 karakter olmalı.');
+    }
+    await CoupleService.ensureReady();
+    final ref = _courses.doc(id);
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final folder = await transaction.get(ref);
+      if (!folder.exists || folder.data()?['deleting'] == true) {
+        throw Exception('Klasör bulunamadı veya siliniyor.');
+      }
+      transaction.update(ref, {'titleCipher': _seal(clean)});
+    });
   }
 
   @override

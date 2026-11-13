@@ -40,16 +40,16 @@ class OraclePrimaryTransport {
     Duration timeout = const Duration(seconds: 30),
     String? encodedBody,
   }) async {
-    final response = await _http
-        .post(
-          identity.base.resolve(path),
-          headers: await _headers(),
-          body: encodedBody ?? jsonEncode(body),
-        )
-        .timeout(timeout);
-    final value = await decodeOracleResponseAsync(response.bodyBytes);
-    if (response.statusCode != 200) throw _error(response.statusCode, value);
-    return Map<String, dynamic>.from(value);
+    return (() async {
+      final response = await _http.post(
+        identity.base.resolve(path),
+        headers: await _headers(),
+        body: encodedBody ?? jsonEncode(body),
+      );
+      final value = await decodeOracleResponseAsync(response.bodyBytes);
+      if (response.statusCode != 200) throw _error(response.statusCode, value);
+      return Map<String, dynamic>.from(value);
+    })().timeout(timeout);
   }
 
   Stream<Map<String, dynamic>> watch(Map<String, dynamic> body) {
@@ -57,22 +57,47 @@ class OraclePrimaryTransport {
     http.Client? client;
     StreamSubscription<String>? lines;
     var cancelled = false;
+    var stopped = false;
+    Future<void> release() async {
+      final current = client;
+      final subscription = lines;
+      client = null;
+      lines = null;
+      current?.close();
+      await subscription?.cancel();
+    }
+
     Future<void> cancel() async {
-      if (cancelled) return;
+      if (stopped) return;
+      stopped = true;
       cancelled = true;
-      client?.close();
-      await lines?.cancel();
+      await release();
     }
 
     void end() {
-      if (cancelled) return;
-      unawaited(cancel().then((_) => controller.close()));
+      if (stopped) return;
+      stopped = true;
+      cancelled = true;
+      unawaited(
+        release().then((_) {
+          if (!controller.isClosed) controller.close();
+        }),
+      );
+    }
+
+    void fail(Object error, StackTrace stack) {
+      if (stopped) return;
+      final denied =
+          error is OracleApiException &&
+          (error.status == 401 || error.status == 403);
+      if (denied && !controller.isClosed) controller.addError(error, stack);
+      end();
     }
 
     Future<void> connect() async {
       try {
         client = _streamClient();
-        final headers = await _headers();
+        final headers = await _headers().timeout(const Duration(seconds: 20));
         if (cancelled) return;
         final request = http.Request('POST', identity.base.resolve('/v1/watch'))
           ..headers.addAll(headers)
@@ -82,8 +107,11 @@ class OraclePrimaryTransport {
             .timeout(const Duration(seconds: 20));
         if (cancelled) return;
         if (response.statusCode != 200) {
-          final data = await response.stream.bytesToString();
-          throw _error(response.statusCode, jsonDecode(data));
+          Object? decoded;
+          try {
+            decoded = jsonDecode(await response.stream.bytesToString());
+          } catch (_) {}
+          throw _error(response.statusCode, decoded);
         }
         var event = '';
         final data = <String>[];
@@ -112,20 +140,15 @@ class OraclePrimaryTransport {
                     event = line.substring(6).trim();
                   }
                 } catch (error, stack) {
-                  if (!cancelled) controller.addError(error, stack);
-                  end();
+                  fail(error, stack);
                 }
               },
-              onError: (Object error, StackTrace stack) {
-                if (!cancelled) controller.addError(error, stack);
-                end();
-              },
+              onError: fail,
               onDone: end,
             );
         if (cancelled) await lines?.cancel();
       } catch (error, stack) {
-        if (!cancelled) controller.addError(error, stack);
-        end();
+        fail(error, stack);
       }
     }
 

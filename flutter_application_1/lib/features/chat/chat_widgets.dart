@@ -33,6 +33,8 @@ class MessageBubble extends StatelessWidget {
   final bool scheduled;
   final VoidCallback? onTap;
   final VoidCallback? onReply;
+  final VoidCallback? onQuoteTap;
+  final bool highlighted;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
   final void Function(String)? onReact;
@@ -52,6 +54,8 @@ class MessageBubble extends StatelessWidget {
     this.scheduled = false,
     this.onTap,
     this.onReply,
+    this.onQuoteTap,
+    this.highlighted = false,
     this.onDelete,
     this.onEdit,
     this.onReact,
@@ -257,12 +261,16 @@ class MessageBubble extends StatelessWidget {
                       ),
                     ),
                   if (quoted != null)
-                    Container(
+                    GestureDetector(
+                      onTap: onQuoteTap,
+                      child: Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: foreground.withValues(alpha: .08),
+                        color: highlighted
+                            ? scheme.tertiaryContainer
+                            : foreground.withValues(alpha: .08),
                         border: Border(
                           left: BorderSide(
                             color: foreground.withValues(alpha: .6),
@@ -280,6 +288,7 @@ class MessageBubble extends StatelessWidget {
                           color: foreground.withValues(alpha: .85),
                         ),
                       ),
+                    ),
                     ),
                   if (scheduled)
                     const Padding(
@@ -613,6 +622,7 @@ class _ChatComposerState extends State<ChatComposer>
           video ? 'video' : 'photo',
           chatId: chatId,
           coupleId: coupleId,
+          instantCapture: !gallery && !video,
         );
         await send(content, scheduled);
         sentParts++;
@@ -907,12 +917,15 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+  Widget build(BuildContext context) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+    padding: EdgeInsets.only(bottom: keyboard),
     child: ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
         top: false,
+        bottom: keyboard == 0,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
           child: Column(
@@ -1110,15 +1123,6 @@ class _ChatComposerState extends State<ChatComposer>
                   ),
                 ],
               ),
-              if (_scheduled == null &&
-                  MediaQuery.viewInsetsOf(context).bottom == 0)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text(
-                    'Ekler varsayılan 2 gün (uzatılabilir) • Dosya 80 MB • Video 100 MB',
-                    style: TextStyle(fontSize: 10, color: Colors.blueGrey),
-                  ),
-                ),
             ],
           ),
         ),
@@ -1127,6 +1131,7 @@ class _ChatComposerState extends State<ChatComposer>
   );
 }
 
+}
 class AttachmentPickerScreen extends StatefulWidget {
   const AttachmentPickerScreen({super.key});
   @override
@@ -1175,6 +1180,14 @@ class _AttachmentPickerScreenState extends State<AttachmentPickerScreen> {
             label: const Text('Dosya seç'),
           ),
           const SizedBox(height: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Dosyalar en fazla 80 MB, videolar 100 MB. Ekler varsayılan olarak 2 gün durur ve süre uzatılabilir.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Vazgeç ve geri dön'),

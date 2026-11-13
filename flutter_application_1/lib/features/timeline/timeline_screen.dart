@@ -1,3 +1,4 @@
+import '../../core/utils/date_format.dart';
 import '../../core/utils/sync_state.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -11,24 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
 import '../media/image_util.dart';
 import '../../core/notifications/notif_prefs.dart';
-
-const List<String> _aylar = [
-  'Ocak',
-  'Şubat',
-  'Mart',
-  'Nisan',
-  'Mayıs',
-  'Haziran',
-  'Temmuz',
-  'Ağustos',
-  'Eylül',
-  'Ekim',
-  'Kasım',
-  'Aralık',
-];
-String _tarih(DateTime d) => '${d.day} ${_aylar[d.month - 1]} ${d.year}';
-String _iso(DateTime d) =>
-    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 /// Anıların tarih ve yerle sıralandığı zaman tüneli.
 ///
@@ -302,7 +285,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   children: [
                     const Icon(Icons.event, size: 18, color: Colors.grey),
                     const SizedBox(width: 8),
-                    Text(_tarih(date)),
+                    Text(formatDisplayDate(date)),
                     const Spacer(),
                     TextButton(
                       onPressed: () async {
@@ -341,7 +324,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, {
-                'date': _iso(date),
+                'date': formatIsoDate(date),
                 'place': placeCtrl.text.trim(),
                 'note': noteCtrl.text.trim(),
               }),
@@ -704,7 +687,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   Row(
                     children: [
                       Text(
-                        _tarih(date),
+                        formatDisplayDate(date),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,

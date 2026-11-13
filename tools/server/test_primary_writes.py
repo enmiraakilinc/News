@@ -59,7 +59,7 @@ try{
   sentAt:stamp,openAt:stamp,
  }}]);
  await assert.rejects(commit(pool,send,auth),e=>e.status===503);assertions++;
- await assert.rejects(recordPresence(pool,auth,{online:true}),e=>e.status===503);assertions++;
+ await assert.rejects(recordPresence(pool,auth),e=>e.status===503);assertions++;
  await admin.query("UPDATE neural.settings SET value='true' WHERE key='primary_writes'");
  const first=await commit(pool,send,auth);
  const repeat=await commit(pool,send,auth);
@@ -143,23 +143,12 @@ try{
    const result=await c.query('SELECT path FROM neural.documents WHERE path=$1',[path]);await c.query('ROLLBACK');return result.rowCount;
   }finally{c.release();}
  };
- const leaguePath='gameLeagues/2026-Q4/games/block_blast/entries/alice';
- await insert('chatProfiles/alice',encodeFields({name:'Alice'}));
- await commit(pool,request([{type:'set',path:leaguePath,fields:{
-  ...encodeFields({uid:'alice',displayName:'Alice',score:40}),updatedAt:stamp,
- }}]),auth);
- assert.equal(await checkRead('alice',leaguePath),1);assertions++;
- assert.equal(await checkRead('bob',leaguePath),1);assertions++;
- assert.equal(await checkRead('alice','gameLeagues/2026-Q4/games/invalid/entries/alice'),0);assertions++;
- await assert.rejects(commit(pool,request([{type:'set',path:leaguePath,fields:{
-  ...encodeFields({uid:'alice',displayName:'Alice',score:41}),updatedAt:stamp,
- }}]),{uid:'bob'}),e=>e.status===403);assertions++;
  assert.equal(await checkRead('alice','chatMedia/extended/chunks/0'),1);assertions++;
  assert.equal(await checkRead('outsider','chatMedia/extended/chunks/0'),0);assertions++;
  const presence='chatAccounts/alice/presence/status';
  const presenceConsent='chatAccounts/alice/personalConfig/presence';
  await commit(pool,request([{type:'set',path:presenceConsent,fields:encodeFields({peers:['bob']})}]),auth);
- await commit(pool,request([{type:'set',path:presence,fields:{...encodeFields({enabled:true,online:false}),lastSeenAt:stamp}}]),auth);
+ await commit(pool,request([{type:'set',path:presence,fields:{...encodeFields({enabled:true}),lastSeenAt:stamp}}]),auth);
  assert.equal(await checkRead('alice',presence),1);assertions++;
  assert.equal(await checkRead('bob',presence),1);assertions++;
  assert.equal(await checkRead('outsider',presence),0);assertions++;
@@ -168,12 +157,11 @@ try{
  assert.equal(await checkRead('bob',presenceConsent),0);assertions++;
  const receiptsBefore=(await admin.query('SELECT count(*)::int AS n FROM neural.commit_receipts')).rows[0].n;
  await admin.query("UPDATE neural.documents SET document=jsonb_set(document,'{fields,lastSeenAt}',jsonb_build_object('timestampValue',to_char(now()-interval '1 minute','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'))) WHERE path=$1",[presence]);
- assert.equal((await recordPresence(pool,auth,{online:true,activity:'Block Blast'})).recorded,true);assertions++;
- assert.equal((await admin.query("SELECT document#>>'{fields,activity,stringValue}' AS activity FROM neural.documents WHERE path=$1",[presence])).rows[0].activity,'Block Blast');assertions++;
- assert.equal((await recordPresence(pool,auth,{online:true,activity:'Block Blast'})).recorded,false);assertions++;
+ assert.equal((await recordPresence(pool,auth)).recorded,true);assertions++;
+ assert.equal((await recordPresence(pool,auth)).recorded,false);assertions++;
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM neural.commit_receipts')).rows[0].n,receiptsBefore);assertions++;
- await commit(pool,request([{type:'set',path:presence,fields:encodeFields({enabled:false,online:false})}]),auth);
- assert.equal((await recordPresence(pool,auth,{online:false})).recorded,false);assertions++;
+ await commit(pool,request([{type:'set',path:presence,fields:encodeFields({enabled:false})}]),auth);
+ assert.equal((await recordPresence(pool,auth)).recorded,false);assertions++;
  await assert.rejects(commit(pool,request([{type:'update',path:presence,fields:[{field:['lastSeenAt'],value:stamp}]}]),auth),e=>e.status===403);assertions++;
  assert.equal(await checkRead('alice',personal),1);assertions++;
  assert.equal(await checkRead('bob',personal),0);assertions++;

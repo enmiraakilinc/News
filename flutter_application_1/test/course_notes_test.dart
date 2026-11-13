@@ -24,6 +24,21 @@ void main() {
       await root.delete(recursive: true);
     }
   });
+  test('Course and topic folders can be renamed', () async {
+    final repo = LocalCourseRepository('rename-course', root: root);
+    await repo.create('Ders');
+    final course = (await repo.folders().first).single;
+    await repo.renameFolder(course.id, 'Yeni ders adı');
+    expect((await repo.folders().first).single.title, 'Yeni ders adı');
+
+    await repo.create('Konu', parent: course.id);
+    final topic = (await repo.folders(parent: course.id).first).single;
+    await repo.renameFolder(topic.id, 'Yeni konu adı');
+    expect(
+      (await repo.folders(parent: course.id).first).single.title,
+      'Yeni konu adı',
+    );
+  });
   testWidgets(
     'Topic header survives scrolling out of view and back on a single subscription stream',
     (tester) async {

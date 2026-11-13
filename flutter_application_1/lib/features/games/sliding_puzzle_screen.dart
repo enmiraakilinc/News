@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import '../contacts/chat_presence.dart';
 import 'game_league_service.dart';
 import 'sliding_puzzle_logic.dart';
+import '../contacts/chat_presence.dart';
 
 class SlidingPuzzleScreen extends StatefulWidget {
   const SlidingPuzzleScreen({super.key});
@@ -29,7 +29,9 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
 
   @override
   void dispose() {
-    ChatPresence.clearActivity('15 Taş');
+    if (ChatPresence.activity.value == '15 Taş') {
+      ChatPresence.setActivity(null);
+    }
     super.dispose();
   }
 
@@ -59,9 +61,6 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
       _leagueScoreSubmitted = false;
     });
   }
-
-  bool _isAdjacent(int index, int empty) =>
-      (index ~/ 4 == empty ~/ 4 || index % 4 == empty % 4) && index != empty;
 
   void _move(int index) {
     final moved = slidePuzzleTile(_tiles, index);
@@ -142,57 +141,65 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
           const SizedBox(height: 8),
           Center(child: Text('Hamle: $_moves')),
           const SizedBox(height: 16),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: 16,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 6,
-                    crossAxisSpacing: 6,
-                  ),
-                  itemBuilder: (context, index) {
-                    final tile = _tiles[index];
-                    final colors = Theme.of(context).colorScheme;
-                    return Semantics(
-                      label: tile == 0 ? 'Boş kare' : 'Taş $tile',
-                      button:
-                          tile != 0 && _isAdjacent(index, _tiles.indexOf(0)),
-                      child: InkWell(
-                        onTap: tile == 0 ? null : () => _move(index),
-                        borderRadius: BorderRadius.circular(12),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: tile == 0
-                                ? colors.surfaceContainerHighest
-                                : colors.primaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: tile == 0
-                                ? null
-                                : Text(
-                                    '$tile',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: colors.onPrimaryContainer,
-                                        ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    );
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final board = constraints.maxWidth > 480 ? 480.0 : constraints.maxWidth - 40;
+              final cell = board / 4;
+              final colors = Theme.of(context).colorScheme;
+              return Center(
+                child: GestureDetector(
+                  onPanEnd: (details) {
+                    final velocity = details.velocity.pixelsPerSecond;
+                    if (velocity.dx.abs() <= velocity.dy.abs()) return;
+                    final empty = _tiles.indexOf(0);
+                    final neighbor = empty + (velocity.dx > 0 ? -1 : 1);
+                    if (neighbor >= 0 &&
+                        neighbor < 16 &&
+                        neighbor ~/ 4 == empty ~/ 4) {
+                      _move(neighbor);
+                    }
                   },
+                  child: SizedBox(
+                    width: board,
+                    height: board,
+                    child: Stack(
+                      children: [
+                        for (var index = 0; index < 16; index++)
+                          if (_tiles[index] != 0)
+                            AnimatedPositioned(
+                              key: ValueKey('sliding-puzzle-tile-${_tiles[index]}'),
+                              duration: const Duration(milliseconds: 120),
+                              curve: Curves.easeOut,
+                              left: (index % 4) * cell + 3,
+                              top: (index ~/ 4) * cell + 3,
+                              width: cell - 6,
+                              height: cell - 6,
+                              child: Material(
+                                color: colors.primaryContainer,
+                                borderRadius: BorderRadius.circular(10),
+                                child: InkWell(
+                                  onTap: () => _move(index),
+                                  child: Center(
+                                    child: Text(
+                                      '${_tiles[index]}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: colors.onPrimaryContainer,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),
