@@ -74,8 +74,15 @@ class PrivateMediaStream {
         await ChatMedia.checkAccess(id);
       },
       load: (start, count) async {
-        final chunks=await ChatMedia.decodedChunks(id,start,count,secret:secret);
-        if(await ChatMedia.accessScope()!=scope)throw const SocketException('Hesap değişti.');
+        final chunks = await ChatMedia.decodedChunks(
+          id,
+          start,
+          count,
+          secret: secret,
+        );
+        if (await ChatMedia.accessScope() != scope) {
+          throw const SocketException('Hesap değişti.');
+        }
         return chunks;
       },
     );
@@ -133,7 +140,7 @@ class PrivateMediaStream {
     final start = index;
     final future = _pending.putIfAbsent(
       start,
-      () => _load(start, index==0?1:min(4, count - start)),
+      () => _load(start, index == 0 ? 1 : min(4, count - start)),
     );
     try {
       final chunks = await future;

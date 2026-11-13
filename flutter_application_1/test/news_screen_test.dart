@@ -57,7 +57,7 @@ void main() {
       );
       expect(
         ChatThemes.theme('orange').colorScheme.primary,
-        const Color(0xffffb77f),
+        const Color(0xffed820e),
       );
     },
   );

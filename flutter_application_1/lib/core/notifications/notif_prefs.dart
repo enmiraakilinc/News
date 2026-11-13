@@ -259,11 +259,10 @@ Future<void> setChatNotifications(bool value) async {
   if (!value) {
     await FlutterLocalNotificationsPlugin().cancel(kNotifChats.id);
   }
-  try {
-    await ChatNotificationService.sync(value);
-  } catch (error) {
+  // Sunucu kaydı arka planda yapılır; yavaşlığı ayarı geri çevirmez.
+  ChatNotificationService.sync(value).catchError((Object error) {
     debugPrint('Chat notification device sync failed: $error');
-  }
+  });
 }
 
 class MorseNotificationSwitch extends StatefulWidget {
@@ -339,9 +338,10 @@ class _ChatNotificationsSwitchState extends State<ChatNotificationsSwitch> {
                     ?.requestNotificationsPermission();
                 if (granted == false) return;
               }
-              await setChatNotifications(value);
               if (mounted) setState(() => _enabled = value);
+              await setChatNotifications(value);
             } catch (_) {
+              if (mounted) setState(() => _enabled = !value);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

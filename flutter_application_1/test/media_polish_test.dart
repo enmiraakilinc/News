@@ -132,7 +132,7 @@ void main() {
       );
       expect(
         userError(TimeoutException('internal request')),
-        contains('İnternetini'),
+        contains('İnternet bağlantın'),
       );
       expect(
         userError(

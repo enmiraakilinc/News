@@ -71,12 +71,10 @@ Future<void> extendChatAttachment(BuildContext context, String message) async {
     }
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            userError(error, fallback: 'Süre uzatılamadı. Yeniden dene.'),
-          ),
-        ),
+      showUserError(
+        context,
+        error,
+        fallback: 'Süre uzatılamadı. Yeniden dene.',
       );
     }
   }

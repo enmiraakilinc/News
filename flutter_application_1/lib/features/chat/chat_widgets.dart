@@ -265,31 +265,31 @@ class MessageBubble extends StatelessWidget {
                     GestureDetector(
                       onTap: onQuoteTap,
                       child: Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: highlighted
-                            ? scheme.tertiaryContainer
-                            : foreground.withValues(alpha: .08),
-                        border: Border(
-                          left: BorderSide(
-                            color: foreground.withValues(alpha: .6),
-                            width: 3,
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: highlighted
+                              ? scheme.tertiaryContainer
+                              : foreground.withValues(alpha: .08),
+                          border: Border(
+                            left: BorderSide(
+                              color: foreground.withValues(alpha: .6),
+                              width: 3,
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          messagePreview(quoted!),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: foreground.withValues(alpha: .85),
                           ),
                         ),
-                        borderRadius: BorderRadius.circular(5),
                       ),
-                      child: Text(
-                        messagePreview(quoted!),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: foreground.withValues(alpha: .85),
-                        ),
-                      ),
-                    ),
                     ),
                   if (scheduled)
                     const Padding(
@@ -921,218 +921,220 @@ class _ChatComposerState extends State<ChatComposer>
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
-    padding: EdgeInsets.only(bottom: keyboard),
-    child: ColoredBox(
-      color: Theme.of(context).colorScheme.surface,
-      child: SafeArea(
-        top: false,
-        bottom: keyboard == 0,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_mediaStatus != null) Text(_mediaStatus!),
-              if (_failedTexts.isNotEmpty)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 100),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final delivery in _failedTexts)
-                        ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.error_outline),
-                          title: const Text('Gönderilemedi'),
-                          subtitle: Text(
-                            messagePreview(delivery.text),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: TextButton(
-                            onPressed: delivery.retrying
-                                ? null
-                                : () => _deliverText(delivery),
-                            child: Text(
-                              delivery.retrying
-                                  ? 'Bekleniyor…'
-                                  : 'Tekrar gönder',
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          top: false,
+          bottom: keyboard == 0,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_mediaStatus != null) Text(_mediaStatus!),
+                if (_failedTexts.isNotEmpty)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 100),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final delivery in _failedTexts)
+                          ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.error_outline),
+                            title: const Text('Gönderilemedi'),
+                            subtitle: Text(
+                              messagePreview(delivery.text),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: TextButton(
+                              onPressed: delivery.retrying
+                                  ? null
+                                  : () => _deliverText(delivery),
+                              child: Text(
+                                delivery.retrying
+                                    ? 'Bekleniyor…'
+                                    : 'Tekrar gönder',
+                              ),
                             ),
                           ),
+                      ],
+                    ),
+                  ),
+                if (widget.replyPreview != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.reply, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          messagePreview(widget.replyPreview!),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      IconButton(
+                        onPressed: widget.onCancelReply,
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Yanıtı kaldır',
+                      ),
                     ],
                   ),
-                ),
-              if (widget.replyPreview != null)
-                Row(
-                  children: [
-                    const Icon(Icons.reply, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        messagePreview(widget.replyPreview!),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: widget.onCancelReply,
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Yanıtı kaldır',
-                    ),
-                  ],
-                ),
-              if (widget.coupleId != null && _scheduled != null)
-                Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 16),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Açılış: ${_scheduled!.day}.${_scheduled!.month}.${_scheduled!.year} ${_scheduled!.hour.toString().padLeft(2, '0')}:${_scheduled!.minute.toString().padLeft(2, '0')}',
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _sending
-                          ? null
-                          : () => setState(() => _scheduled = null),
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Şimdi gönder',
-                    ),
-                  ],
-                ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (widget.coupleId != null)
-                    IconButton(
-                      onPressed: _sending ? null : _schedule,
-                      icon: const Icon(Icons.schedule_outlined),
-                      tooltip: 'Geleceğe gönder',
-                    ),
-                  Expanded(
-                    child: TextField(
-                      focusNode: _focus,
-                      controller: _text,
-                      onChanged: _onTextChanged,
-                      minLines: 1,
-                      maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
-                          ? 3
-                          : 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      style: const TextStyle(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: 'Mesajını yaz…',
-                        hintMaxLines: 1,
-                        hintStyle: const TextStyle(fontSize: 14),
-                        isDense: true,
-                        filled: true,
-                        fillColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLowest,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
+                if (widget.coupleId != null && _scheduled != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Açılış: ${_scheduled!.day}.${_scheduled!.month}.${_scheduled!.year} ${_scheduled!.hour.toString().padLeft(2, '0')}:${_scheduled!.minute.toString().padLeft(2, '0')}',
                         ),
                       ),
-                    ),
+                      IconButton(
+                        onPressed: _sending
+                            ? null
+                            : () => setState(() => _scheduled = null),
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Şimdi gönder',
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: _sending ? null : _attach,
-                    icon: const Icon(Icons.attach_file),
-                    tooltip: 'Dosya gönder',
-                  ),
-                  PopupMenuButton<String>(
-                    requestFocus: false,
-                    onOpened: _hideComposerKeyboard,
-                    onCanceled: () => _focus.canRequestFocus = true,
-                    enabled: !_sending,
-                    tooltip: 'Fotoğraf, video veya konum',
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    onSelected: _selectMedia,
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'voice',
-                        child: ConversationMenuLabel(
-                          icon: Icons.mic_none_rounded,
-                          label: 'Sesli mesaj kaydet',
-                        ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (widget.coupleId != null)
+                      IconButton(
+                        onPressed: _sending ? null : _schedule,
+                        icon: const Icon(Icons.schedule_outlined),
+                        tooltip: 'Geleceğe gönder',
                       ),
-                      const PopupMenuItem(
-                        value: 'photo',
-                        child: ConversationMenuLabel(
-                          icon: Icons.photo_camera_outlined,
-                          label: 'Fotoğraf çek',
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'video',
-                        child: ConversationMenuLabel(
-                          icon: Icons.videocam_outlined,
-                          label: 'Video çek',
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'galleryPhoto',
-                        child: ConversationMenuLabel(
-                          icon: Icons.photo_library_outlined,
-                          label: 'Galeriden fotoğraf seç',
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'galleryVideo',
-                        child: ConversationMenuLabel(
-                          icon: Icons.video_library_outlined,
-                          label: 'Galeriden video seç',
-                        ),
-                      ),
-                      if (widget.onShareLocation != null)
-                        const PopupMenuItem(
-                          value: 'location',
-                          child: ConversationMenuLabel(
-                            icon: Icons.location_on_outlined,
-                            label: 'Konum paylaş · 1 saat',
+                    Expanded(
+                      child: TextField(
+                        focusNode: _focus,
+                        controller: _text,
+                        onChanged: _onTextChanged,
+                        minLines: 1,
+                        maxLines: MediaQuery.viewInsetsOf(context).bottom > 0
+                            ? 3
+                            : 5,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(fontSize: 15),
+                        decoration: InputDecoration(
+                          hintText: 'Mesajını yaz…',
+                          hintMaxLines: 1,
+                          hintStyle: const TextStyle(fontSize: 14),
+                          isDense: true,
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLowest,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            borderSide: BorderSide.none,
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(width: 2),
-                  ConversationPressFeedback(
-                    child: IconButton.filled(
-                      onPressed: _sending ? null : _send,
-                      tooltip: 'Gönder',
-                      style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimaryContainer,
                       ),
-                      icon: _sending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send_rounded),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    IconButton(
+                      onPressed: _sending ? null : _attach,
+                      icon: const Icon(Icons.attach_file),
+                      tooltip: 'Dosya gönder',
+                    ),
+                    PopupMenuButton<String>(
+                      requestFocus: false,
+                      onOpened: _hideComposerKeyboard,
+                      onCanceled: () => _focus.canRequestFocus = true,
+                      enabled: !_sending,
+                      tooltip: 'Fotoğraf, video veya konum',
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      onSelected: _selectMedia,
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'voice',
+                          child: ConversationMenuLabel(
+                            icon: Icons.mic_none_rounded,
+                            label: 'Sesli mesaj kaydet',
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'photo',
+                          child: ConversationMenuLabel(
+                            icon: Icons.photo_camera_outlined,
+                            label: 'Fotoğraf çek',
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'video',
+                          child: ConversationMenuLabel(
+                            icon: Icons.videocam_outlined,
+                            label: 'Video çek',
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'galleryPhoto',
+                          child: ConversationMenuLabel(
+                            icon: Icons.photo_library_outlined,
+                            label: 'Galeriden fotoğraf seç',
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'galleryVideo',
+                          child: ConversationMenuLabel(
+                            icon: Icons.video_library_outlined,
+                            label: 'Galeriden video seç',
+                          ),
+                        ),
+                        if (widget.onShareLocation != null)
+                          const PopupMenuItem(
+                            value: 'location',
+                            child: ConversationMenuLabel(
+                              icon: Icons.location_on_outlined,
+                              label: 'Konum paylaş · 1 saat',
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 2),
+                    ConversationPressFeedback(
+                      child: IconButton.filled(
+                        onPressed: _sending ? null : _send,
+                        tooltip: 'Gönder',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-}
 class AttachmentPickerScreen extends StatefulWidget {
   const AttachmentPickerScreen({super.key});
   @override

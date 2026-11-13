@@ -109,9 +109,7 @@ class ContactChatHeader extends StatelessWidget {
         }
       } catch (error) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(userError(error))));
+          showUserError(context, error);
         }
       }
     }
@@ -126,9 +124,7 @@ class ContactChatHeader extends StatelessWidget {
         );
       } catch (error) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(userError(error))));
+          showUserError(context, error);
         }
       }
     }
@@ -259,9 +255,7 @@ class ContactDetailsScreen extends StatelessWidget {
                     await editProfileAvatar(context, contactId: contactId);
                   } catch (error) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(userError(error))));
+                      showUserError(context, error);
                     }
                   }
                 },
@@ -428,9 +422,7 @@ class _ClearChatContentTileState extends State<_ClearChatContentTile> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

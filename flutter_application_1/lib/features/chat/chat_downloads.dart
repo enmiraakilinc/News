@@ -98,15 +98,10 @@ class ChatDownloads {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback: 'İndirme isteği gönderilemedi. Yeniden dene.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback: 'İndirme isteği gönderilemedi. Yeniden dene.',
         );
       }
     }
@@ -235,9 +230,7 @@ class _ChatDownloadRequestsState extends State<ChatDownloadRequests> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     } finally {
       if (mounted) setState(() => _busy.remove(doc.id));

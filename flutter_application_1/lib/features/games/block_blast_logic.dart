@@ -64,10 +64,7 @@ class BlockBlastState {
     score: 0,
     round: 0,
     gameOver: false,
-    cellColors: List<int>.filled(
-      blockBlastBoardSize * blockBlastBoardSize,
-      0,
-    ),
+    cellColors: List<int>.filled(blockBlastBoardSize * blockBlastBoardSize, 0),
     pieceColors: _randomColors(random ?? Random()),
   );
 }
@@ -103,8 +100,7 @@ BlockBlastState? placeBlock(
   int row,
   int column, [
   Random? random,
-]
-) {
+]) {
   if (state.gameOver || pieceIndex < 0 || pieceIndex >= state.pieces.length) {
     return null;
   }

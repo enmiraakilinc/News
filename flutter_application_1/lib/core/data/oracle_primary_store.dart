@@ -418,6 +418,7 @@ class OraclePrimaryStore {
     Timer? reconnect;
     Timer? pull;
     var pulling = false;
+    var generation = 0;
     var failures = 0;
     void emit() {
       if (!cancelled && isCurrent()) controller.add(_snapshot(view));
@@ -450,10 +451,11 @@ class OraclePrimaryStore {
           pull = Timer.periodic(const Duration(seconds: 2), (_) {
             if (pulling || cancelled || !isCurrent() || !networkEnabled) return;
             pulling = true;
+            final seen = generation;
             unawaited(() async {
               try {
                 final data = await transport.post('/v1/read', request);
-                if (cancelled || !isCurrent()) return;
+                if (cancelled || !isCurrent() || seen != generation) return;
                 final rows = request['kind'] == 'document'
                     ? (data['row'] == null
                           ? <Map<String, dynamic>>[]
@@ -466,10 +468,11 @@ class OraclePrimaryStore {
                         rows[i]['path'] == view.rows[i]['path'] &&
                             rows[i]['version'] == view.rows[i]['version'],
                     ].every((ok) => ok);
-                if (same) return;
+                if (same || seen != generation) return;
                 view.rows = rows;
                 view.ready = true;
                 view.fromCache = false;
+                generation++;
                 emit();
               } catch (_) {
               } finally {
@@ -521,6 +524,7 @@ class OraclePrimaryStore {
                     }
                     view.ready = true;
                     view.fromCache = false;
+                    generation++;
                     failures = 0;
                     _cache(request, view.rows);
                     emit();

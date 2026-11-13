@@ -1,0 +1,28 @@
+{
+  "version": "1.17.2",
+  "code": 2102,
+  "filename": "Neural-Haber-1.17.2-arm64.apk",
+  "bytes": 39577490,
+  "sha256": "7538cbf48c5ddc1ac98803680fb2b075e6413996b97171af71a45a122e6b1567",
+  "abi": [
+    "arm64-v8a"
+  ],
+  "signingVerified": true,
+  "debuggable": false,
+  "postgresPrimary": true,
+  "dataWriteMode": "postgres-primary",
+  "published": false,
+  "stagedOnVps": false,
+  "physicalDeviceTested": false,
+  "verification": {
+    "flutterTests": "227 passed",
+    "dartAnalyze": "passed",
+    "serverTests": "61 passed"
+  },
+  "livePrimaryEnabled": true,
+  "primaryCutoverRequired": false,
+  "sourceCommit": "399435238b5a276fdd0ac7adb9fa2d7b7c54581b",
+  "githubDownloadVerified": false,
+  "legacyMetadataUpdated": false,
+  "vpsMetadataUpdated": false
+}

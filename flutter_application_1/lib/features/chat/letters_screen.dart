@@ -94,9 +94,7 @@ class _PairingViewState extends State<_PairingView> {
       if (mounted) widget.onPaired();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_msg(e))));
+        showUserError(context, e);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -119,7 +117,7 @@ class _PairingViewState extends State<_PairingView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(_msg(e))));
+      showUserErrorOn(messenger, e);
     }
   }
 
@@ -145,7 +143,7 @@ class _PairingViewState extends State<_PairingView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(_msg(e))));
+      showUserErrorOn(messenger, e);
     }
   }
 
@@ -183,8 +181,6 @@ class _PairingViewState extends State<_PairingView> {
       ),
     );
   }
-
-  String _msg(Object e) => userError(e);
 
   @override
   Widget build(BuildContext context) {
@@ -369,9 +365,7 @@ class _LettersViewState extends State<_LettersView>
       await operation();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(e))));
+        showUserError(context, e);
       }
     }
   }
@@ -454,9 +448,7 @@ class _LettersViewState extends State<_LettersView>
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     } finally {
       if (mounted) setState(() => _clearing = false);

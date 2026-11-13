@@ -192,19 +192,12 @@ class _SudokuScreenState extends State<SudokuScreen> {
       if (item is! List) continue;
       final stroke = <Offset>[];
       for (final point in item) {
-        if (point is! Map ||
-            point['x'] is! num ||
-            point['y'] is! num) {
+        if (point is! Map || point['x'] is! num || point['y'] is! num) {
           continue;
         }
         final x = (point['x'] as num).toDouble();
         final y = (point['y'] as num).toDouble();
-        if (x.isFinite &&
-            y.isFinite &&
-            x >= 0 &&
-            x <= 1 &&
-            y >= 0 &&
-            y <= 1) {
+        if (x.isFinite && y.isFinite && x >= 0 && x <= 1 && y >= 0 && y <= 1) {
           stroke.add(Offset(x, y));
         }
       }
@@ -287,13 +280,15 @@ class _SudokuScreenState extends State<SudokuScreen> {
     if (number == 0) return null;
     final row = cell ~/ 9, column = cell % 9;
     final conflicts = <String>{
-      if (List.generate(9, (i) => i).any(
-        (i) => i != column && _board[row * 9 + i] == number,
-      ))
+      if (List.generate(
+        9,
+        (i) => i,
+      ).any((i) => i != column && _board[row * 9 + i] == number))
         'satır ${row + 1}',
-      if (List.generate(9, (i) => i).any(
-        (i) => i != row && _board[i * 9 + column] == number,
-      ))
+      if (List.generate(
+        9,
+        (i) => i,
+      ).any((i) => i != row && _board[i * 9 + column] == number))
         'sütun ${column + 1}',
       if (List.generate(81, (i) => i).any(
         (i) =>
@@ -312,10 +307,10 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _selected == null ? null : _conflictDescription(_selected!);
 
   Future<void> _recordLeagueScore() async {
-    final seconds = DateTime.now().difference(_startedAt).inSeconds.clamp(
-      1,
-      999999,
-    );
+    final seconds = DateTime.now()
+        .difference(_startedAt)
+        .inSeconds
+        .clamp(1, 999999);
     try {
       await GameLeagueService.recordBestScore(
         game: 'sudoku',
@@ -555,8 +550,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
                   const SizedBox(height: 4),
                   const Center(
                     child: Text(
-                    'Parmağınla tahtanın üzerine not al. Çizimler saklanır; '
-                    'çözüm denetimi girilen sayıları kontrol eder.',
+                      'Parmağınla tahtanın üzerine not al. Çizimler saklanır; '
+                      'çözüm denetimi girilen sayıları kontrol eder.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -583,7 +578,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                   !SudokuPuzzle.allowed(_board, i, _board[i]);
                               final selected = _selected == i;
                               final selectedRow =
-                                  _selected != null && _selected! ~/ 9 == i ~/ 9;
+                                  _selected != null &&
+                                  _selected! ~/ 9 == i ~/ 9;
                               final selectedColumn =
                                   _selected != null && _selected! % 9 == i % 9;
                               final sameBox =
@@ -608,7 +604,8 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
                                       color:
-                                          _incorrectCells.contains(i) || conflict
+                                          _incorrectCells.contains(i) ||
+                                              conflict
                                           ? colors.errorContainer
                                           : selected
                                           ? colors.primaryContainer

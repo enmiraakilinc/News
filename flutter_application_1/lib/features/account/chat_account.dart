@@ -51,6 +51,9 @@ class ChatAccount {
     final own = db.doc('accountLoginCodes/${user.uid}');
     final random = Random.secure();
     final candidate = List.generate(12, (_) => random.nextInt(10)).join();
+    final existing = await own.get().timeout(const Duration(seconds: 8));
+    final stored = existing.data()?['code'];
+    if (existing.exists && stored is String) return displayCode(stored);
     return db
         .runTransaction<String>((transaction) async {
           final saved = await transaction.get(own);

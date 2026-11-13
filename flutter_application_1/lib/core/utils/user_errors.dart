@@ -2,7 +2,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import '../data/oracle_client.dart';
 
 String userError(
   Object error, {
@@ -20,7 +23,7 @@ String userError(
   if (error is FirebaseException) {
     switch (error.code) {
       case 'permission-denied':
-        return 'Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).';
+        return 'Bu işlem için erişim iznin yok. Hesabınla giriş yaptığını kontrol et.';
       case 'unavailable':
       case 'network-request-failed':
         return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
@@ -46,8 +49,8 @@ String userError(
   }
   if (error is PlatformException) {
     final code = error.code.toLowerCase();
-    final detail =
-        '${error.message ?? ''} ${error.details ?? ''}'.toLowerCase();
+    final detail = '${error.message ?? ''} ${error.details ?? ''}'
+        .toLowerCase();
     if (code.contains('in_use') ||
         code.contains('inuse') ||
         code.contains('notreadable') ||
@@ -87,7 +90,7 @@ String userError(
   if (lower.contains('erişim iznin') ||
       lower.contains('permission-denied') ||
       lower.contains('permission_denied')) {
-    return 'Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).';
+    return 'Bu işlem için erişim iznin yok. Hesabınla giriş yaptığını kontrol et.';
   }
   if (lower.contains('timeout') ||
       lower.contains('deadline') ||
@@ -112,12 +115,71 @@ String userError(
     return 'Mikrofon izni kapalı, ayarlardan izin verin.';
   }
   if (lower.contains('rejected')) return 'Karşı taraf aramayı reddetti.';
+  // Teknik ayrıntı (yol, yığın izi, adres) kullanıcıya gösterilmez; ağ hatası da sayılmaz.
   if (RegExp(
-    r'exception|firebase|stacktrace|errno|https?://',
+    r'exception|firebase|stacktrace|errno|https?://|[a-z]:\\|/(data|storage|home|var)/',
     caseSensitive: false,
   ).hasMatch(message)) {
-    return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
+    return fallback;
   }
   if (message.isNotEmpty && message.length < 180) return message;
   return fallback;
+}
+
+/// Kullanıcının işlemini durdurmaması gereken geçici hatalar: ağ, zaman aşımı,
+/// sunucu (404/408/409/429/5xx) ve uyumsuzluklar. Bunlar sessizce yerelde
+/// sürer, arka planda yeniden denenir.
+bool isTransientError(Object error) {
+  if (error is TimeoutException ||
+      error is SocketException ||
+      error is http.ClientException ||
+      error is FormatException ||
+      error is StateError ||
+      error is UnsupportedError) {
+    return true;
+  }
+  if (error is OracleApiException) {
+    final s = error.status;
+    return s >= 500 || const [404, 408, 409, 429].contains(s);
+  }
+  if (error is FirebaseException) {
+    return const [
+      'unavailable',
+      'deadline-exceeded',
+      'not-found',
+      'aborted',
+      'cancelled',
+      'network-request-failed',
+      'resource-exhausted',
+      'internal',
+      'unknown',
+    ].contains(error.code);
+  }
+  final text = error.toString().toLowerCase();
+  return text.contains('timeout') ||
+      text.contains('socket') ||
+      text.contains('network') ||
+      text.contains('not-found') ||
+      text.contains('zamanında') ||
+      text.contains('unavailable');
+}
+
+/// Yalnızca kullanıcının gerçekten devam edemeyeceği durumlarda mesaj gösterir.
+void showUserError(BuildContext context, Object error, {String? fallback}) {
+  if (!context.mounted || isTransientError(error)) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        fallback == null
+            ? userError(error)
+            : userError(error, fallback: fallback),
+      ),
+    ),
+  );
+}
+
+/// Aynı kural, önceden alınmış [ScaffoldMessengerState] için.
+void showUserErrorOn(ScaffoldMessengerState messenger, Object error) {
+  if (isTransientError(error)) return;
+  messenger.showSnackBar(SnackBar(content: Text(userError(error))));
 }

@@ -74,9 +74,7 @@ class SharedContactLabel {
       );
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     }
   }
@@ -145,9 +143,7 @@ class _ShareContactLabelSwitchState extends State<ShareContactLabelSwitch> {
               if (mounted) setState(() => _enabled = value);
             } catch (error) {
               if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(userError(error))));
+                showUserError(context, error);
               }
             } finally {
               if (mounted) setState(() => _busy = false);

@@ -363,9 +363,7 @@ class _NewsNotesState extends State<NewsNotes> {
 
   void _error(Object error) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(userError(error))));
+      showUserError(context, error);
     }
   }
 

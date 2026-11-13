@@ -28,7 +28,7 @@ class OracleApiException implements Exception {
       switch (code) {
         'permission-denied' => 'Bu alana erişim iznin yok.',
         'unauthenticated' => 'Oturumunu yenilemek için tekrar giriş yap.',
-        _ => 'Bağlantı şu anda kurulamıyor. Biraz sonra tekrar dene.',
+        _ => 'Sunucu bu işlemi tamamlayamadı ($code).',
       };
 }
 

@@ -80,12 +80,19 @@ void main() {
   );
 
   testWidgets('block pieces can be dragged onto the board', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(const MaterialApp(home: BlockBlastScreen()));
     await tester.pumpAndSettle();
     final piece = find.byKey(const ValueKey('block-blast-piece-0'));
     final cell = find.byKey(const ValueKey('block-blast-cell-0'));
     final gesture = await tester.startGesture(tester.getCenter(piece));
-    await gesture.moveTo(tester.getCenter(cell));
+    await gesture.moveBy(const Offset(0, -40));
+    await tester.pump();
+    // Parmak, parçanın altında durur; bırakma noktası feedbackOffset kadar yukarıdadır.
+    final lift = tester.widget<Draggable<int>>(piece).feedbackOffset;
+    await gesture.moveTo(tester.getCenter(cell) - lift);
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
@@ -372,7 +379,15 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SlidingPuzzleScreen()));
     await tester.pumpAndSettle();
     expect(find.text('Hamle: 0'), findsOneWidget);
-    expect(find.byType(GridView), findsOneWidget);
-    expect(find.bySemanticsLabel('Boş kare'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key as ValueKey<String>).value.startsWith(
+              'sliding-puzzle-tile-',
+            ),
+      ),
+      findsNWidgets(15),
+    );
   });
 }

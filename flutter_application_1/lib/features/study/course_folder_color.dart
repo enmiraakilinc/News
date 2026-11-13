@@ -69,9 +69,7 @@ class CourseFolderColorButton extends StatelessWidget {
               if (context.mounted) onChanged();
             } catch (error) {
               if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(userError(error))));
+                showUserError(context, error);
               }
             }
           },

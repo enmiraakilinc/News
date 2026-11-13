@@ -321,7 +321,6 @@ class _BlockBlastScreenState extends State<BlockBlastScreen> {
       ),
     ),
   );
-
 }
 
 class _PieceChoice extends StatelessWidget {

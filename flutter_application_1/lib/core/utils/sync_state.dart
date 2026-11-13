@@ -1,8 +1,12 @@
 // Yükleme zaman aşımı ve yenileme durumunu gösterir.
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'user_errors.dart';
 
-class SyncError extends StatelessWidget {
+/// Geçici hatalarda (ağ, zaman aşımı, sunucu) hata ekranı göstermez; kısa bir
+/// bekleme göstergesiyle sessizce yeniden dener. Yalnızca gerçekten devam
+/// edilemeyen durumlarda mesaj ve "Tekrar dene" düğmesi çıkar.
+class SyncError extends StatefulWidget {
   final String label;
   final VoidCallback onRetry;
   final Object? error;
@@ -14,31 +18,58 @@ class SyncError extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off_outlined, size: 40),
-          const SizedBox(height: 12),
-          Text(
-            error == null
-                ? '$label yüklenemedi. İnternet bağlantını kontrol edip yeniden dene.'
-                : userError(
-                    error!,
-                    fallback: '$label yüklenemedi. Yeniden dene.',
-                  ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Tekrar dene'),
-          ),
-        ],
+  State<SyncError> createState() => _SyncErrorState();
+}
+
+class _SyncErrorState extends State<SyncError> {
+  Timer? _timer;
+  bool get _quiet => widget.error == null || isTransientError(widget.error!);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_quiet) {
+      _timer = Timer(const Duration(seconds: 3), () {
+        if (mounted) widget.onRetry();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_quiet) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.info_outline, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              userError(
+                widget.error!,
+                fallback: '${widget.label} yüklenemedi. Yeniden dene.',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: widget.onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tekrar dene'),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

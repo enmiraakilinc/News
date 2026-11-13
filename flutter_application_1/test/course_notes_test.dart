@@ -54,21 +54,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Tokenizer'), findsOneWidget);
-      final list = tester.widget<ListView>(find.byType(ListView).first);
-      expect(list.childrenDelegate.estimatedChildCount, 81);
-      final scroll = tester.state<ScrollableState>(
-        find
-            .descendant(
-              of: find.byType(ListView).first,
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      final pages = tester.widget<PageView>(find.byType(PageView));
+      expect(pages.childrenDelegate.estimatedChildCount, 80);
       for (var i = 0; i < 3; i++) {
-        scroll.position.jumpTo(scroll.position.maxScrollExtent);
+        await tester.drag(find.byType(PageView), const Offset(-600, 0));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        scroll.position.jumpTo(0);
+        await tester.drag(find.byType(PageView), const Offset(600, 0));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.text('Tokenizer'), findsOneWidget);

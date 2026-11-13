@@ -325,19 +325,14 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
       await CallBackground.channel
           .invokeMethod('disableIncoming')
           .catchError((_) {});
-      await FirebaseMessaging.instance
-          .unsubscribeFromTopic('updates')
-          .timeout(const Duration(seconds: 10));
+      // Konu aboneliği arka planda tamamlanır; gecikmesi ayarı bozmaz.
+      try {
+        await FirebaseMessaging.instance
+            .unsubscribeFromTopic('updates')
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {}
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Yerel ayarlar kaydedildi; internet bağlantısını kontrol et.',
-            ),
-          ),
-        );
-      }
+      /* Yerel ayarlar kaydedildi; kullanıcıya hata gösterilmez. */
     } finally {
       if (mounted) {
         setState(() {

@@ -256,14 +256,18 @@ class _WakeupSettingsState extends State<WakeupSettings> {
         }
         await WakeupService.register();
       }
-      await WakeupService.permission(widget.sourceKey, _device!)
-          .set({
-            'sourceKey': widget.sourceKey,
-            'deviceId': _device,
-            'enabled': enabled,
-            'volume': _volume,
-          })
-          .timeout(const Duration(seconds: 20));
+      try {
+        await WakeupService.permission(widget.sourceKey, _device!)
+            .set({
+              'sourceKey': widget.sourceKey,
+              'deviceId': _device,
+              'enabled': enabled,
+              'volume': _volume,
+            })
+            .timeout(const Duration(seconds: 20));
+      } on TimeoutException {
+        /* Kayıt arka planda sürer; ayar kaydedilmiş sayılır. */
+      }
       if (enabled) {
         await (await SharedPreferences.getInstance()).setBool(
           'wakeup_used_${CoupleService.uid}',
@@ -278,9 +282,7 @@ class _WakeupSettingsState extends State<WakeupSettings> {
       if (mounted) setState(() => _enabled = enabled);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -343,9 +345,7 @@ class _WakeupSettingsState extends State<WakeupSettings> {
                         });
                       } catch (error) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(userError(error))),
-                          );
+                          showUserError(context, error);
                         }
                       }
                     }
@@ -377,9 +377,7 @@ class _WakeupSettingsState extends State<WakeupSettings> {
                     }
                   } catch (error) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(userError(error))));
+                      showUserError(context, error);
                     }
                   } finally {
                     if (mounted) setState(() => _busy = false);
@@ -424,9 +422,7 @@ class _WakeupSettingsState extends State<WakeupSettings> {
                     }
                   } catch (error) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(userError(error))));
+                      showUserError(context, error);
                     }
                   } finally {
                     if (mounted) setState(() => _busy = false);
@@ -450,9 +446,7 @@ class _WakeupSettingsState extends State<WakeupSettings> {
                     }
                   } catch (error) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(userError(error))));
+                      showUserError(context, error);
                     }
                   } finally {
                     if (mounted) setState(() => _busy = false);

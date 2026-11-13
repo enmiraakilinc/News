@@ -167,6 +167,8 @@ const server=http.createServer(async(request,response)=>{
    send(response,200,{ok:true,messageId:result.messageId});return;
   }
   if(url.pathname==='/admin'||url.pathname.startsWith('/admin/')){
+   // Yönetim paneli yalnızca sunucudaki yerel bağlantıdan (SSH tüneli) açılır; nginx üzerinden gelen istek reddedilir.
+   if(request.headers['x-real-ip']||request.headers['x-forwarded-proto'])throw new ApiError(404,'not-found','Bu adres bulunamadı.');
    if(request.method==='GET'&&url.pathname==='/admin/api/releases'){
     send(response,200,await listReleases(services.store));return;
    }

@@ -144,7 +144,9 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final board = constraints.maxWidth > 480 ? 480.0 : constraints.maxWidth - 40;
+              final board = constraints.maxWidth > 480
+                  ? 480.0
+                  : constraints.maxWidth - 40;
               final cell = board / 4;
               final colors = Theme.of(context).colorScheme;
               return Center(
@@ -168,7 +170,9 @@ class _SlidingPuzzleScreenState extends State<SlidingPuzzleScreen> {
                         for (var index = 0; index < 16; index++)
                           if (_tiles[index] != 0)
                             AnimatedPositioned(
-                              key: ValueKey('sliding-puzzle-tile-${_tiles[index]}'),
+                              key: ValueKey(
+                                'sliding-puzzle-tile-${_tiles[index]}',
+                              ),
                               duration: const Duration(milliseconds: 120),
                               curve: Curves.easeOut,
                               left: (index % 4) * cell + 3,

@@ -29,18 +29,22 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
 
   Future<void> _load() async {
     try {
-      await CoupleService.ensureReady();
-      String? code = ChatAccount.currentCode;
-      try {
-        code = await ChatAccount.shortCode() ?? code;
-      } catch (_) {
-        /* Old code stays usable offline or before server publication. */
-      }
-      if (mounted) setState(() => _linkedCode = code);
-    } catch (e) {
-      if (mounted) setState(() => _error = ChatAccount.errorMessage(e));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      await CoupleService.ensureReady().timeout(const Duration(seconds: 8));
+    } catch (_) {
+      /* Kayıtlı hesap kodu çevrimdışı da gösterilir. */
+    }
+    final legacy = ChatAccount.currentCode;
+    if (mounted) {
+      setState(() {
+        _linkedCode = legacy;
+        _busy = false;
+      });
+    }
+    try {
+      final code = await ChatAccount.shortCode();
+      if (mounted && code != null) setState(() => _linkedCode = code);
+    } catch (_) {
+      /* Eski kod geçerli kalır; kısa kod sunucuya ulaşınca görünür. */
     }
   }
 
@@ -102,7 +106,9 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
       await ChatAccount.sendPasswordReset(code);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şifre sıfırlama bağlantısı gönderildi.')),
+          const SnackBar(
+            content: Text('Şifre sıfırlama bağlantısı gönderildi.'),
+          ),
         );
       }
     } catch (error) {

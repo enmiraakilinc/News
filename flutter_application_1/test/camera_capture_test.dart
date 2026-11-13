@@ -363,7 +363,7 @@ void main() {
         const MaterialApp(home: CameraCaptureScreen(video: false)),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Kamera izni verilmedi'), findsOneWidget);
+      expect(find.textContaining('Kamera izni kapalı'), findsOneWidget);
       expect(camera.open, 0);
       camera.deny = false;
       await tester.tap(find.text('Tekrar dene'));

@@ -7,11 +7,11 @@ void main() {
 
   test('Online presence has no clock label and expires promptly', () {
     expect(
-      isPresenceOnline(now.subtract(const Duration(seconds: 89)), now: now),
+      isPresenceOnline(now.subtract(const Duration(seconds: 44)), now: now),
       isTrue,
     );
     expect(
-      isPresenceOnline(now.subtract(const Duration(seconds: 90)), now: now),
+      isPresenceOnline(now.subtract(const Duration(seconds: 45)), now: now),
       isFalse,
     );
     expect(

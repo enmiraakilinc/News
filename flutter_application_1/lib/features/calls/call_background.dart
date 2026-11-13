@@ -255,12 +255,13 @@ class _BackgroundCallSwitchState extends State<BackgroundCallSwitch> {
                 requestPermission: false,
               ).timeout(const Duration(seconds: 20));
               if (mounted) setState(() => _enabled = value);
+            } on TimeoutException {
+              // Kayıt arka planda sürer; ayar kaydedildi sayılır.
+              if (mounted) setState(() => _enabled = value);
             } catch (error) {
               if (!value && mounted) setState(() => _enabled = false);
               if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(userError(error))));
+                showUserError(context, error);
               }
             } finally {
               if (mounted) setState(() => _busy = false);

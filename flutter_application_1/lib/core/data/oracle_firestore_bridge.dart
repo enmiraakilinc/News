@@ -196,7 +196,12 @@ class OracleFirestoreBridge extends FirebaseFirestorePlatform {
     var active = true;
     Future<T?> execute() async {
       final current = store;
-      await current.outbox.waitForPendingWrites();
+      // Takılı kalmış bir gönderim, ilgisiz işlemleri (gizli kelime girişi,
+      // hesap kodu vb.) 30 sn bekletmesin.
+      await current.outbox.waitForPendingWrites().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {},
+      );
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         if (!active) throw TimeoutException('İşlem zamanında tamamlanamadı.');
         final transaction = OraclePrimaryTransaction(

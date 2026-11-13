@@ -157,17 +157,25 @@ class _ContactsScreenState extends State<ContactsScreen> {
         await ChatService.deleteDirect(id);
       }
     } catch (error) {
+      if (isTransientError(error)) {
+        // Ağ/sunucu gecikmesi işlemi engellemez; silme arka planda tekrar denenir.
+        if (id != ContactNames.posniId) {
+          unawaited(
+            Future<void>.delayed(const Duration(seconds: 5), () async {
+              try {
+                await ChatService.deleteDirect(id);
+              } catch (_) {}
+            }),
+          );
+        }
+        if (mounted) setState(() {});
+        return;
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback:
-                    'Kişi kaldırılamadı. Bağlantını kontrol edip yeniden dene.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback: 'Kişi kaldırılamadı. Yeniden dene.',
         );
       }
       return;
@@ -237,9 +245,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       await operation();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -795,9 +801,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       await operation();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
+        showUserError(context, error);
       }
     }
   }

@@ -16,6 +16,7 @@ class ActiveConversation {
   static void noteIncomingMessage() {
     liveRefresh.value = liveRefresh.value + 1;
   }
+
   static Future<void> set(String? key) async {
     sourceKey = key;
     if (key == null) {
@@ -28,7 +29,10 @@ class ActiveConversation {
       await prefs.remove('active_chat_at');
     } else {
       await prefs.setString('active_chat_source', key);
-      await prefs.setInt('active_chat_at', DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        'active_chat_at',
+        DateTime.now().millisecondsSinceEpoch,
+      );
       _beat ??= Timer.periodic(const Duration(seconds: 8), (_) {
         final current = sourceKey;
         if (current != null) unawaited(set(current));

@@ -191,7 +191,8 @@ class _QuestionViewState extends State<_QuestionView> {
               : (live.myAnswer == null &&
                     live.partnerAnswer == null &&
                     _cached != null &&
-                    (_cached!.myAnswer != null || _cached!.partnerAnswer != null))
+                    (_cached!.myAnswer != null ||
+                        _cached!.partnerAnswer != null))
               ? _cached!
               : live;
           if (data.myAnswer != null && data.partnerAnswer != null && !_seen) {

@@ -308,36 +308,32 @@ class _LastSeenLabelState extends State<LastSeenLabel> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _stream,
-        builder: (context, snapshot) {
-          _apply(snapshot.data?.data());
-          final now = DateTime.now();
-          final date = _seenAt;
-          final online = _online && isPresenceOnline(date, now: now);
-          final game = online
-              ? (snapshot.data?.data()?['game'] as String?)
-              : null;
-          final text = online
-              ? game == null
-                    ? 'Çevrimiçi'
-                    : '$game oynuyor'
-              : formatLastSeen(date, now: now) ?? widget.fallback;
-          return Tooltip(
-            message: text,
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          );
-        },
+  Widget build(
+    BuildContext context,
+  ) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: _stream,
+    builder: (context, snapshot) {
+      _apply(snapshot.data?.data());
+      final now = DateTime.now();
+      final date = _seenAt;
+      final online = _online && isPresenceOnline(date, now: now);
+      final game = online ? (snapshot.data?.data()?['game'] as String?) : null;
+      final text = online
+          ? game == null
+                ? 'Çevrimiçi'
+                : '$game oynuyor'
+          : formatLastSeen(date, now: now) ?? widget.fallback;
+      return Tooltip(
+        message: text,
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+        ),
       );
+    },
+  );
 }
 
 String? formatLastSeen(DateTime? date, {DateTime? now}) {
@@ -566,6 +562,8 @@ class _LastSeenSwitchState extends State<LastSeenSwitch> {
             setState(() => _busy = true);
             try {
               await ChatPresence.setSharedWith(_peers, v);
+              if (mounted) setState(() => _enabled = v);
+            } on TimeoutException {
               if (mounted) setState(() => _enabled = v);
             } catch (_) {
               if (context.mounted) {

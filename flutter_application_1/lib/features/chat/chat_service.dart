@@ -10,6 +10,7 @@ import '../pair/couple_service.dart';
 import '../../core/utils/open_stream.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../media/chat_media.dart';
+import '../../core/data/oracle_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatProfile {
@@ -296,9 +297,9 @@ class ChatService {
     final ref = _db.collection('chats').doc(chatId);
     final doc = await ref.get();
     final data = doc.data();
-    final members = List<String>.from(data?['members'] ?? const []);
-    if (data == null ||
-        data['group'] == true ||
+    if (data == null) return;
+    final members = List<String>.from(data['members'] ?? const []);
+    if (data['group'] == true ||
         members.length != 2 ||
         !members.contains(_uid)) {
       throw Exception('Bu bağlantı bulunamadı.');
@@ -335,7 +336,13 @@ class ChatService {
           .doc(chatId),
     );
     batch.delete(ref);
-    await batch.commit();
+    try {
+      await batch.commit();
+    } on FirebaseException catch (error) {
+      if (error.code != 'not-found') rethrow;
+    } on OracleApiException catch (error) {
+      if (error.status != 404 && error.code != 'not-found') rethrow;
+    }
   }
 
   static Stream<List<Conversation>> conversations() => _ready(

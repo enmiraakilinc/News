@@ -280,7 +280,11 @@ class CoupleService {
   static Stream<T> _gated<T>(String? cacheKey, Stream<T> Function() build) {
     final cached = cacheKey == null ? null : _sonDeger[cacheKey];
     return openStreamAfter<T>(
-      ensureReady,
+      () async {
+        await ensureReady();
+        // Üyelik onarımı akışı bekletmez; arka planda sessizce yapılır.
+        unawaited(_repairMembership());
+      },
       () => build().map((value) {
         if (cacheKey != null) _sonDeger[cacheKey] = value;
         return value;
@@ -288,6 +292,40 @@ class CoupleService {
       initial: cached is T ? cached : null,
       message: 'Kayıtlar yüklenemedi.',
     );
+  }
+
+  static String? _repairedFor;
+
+  /// Bu cihazın kayıtlı gizli kelimesiyle üyeliği oturum başına bir kez doğrular.
+  /// Üyelik eksikse ortak alan boş görünür; kelimenin kanıtı (joinProof) ile
+  /// kendi uid'ini yeniden ekler. Hata sessizce geçilir, kimlik değişmez.
+  static Future<void> _repairMembership() async {
+    try {
+      final cid = await coupleId();
+      final word = await secret();
+      final me = uid;
+      if (cid == null || word == null || me == null) return;
+      final key = '$me|$cid';
+      if (_repairedFor == key) return;
+      _repairedFor = key;
+      final snapshot = await _db
+          .collection('couples')
+          .doc(cid)
+          .get()
+          .timeout(const Duration(seconds: 6));
+      final members = snapshot.data()?['members'];
+      if (snapshot.exists && members is List && members.contains(me)) return;
+      await _db
+          .collection('couples')
+          .doc(cid)
+          .update({
+            'members': FieldValue.arrayUnion([me]),
+            'joinProof': _secretCheck(word),
+          })
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      /* Oturum başına tek deneme; akış bu yüzden tekrar tekrar gecikmez. */
+    }
   }
 
   /// Eşleşme kaldırılınca/değişince önbellek başka çifte sızmasın.
@@ -344,29 +382,25 @@ class CoupleService {
     final cid = await coupleId();
     final word = await secret();
     if (cid == null || word == null) return;
-    await ensureReady().timeout(const Duration(seconds: 12));
+    await ensureReady();
     await _registerSecretLogin(cid, word);
   }
 
   static Future<void> _registerSecretLogin(String cid, String word) async {
     final ref = _db.collection('invites').doc(_loginId(word));
-    await _db.runTransaction((tx) async {
-      final existing = await tx.get(ref);
-      if (existing.exists && existing.data()!['coupleId'] != cid) {
-        throw Exception('Bu gizli kelime başka bir bağda kullanılıyor.');
-      }
-      if (!existing.exists) tx.set(ref, {'coupleId': cid});
-    });
+    final existing = await ref.get();
+    final current = existing.data()?['coupleId'];
+    if (current == cid) return;
+    if (existing.exists && current != null) {
+      throw Exception('Bu gizli kelime başka bir bağda kullanılıyor.');
+    }
+    await ref.set({'coupleId': cid});
   }
 
   static Future<void> signInWithSecret(String word) async {
     if (word.isEmpty) throw Exception('Gizli kelimeyi gir.');
-    await ensureReady().timeout(const Duration(seconds: 12));
-    final login = await _db
-        .collection('invites')
-        .doc(_loginId(word))
-        .get()
-        .timeout(const Duration(seconds: 12));
+    await ensureReady();
+    final login = await _db.collection('invites').doc(_loginId(word)).get();
     if (!login.exists) {
       throw Exception(
         'Gizli kelime bulunamadı. Kelimeyi kontrol edip tekrar dene.',
@@ -376,12 +410,10 @@ class CoupleService {
     final ref = _db.collection('couples').doc(cid);
     // Firestore validates the proof before granting private membership.
     // Non-members cannot read the stored secret hash.
-    await ref
-        .update({
-          'members': FieldValue.arrayUnion([uid!]),
-          'joinProof': _secretCheck(word),
-        })
-        .timeout(const Duration(seconds: 12));
+    await ref.update({
+      'members': FieldValue.arrayUnion([uid!]),
+      'joinProof': _secretCheck(word),
+    });
     await _saveLocal(cid, word);
   }
 

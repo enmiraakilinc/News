@@ -21,6 +21,7 @@ import '../../core/theme/app_theme.dart';
 import '../wishes/wishes_screen.dart';
 import '../pair/badge_service.dart';
 import '../../core/utils/sync_state.dart';
+import '../../core/utils/user_errors.dart';
 import '../chat/chat_unread.dart';
 import '../settings/app_settings_screen.dart';
 import '../study/course_screen.dart';
@@ -197,12 +198,11 @@ class _CounterScreenState extends State<CounterScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Gizli kelimeyle yeniden giriş hazırlanamadı: ${error.toString().replaceFirst("Exception: ", "")}. Bu bölüme tekrar girerek yeniden deneyebilirsin.',
-          ),
-        ),
+      showUserError(
+        context,
+        error,
+        fallback:
+            'Gizli kelimeyle yeniden giriş hazırlanamadı. Bu bölüme tekrar girerek yeniden dene.',
       );
     }
   }
@@ -356,7 +356,9 @@ class _CounterScreenState extends State<CounterScreen> {
         if (notif != null && sayim.isNotEmpty) {
           await BadgeService.markSeenWith(sayim, [notif]);
         }
-        final r = sayim.isEmpty ? <String, int>{} : await BadgeService.unseenFrom(sayim);
+        final r = sayim.isEmpty
+            ? <String, int>{}
+            : await BadgeService.unseenFrom(sayim);
         if (mounted) {
           setState(() {
             _sayimlar = sayim;
@@ -905,7 +907,9 @@ class _CounterScreenState extends State<CounterScreen> {
               final sec = _secret;
               if (cid == null || sec == null) return;
               CoupleService.resetConnection();
-              setState(() => _notesStream = CoupleService.notesStream(cid, sec));
+              setState(
+                () => _notesStream = CoupleService.notesStream(cid, sec),
+              );
             },
           );
         }

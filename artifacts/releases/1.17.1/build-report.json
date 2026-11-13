@@ -21,9 +21,9 @@
   },
   "livePrimaryEnabled": true,
   "primaryCutoverRequired": false,
-  "sourceCommit": "66bfff7512802bcd37446d7d48b40aadef8bf65e",
+  "sourceCommit": "399435238b5a276fdd0ac7adb9fa2d7b7c54581b",
   "githubDownloadVerified": true,
-  "releaseUrl": "https://github.com/enmiraakilinc/News/releases/tag/v1.16.14",
+  "releaseUrl": "https://github.com/enmiraakilinc/News/releases/tag/v1.17.1",
   "legacyMetadataUpdated": true,
   "vpsMetadataUpdated": true
 }

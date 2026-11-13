@@ -27,9 +27,9 @@ String voiceCallEndMessage(String? reason) => switch (reason) {
   'caller_cancelled' => 'Arayan aramayı iptal etti.',
   'connection_timeout' =>
     'Arama zaman aşımına uğradı. 60 saniye içinde bağlantı kurulamadı.',
-  'connection_failed' || 'connection_lost' => 'Karşı tarafın bağlantısı koptu.',
-  'setup_failed' =>
-    'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.',
+  'connection_failed' => 'Arama bağlantısı kurulamadı. Yeniden dene.',
+  'connection_lost' => 'Karşı tarafın bağlantısı koptu.',
+  'setup_failed' => 'Arama kurulamadı. Yeniden dene.',
   'account_changed' => 'Hesap değiştiği için arama sona erdi.',
   'call_ended' => 'Karşı taraf aramayı bitirdi.',
   _ => 'Karşı taraf aramayı bitirdi.',
@@ -41,18 +41,16 @@ String voiceCallEventText({
   bool answered = false,
 }) {
   final outcome = switch (reason) {
-    'unanswered' => 'Cevapsız',
+    'unanswered' => 'Yanıtlanmadı',
     'rejected' => 'Reddedildi',
     'caller_cancelled' => 'Arayan aramayı iptal etti',
     'connection_timeout' => 'Yanıtlandı · bağlantı kurulamadı',
     'connection_failed' => 'Yanıtlandı · bağlantı kurulamadı',
     'connection_lost' => 'Yanıtlandı · bağlantı koptu',
-    'setup_failed' => answered
-        ? 'Yanıtlandı · arama kurulamadı'
-        : 'Arama kurulamadı',
-    'account_changed' => answered
-        ? 'Yanıtlandı · hesap değişti'
-        : 'Hesap değişti',
+    'setup_failed' =>
+      answered ? 'Yanıtlandı · arama kurulamadı' : 'Arama kurulamadı',
+    'account_changed' =>
+      answered ? 'Yanıtlandı · hesap değişti' : 'Hesap değişti',
     'answered' => 'Yanıtlandı',
     'call_ended' => answered ? 'Yanıtlandı' : 'Arama sona erdi',
     _ => answered ? 'Yanıtlandı' : 'Arama sona erdi',
@@ -80,7 +78,7 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
         raw.contains('permission-denied') ||
         raw.contains('permission_denied') ||
         raw.contains('erişim iznin yok')) {
-      return 'Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).';
+      return 'Bu işlem için erişim iznin yok. Hesabınla giriş yaptığını kontrol et.';
     }
     if (error is FirebaseException) {
       return switch (error.code) {
@@ -95,9 +93,12 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
       };
     }
   }
-  if (error is PlatformException || raw.contains('permission') || raw.contains('in_use')) {
+  if (error is PlatformException ||
+      raw.contains('permission') ||
+      raw.contains('in_use')) {
     final blob = error is PlatformException
-        ? '${error.code} ${error.message ?? ''} ${error.details ?? ''}'.toLowerCase()
+        ? '${error.code} ${error.message ?? ''} ${error.details ?? ''}'
+              .toLowerCase()
         : raw;
     if (blob.contains('in_use') ||
         blob.contains('inuse') ||
@@ -122,7 +123,7 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
     }
   }
   if (raw.contains('erişim iznin yok') || raw.contains('permission-denied')) {
-    return 'Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).';
+    return 'Bu işlem için erişim iznin yok. Hesabınla giriş yaptığını kontrol et.';
   }
   if (raw.contains('sona ermiş')) {
     return 'Karşı taraf aramayı yanıtladıktan sonra kayıt kapanmış.';
@@ -130,7 +131,9 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
   if (raw.contains('rejected')) {
     return 'Karşı taraf aramayı reddetti.';
   }
-  if (raw.contains('unanswered') || raw.contains('timeout') || raw.contains('deadline')) {
+  if (raw.contains('unanswered') ||
+      raw.contains('timeout') ||
+      raw.contains('deadline')) {
     return 'Arama zaman aşımına uğradı. Karşı taraf yanıt vermedi.';
   }
   if (raw.contains('connection_lost') || raw.contains('disconnected')) {
@@ -138,5 +141,5 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
   }
   final visible = error.toString().replaceFirst('Exception: ', '').trim();
   if (visible.isNotEmpty && visible.length < 200) return visible;
-  return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+  return 'Arama kurulamadı. Yeniden dene.';
 }

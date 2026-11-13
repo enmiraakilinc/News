@@ -65,9 +65,9 @@ class ContactNames {
         for (final id in missing) {
           final alias = _names[id];
           if (alias == null) continue;
-          await _contacts(uid).doc(id).set({
-            'alias': alias,
-          }, SetOptions(merge: true));
+          await _contacts(
+            uid,
+          ).doc(id).set({'alias': alias}, SetOptions(merge: true));
         }
         for (final doc in snapshot.docs) {
           final data = doc.data();

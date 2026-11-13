@@ -125,15 +125,10 @@ class ReminderService {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback: 'Hatırlatıcı kurulamadı. İzinleri kontrol et.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback: 'Hatırlatıcı kurulamadı. İzinleri kontrol et.',
         );
       }
     }

@@ -100,15 +100,10 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback: 'Sesli mesaj açılamadı. Yeniden dene.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback: 'Sesli mesaj açılamadı. Yeniden dene.',
         );
       }
     } finally {
@@ -194,16 +189,11 @@ class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback:
-                    'Ses başka uygulamada açılamadı. Buradaki oynat düğmesini kullanabilirsin.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback:
+              'Ses başka uygulamada açılamadı. Buradaki oynat düğmesini kullanabilirsin.',
         );
       }
     } finally {

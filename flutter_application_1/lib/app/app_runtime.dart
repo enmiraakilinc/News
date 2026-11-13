@@ -344,19 +344,15 @@ Future<void> handleFirebaseBackgroundMessage(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Firebase.apps.isEmpty) await Firebase.initializeApp();
   await initializeLocalNotifications();
-  if (message.data['type'] != 'chat' ||
-      !await chatNotificationsEnabled()) {
+  if (message.data['type'] != 'chat' || !await chatNotificationsEnabled()) {
     return;
   }
   final recipient = message.data['recipientUid'];
   if (recipient is! String) return;
-  final user = await FirebaseAuth.instance
-      .authStateChanges()
-      .first
-      .timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => FirebaseAuth.instance.currentUser,
-      );
+  final user = await FirebaseAuth.instance.authStateChanges().first.timeout(
+    const Duration(seconds: 5),
+    onTimeout: () => FirebaseAuth.instance.currentUser,
+  );
   if (user?.uid != recipient) return;
   ActiveConversation.noteIncomingMessage();
   if (await _viewingChat(message)) return;
@@ -387,6 +383,11 @@ Future<void> _initFcm() async {
     } catch (error) {
       debugPrint('Chat notification registration failed: $error');
     }
+    // Oturum geç açılsa veya ilk kayıt başarısız olsa da bildirim kaydı kendini onarır.
+    Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => unawaited(ChatNotificationService.ensureRegistered()),
+    );
     if (await contentNotificationEnabled(kNotifUpdates)) {
       await messaging.subscribeToTopic('updates');
     } else {

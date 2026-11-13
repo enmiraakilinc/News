@@ -7,8 +7,8 @@ Stream<T> openStreamAfter<T>(
   Future<void> Function() ready,
   Stream<T> Function() source, {
   T? initial,
-  Duration readyLimit = const Duration(seconds: 8),
-  Duration stall = const Duration(seconds: 8),
+  Duration readyLimit = const Duration(seconds: 20),
+  Duration stall = const Duration(seconds: 25),
   String message = 'Yüklenemedi.',
 }) {
   late StreamController<T> controller;

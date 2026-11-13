@@ -543,16 +543,10 @@ class _RemoteMediaState extends State<_RemoteMedia> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback:
-                    'Ek açılamadı. İnternetini kontrol edip yeniden dene.',
-              ),
-            ),
-          ),
+        showUserError(
+          context,
+          error,
+          fallback: 'Ek açılamadı. İnternetini kontrol edip yeniden dene.',
         );
       }
     } finally {
