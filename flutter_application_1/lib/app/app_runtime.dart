@@ -13,8 +13,10 @@ import '../features/pair/badge_service.dart';
 import '../features/location/location_share.dart';
 import '../features/media/chat_media.dart';
 import '../features/chat/chat_notification_service.dart';
+import '../features/chat/chat_unread.dart';
 import '../features/wakeup/wakeup_service.dart';
 import '../features/storage/storage_monitor.dart';
+export '../core/utils/date_format.dart';
 
 final appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -166,29 +168,6 @@ const List<String> kNotEmojileri = [
   '📌',
   '🔒',
 ];
-
-const List<String> kAylar = [
-  'Ocak',
-  'Şubat',
-  'Mart',
-  'Nisan',
-  'Mayıs',
-  'Haziran',
-  'Temmuz',
-  'Ağustos',
-  'Eylül',
-  'Ekim',
-  'Kasım',
-  'Aralık',
-];
-
-/// Depolama için: 2026-03-17
-String formatIsoDate(DateTime d) =>
-    "${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-
-/// Ekranda göstermek için: 17 Mart 2026
-String formatDisplayDate(DateTime d) =>
-    "${d.day} ${kAylar[d.month - 1]} ${d.year}";
 
 /// Bildirim eklentisini başlatır (hem ön planda hem arka plan izolatında çağrılır).
 Future<void> initializeLocalNotifications() async {
@@ -354,7 +333,23 @@ Future<void> handleFirebaseBackgroundMessage(RemoteMessage message) async {
         onTimeout: () => FirebaseAuth.instance.currentUser,
       );
   if (user?.uid != recipient) return;
+  ActiveConversation.noteIncomingMessage();
+  if (await _viewingChat(message)) return;
   await _showChatNotification();
+}
+
+Future<bool> _viewingChat(RemoteMessage message) async {
+  final chatId = message.data['chatId'];
+  if (chatId is! String || chatId.isEmpty) return false;
+  if (ActiveConversation.matches(chatId)) return true;
+  final prefs = await SharedPreferences.getInstance();
+  final active = prefs.getString('active_chat_source');
+  final at = prefs.getInt('active_chat_at') ?? 0;
+  final fresh = DateTime.now().millisecondsSinceEpoch - at < 20000;
+  return fresh &&
+      (active == chatId ||
+          active == 'chat/$chatId' ||
+          active == 'couple/$chatId');
 }
 
 /// Firebase Cloud Messaging kurulumu — anlık güncelleme bildirimleri için.
@@ -375,8 +370,12 @@ Future<void> _initFcm() async {
     // Uygulama ön plandayken push gelirse Android otomatik göstermez → elle göster.
     FirebaseMessaging.onMessage.listen((RemoteMessage m) async {
       if (m.data['type'] == 'chat') {
+        if (m.data['recipientUid'] == CoupleService.uid) {
+          ActiveConversation.noteIncomingMessage();
+        }
         if (m.data['recipientUid'] != CoupleService.uid ||
-            !await chatNotificationsEnabled()) {
+            !await chatNotificationsEnabled() ||
+            await _viewingChat(m)) {
           return;
         }
         await _showChatNotification();

@@ -2,8 +2,11 @@ import '../media/message_content.dart';
 import 'search/message_search.dart';
 import '../contacts/contact_names.dart';
 import '../../core/theme/chat_theme.dart';
+import '../contacts/chat_presence.dart';
 import 'chat_widgets.dart';
+import 'chat_unread.dart';
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,30 +14,8 @@ import '../pair/couple_service.dart';
 import '../location/location_share.dart';
 import '../media/chat_media.dart';
 import '../contacts/contact_details_screen.dart';
+import '../../core/utils/date_format.dart';
 import '../../core/utils/user_errors.dart';
-
-const List<String> _aylar = [
-  'Ocak',
-  'Şubat',
-  'Mart',
-  'Nisan',
-  'Mayıs',
-  'Haziran',
-  'Temmuz',
-  'Ağustos',
-  'Eylül',
-  'Ekim',
-  'Kasım',
-  'Aralık',
-];
-String _tarih(DateTime d) => '${d.day} ${_aylar[d.month - 1]} ${d.year}';
-String _ikiHane(int n) => n.toString().padLeft(2, '0');
-
-/// Tarih + saat: "5 Mart 2026, 14:32" (gönderim/açılış anını göstermek için).
-String _tarihSaat(DateTime d) =>
-    '${_tarih(d)}, ${_ikiHane(d.hour)}:${_ikiHane(d.minute)}';
-
-/// Saat: "09:00"
 
 /// Geleceğe mektup ekranı. Eşleşme yoksa önce eşleşme ekranını gösterir.
 class LettersScreen extends StatefulWidget {
@@ -289,14 +270,58 @@ class _LettersView extends StatefulWidget {
   State<_LettersView> createState() => _LettersViewState();
 }
 
-class _LettersViewState extends State<_LettersView> {
+class _LettersViewState extends State<_LettersView>
+    with WidgetsBindingObserver {
   int _messageLimit = 100;
   bool _clearing = false;
+  Timer? _presenceTick;
+  final _messageKeys = <String, GlobalKey>{};
+  String? _highlightId;
+  GlobalKey _messageKey(String id) =>
+      _messageKeys.putIfAbsent(id, GlobalKey.new);
+
+  void _watchConversation() {
+    final resumed =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    unawaited(
+      ActiveConversation.set(resumed ? 'couple/${widget.coupleId}' : null),
+    );
+  }
+
+  void _showQuoted(String? id) {
+    if (id == null) return;
+    final target = _messageKey(id).currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 280),
+        alignment: 0.35,
+      );
+    }
+    setState(() => _highlightId = id);
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted && _highlightId == id) setState(() => _highlightId = null);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _watchConversation();
     ContactNames.changes.addListener(_nameChanged);
     ContactNames.load();
+    _presenceTick = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted) return;
+      ChatPresence.changes.value++;
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _watchConversation();
+    if (state == AppLifecycleState.resumed) ChatPresence.changes.value++;
   }
 
   void _nameChanged() {
@@ -305,6 +330,9 @@ class _LettersViewState extends State<_LettersView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceTick?.cancel();
+    unawaited(ActiveConversation.set(null));
     ContactNames.changes.removeListener(_nameChanged);
     super.dispose();
   }
@@ -312,10 +340,10 @@ class _LettersViewState extends State<_LettersView> {
   Future<void> _action(Future<void> Function() operation) async {
     try {
       await operation();
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('İşlem tamamlanamadı. Tekrar dene.')),
+          SnackBar(content: Text(userError(e))),
         );
       }
     }
@@ -345,6 +373,8 @@ class _LettersViewState extends State<_LettersView> {
         .catchError((Object _) {})
         .whenComplete(() => _pendingReads.remove(letter.id));
   }
+
+  List<Letter> _visibleLetters = const [];
 
   /// Akış bir kez kurulur; her yeniden çizimde yeniden bağlanmasın.
   late Stream<List<Letter>> _stream = CoupleService.lettersStream(
@@ -453,11 +483,14 @@ class _LettersViewState extends State<_LettersView> {
       body: StreamBuilder<List<Letter>>(
         stream: _stream,
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+          final incoming = snap.data;
+          if (incoming != null) _visibleLetters = incoming;
+          final letters = incoming ?? _visibleLetters;
+          if (snap.connectionState == ConnectionState.waiting &&
+              letters.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
           // Hata varsa ama elimizde mektup varsa listeyi silme — sadece uyar.
-          final letters = snap.data ?? [];
           final photoMessages = [
             for (final letter in letters.reversed)
               if (letter.acildi && letter.text != null) letter.text!,
@@ -535,12 +568,16 @@ class _LettersViewState extends State<_LettersView> {
               final original = byId[letter.replyToId];
               return Column(
                 children: [
+                  KeyedSubtree(
+                    key: _messageKey(letter.id),
+                    child: const SizedBox.shrink(),
+                  ),
                   if (showDate)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Chip(
                         label: Text(
-                          _tarih(day),
+                          formatDisplayDate(day),
                           style: const TextStyle(fontSize: 11),
                         ),
                         side: BorderSide.none,
@@ -548,6 +585,10 @@ class _LettersViewState extends State<_LettersView> {
                     ),
                   MessageBubble(
                     messageId: letter.id,
+                    highlighted: _highlightId == letter.id,
+                    onQuoteTap: original == null
+                        ? null
+                        : () => _showQuoted(original.id),
                     copyOrder: day.millisecondsSinceEpoch,
                     photoMessages: photoMessages,
                     starMessageId: letter.acildi ? letter.id : null,
@@ -557,8 +598,8 @@ class _LettersViewState extends State<_LettersView> {
                         : ContactNames.name(ContactNames.posniId, 'Posni'),
                     text: letter.text ?? 'Geleceğe bırakılmış bir mektup',
                     time: letter.acildi
-                        ? '${_ikiHane(day.hour)}:${_ikiHane(day.minute)}${letter.edited ? ' · düzenlendi' : ''}'
-                        : 'Açılış: ${_tarihSaat(letter.openDate)}',
+                        ? '${formatClock(day)}${letter.edited ? ' · düzenlendi' : ''}'
+                        : 'Açılış: ${formatDisplayDateTime(letter.openDate)}',
                     quoted:
                         original?.text ??
                         (letter.replyToId != null ? 'Bir mektuba yanıt' : null),
@@ -648,7 +689,7 @@ class _LettersViewState extends State<_LettersView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Bu mektup ${_tarihSaat(l.openDate)} tarihinde açılacak"
+            "Bu mektup ${formatDisplayDateTime(l.openDate)} tarihinde açılacak"
             "${kalan > 0 ? ' (${kalan + 1} gün kaldı)' : ''} 🎁",
           ),
         ),
@@ -683,14 +724,14 @@ class _LettersViewState extends State<_LettersView> {
                 if (l.sentDate != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    "Gönderildi: ${_tarihSaat(l.sentDate!)}",
+                    "Gönderildi: ${formatDisplayDateTime(l.sentDate!)}",
                     style: const TextStyle(color: Colors.grey, fontSize: 11),
                   ),
                 ],
                 if (l.readAt != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    "Açıldı: ${_tarihSaat(l.readAt!)}",
+                    "Açıldı: ${formatDisplayDateTime(l.readAt!)}",
                     style: TextStyle(
                       color: Colors.green.shade600,
                       fontSize: 11,

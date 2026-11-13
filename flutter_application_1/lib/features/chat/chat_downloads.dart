@@ -25,8 +25,47 @@ class ChatDownloads {
       if (uid == null) throw Exception('Hesabına tekrar giriş yap.');
       final ref = requests.doc('${id}_$uid');
       final request = media['owner'] == uid ? null : (await ref.get()).data();
+      if (media['instantCapture'] == true && media['kind'] == 'photo') {
+        if (media['downloadUsed'] == true) {
+          throw Exception('Bu çekimin indirme hakkı kullanıldı.');
+        }
+        final mine = media['owner'] == uid;
+        final mineOk = media['senderDownloadOk'] == true;
+        final peerOk = media['recipientDownloadOk'] == true;
+        if (!(mine ? mineOk : peerOk)) {
+          await FirebaseFirestore.instance.doc('chatMedia/$id').update({
+            mine ? 'senderDownloadOk' : 'recipientDownloadOk': true,
+          });
+        }
+        if (mineOk && peerOk || (mine ? peerOk : mineOk)) {
+          await save(id);
+          await FirebaseFirestore.instance.doc('chatMedia/$id').update({
+            'downloadUsed': true,
+          });
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Galeriye kaydedildi.')),
+            );
+          }
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Anlık çekim için hem senin hem karşı tarafın onayı gerekiyor. Onayın kaydedildi.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       if (media['owner'] == uid || request?['status'] == 'approved') {
         await save(id);
+        if (request?['status'] == 'approved') {
+          await ref.update({
+            'status': 'used',
+            'usedAt': FieldValue.serverTimestamp(),
+          });
+        }
         if (context.mounted) {
           ScaffoldMessenger.of(
             context,
@@ -175,6 +214,12 @@ class _ChatDownloadRequestsState extends State<ChatDownloadRequests> {
         }
       } else if (action == 'save') {
         await ChatDownloads.save(doc.data()['mediaId'] as String);
+        if (doc.data()['status'] == 'approved') {
+          await doc.reference.update({
+            'status': 'used',
+            'usedAt': FieldValue.serverTimestamp(),
+          });
+        }
         if (mounted) {
           ScaffoldMessenger.of(
             context,

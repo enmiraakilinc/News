@@ -1,8 +1,48 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_service.dart';
 import '../pair/couple_service.dart';
 import '../pair/badge_service.dart';
+
+/// The conversation currently on screen. Cleared when the app leaves the foreground
+/// so a background message can still notify.
+class ActiveConversation {
+  static String? sourceKey;
+  static final liveRefresh = ValueNotifier<int>(0);
+  static Timer? _beat;
+
+  static void noteIncomingMessage() {
+    liveRefresh.value = liveRefresh.value + 1;
+  }
+  static Future<void> set(String? key) async {
+    sourceKey = key;
+    if (key == null) {
+      _beat?.cancel();
+      _beat = null;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    if (key == null) {
+      await prefs.remove('active_chat_source');
+      await prefs.remove('active_chat_at');
+    } else {
+      await prefs.setString('active_chat_source', key);
+      await prefs.setInt('active_chat_at', DateTime.now().millisecondsSinceEpoch);
+      _beat ??= Timer.periodic(const Duration(seconds: 8), (_) {
+        final current = sourceKey;
+        if (current != null) unawaited(set(current));
+      });
+    }
+  }
+
+  static bool matches(String? chatId) {
+    final active = sourceKey;
+    if (active == null || chatId == null || chatId.isEmpty) return false;
+    return active == chatId ||
+        active == 'chat/$chatId' ||
+        active == 'couple/$chatId';
+  }
+}
 
 int unreadMessageCount(Iterable<ChatMessage> messages, {String? userId}) =>
     messages
@@ -13,6 +53,20 @@ int unreadMessageCount(Iterable<ChatMessage> messages, {String? userId}) =>
               !m.readBy.contains(userId ?? CoupleService.uid),
         )
         .length;
+
+int? unreadDividerIndex(List<ChatMessage> messages, {String? userId}) {
+  final uid = userId ?? CoupleService.uid;
+  var oldestUnread = -1;
+  for (var index = 0; index < messages.length; index++) {
+    final message = messages[index];
+    if (message.sender != uid &&
+        message.unlocked &&
+        !message.readBy.contains(uid)) {
+      oldestUnread = index;
+    }
+  }
+  return oldestUnread < 0 ? null : oldestUnread + 1;
+}
 
 class ChatTotalBadge extends StatefulWidget {
   final int baseCount;

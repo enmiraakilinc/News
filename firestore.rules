@@ -89,15 +89,16 @@ service cloud.firestore {
           /databases/$(database)/documents/chatAccounts/$(userId)/personalConfig/presence
         ).data.peers);
       allow create, update: if girisYapti() && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['enabled', 'online', 'lastSeenAt', 'activity'])
+        && request.resource.data.keys().hasOnly(['enabled', 'online', 'lastSeenAt', 'game'])
         && ((request.resource.data.enabled == false
             && request.resource.data.online == false
-            && !request.resource.data.keys().hasAny(['lastSeenAt', 'activity']))
+            && !request.resource.data.keys().hasAny(['lastSeenAt', 'game']))
           || (request.resource.data.enabled == true
             && request.resource.data.online is bool
             && request.resource.data.lastSeenAt == request.time
-            && (!request.resource.data.keys().hasAny(['activity'])
-              || request.resource.data.activity in ['Sudoku', '15 Taş', 'Block Blast'])));
+            && (!request.resource.data.keys().hasAny(['game'])
+              || request.resource.data.game == null
+              || request.resource.data.game in ['Sudoku', '15 Taş', 'Block Blast'])));
     }
 
     match /chatAccounts/{userId}/starredMessages/{starId} {
@@ -237,18 +238,22 @@ service cloud.firestore {
       allow delete: if uye(cid) && request.auth.uid == userId;
     }
     match /config/voice_calls { allow get: if true; }
+    function voiceMembers(kind, id) {
+      return get(/databases/$(database)/documents/$(kind)/$(id)).data.members;
+    }
+    function voicePair(kind, id, data) {
+      return !exists(/databases/$(database)/documents/$(kind)/$(id))
+        || (voiceMembers(kind, id).size() == 2
+          && data.caller in voiceMembers(kind, id)
+          && data.callee in voiceMembers(kind, id));
+    }
     function voiceSource(data) {
       return data.sourceType in ['chat', 'couple'] && data.sourceId is string
         && data.sourceId.matches('^[A-Za-z0-9_-]{1,200}$')
         && data.sourceKey == data.sourceType + '/' + data.sourceId
-        && ((data.sourceType == 'chat'
-          && get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members.size() == 2
-          && data.caller in get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members
-          && data.callee in get(/databases/$(database)/documents/chats/$(data.sourceId)).data.members)
-        || (data.sourceType == 'couple'
-          && get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members.size() == 2
-          && data.caller in get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members
-          && data.callee in get(/databases/$(database)/documents/couples/$(data.sourceId)).data.members));
+        && data.caller is string && data.callee is string && data.caller != data.callee
+        && ((data.sourceType == 'chat' && voicePair('chats', data.sourceId, data))
+          || (data.sourceType == 'couple' && voicePair('couples', data.sourceId, data)));
     }
     function voiceParticipant(data) {
       return girisYapti() && request.auth.uid in [data.caller, data.callee] && voiceSource(data);
@@ -270,7 +275,7 @@ service cloud.firestore {
         && descriptionValid(request.resource.data.offer, 'offer');
       allow update: if voiceParticipant(resource.data)
         && ((resource.data.state == 'ringing' && request.auth.uid == resource.data.callee
-          && request.time < resource.data.createdAt + duration.value(60, 's')
+          && request.time < resource.data.createdAt + duration.value(90, 's')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'answer', 'startedAt'])
           && request.resource.data.state == 'accepted' && request.resource.data.startedAt == request.time
           && descriptionValid(request.resource.data.answer, 'answer'))
@@ -415,7 +420,11 @@ service cloud.firestore {
       allow get: if mediaId == '1ZC95xAZQPrUbOocOM7E' && sohbetUyesi('direct_T0yLDuYUL2O5nj7kZvfZhGAfHmB2_cFiiF3rJJhVvETi3Gr3HJaZfHgH3')
         && !exists(/databases/$(database)/documents/chatMedia/$(mediaId));
       allow create: if girisYapti()
-        && request.resource.data.keys().hasOnly(['owner', 'chatId', 'coupleId', 'name', 'kind', 'size', 'chunks', 'createdAt', 'ready'])
+        && request.resource.data.keys().hasOnly(['owner', 'chatId', 'coupleId', 'name', 'kind', 'size', 'chunks', 'createdAt', 'ready', 'instantCapture', 'senderDownloadOk', 'recipientDownloadOk', 'downloadUsed'])
+        && (!request.resource.data.keys().hasAny(['instantCapture']) || (request.resource.data.instantCapture == true && request.resource.data.kind == 'photo'))
+        && (!request.resource.data.keys().hasAny(['senderDownloadOk']) || request.resource.data.senderDownloadOk is bool)
+        && (!request.resource.data.keys().hasAny(['recipientDownloadOk']) || request.resource.data.recipientDownloadOk is bool)
+        && (!request.resource.data.keys().hasAny(['downloadUsed']) || request.resource.data.downloadUsed is bool)
         && request.resource.data.owner == request.auth.uid
         && ((request.resource.data.chatId is string && request.resource.data.coupleId == null)
           || (request.resource.data.coupleId is string && request.resource.data.chatId == null))
@@ -427,13 +436,26 @@ service cloud.firestore {
         && request.resource.data.chunks == int((request.resource.data.size + 460799) / 460800)
         && request.resource.data.createdAt == request.time && request.resource.data.ready == false;
       allow read: if girisYapti() && (resource.data.owner == request.auth.uid || medyaUyesi(resource.data));
-      allow update: if girisYapti() && resource.data.owner == request.auth.uid && medyaUyesi(resource.data)
-        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
-          && resource.data.ready == false && request.resource.data.ready == true
-          && request.time < resource.data.createdAt + medyaSuresi(resource.data))
-        || (resource.data.kind == 'video'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleteRequestedAt'])
-          && request.resource.data.deleteRequestedAt == request.time));
+      allow update: if girisYapti() && medyaUyesi(resource.data)
+        && ((resource.data.owner == request.auth.uid
+          && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
+            && resource.data.ready == false && request.resource.data.ready == true
+            && request.time < resource.data.createdAt + medyaSuresi(resource.data))
+          || (resource.data.kind == 'video'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleteRequestedAt'])
+            && request.resource.data.deleteRequestedAt == request.time)
+          || (resource.data.instantCapture == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['senderDownloadOk'])
+            && request.resource.data.senderDownloadOk == true)))
+        || (resource.data.instantCapture == true
+          && request.auth.uid != resource.data.owner
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['recipientDownloadOk'])
+          && request.resource.data.recipientDownloadOk == true)
+        || (resource.data.instantCapture == true
+          && resource.data.senderDownloadOk == true
+          && resource.data.recipientDownloadOk == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadUsed'])
+          && request.resource.data.downloadUsed == true));
       allow delete: if girisYapti() && medyaUyesi(resource.data)
         && medyaSilinebilir(resource.data)
         && !existsAfter(/databases/$(database)/documents/chatMedia/$(mediaId)/preview/image);

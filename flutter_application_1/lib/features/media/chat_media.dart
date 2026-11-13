@@ -136,6 +136,7 @@ class ChatMedia {
     String kind, {
     String? chatId,
     String? coupleId,
+    bool instantCapture = false,
   }) async {
     if (!['file', 'photo', 'video', 'audio'].contains(kind) ||
         bytes.isEmpty ||
@@ -167,6 +168,7 @@ class ChatMedia {
       'chunks': chunks,
       'createdAt': FieldValue.serverTimestamp(),
       'ready': false,
+      if (instantCapture && kind == 'photo') 'instantCapture': true,
     });
     try {
       if (kind == 'photo') {
@@ -220,8 +222,26 @@ class ChatMedia {
       await ref.update({'ready': true});
       return mediaPrefix +
           jsonEncode({'id': ref.id, 'name': name, 'kind': kind});
-    } catch (_) {
+    } catch (error) {
       await remove(ref.id).catchError((_) {});
+      final raw = error.toString().toLowerCase();
+      if (raw.contains('camera') &&
+          (raw.contains('permission') ||
+              raw.contains('denied') ||
+              raw.contains('access'))) {
+        throw Exception('Kamera izni kapalı, ayarlardan izin verin.');
+      }
+      if (raw.contains('storage') ||
+          raw.contains('external_storage') ||
+          raw.contains('write_external') ||
+          raw.contains('depolama')) {
+        throw Exception('Depolama izni kapalı, ayarlardan izin verin.');
+      }
+      if (error is FirebaseException && error.code == 'permission-denied') {
+        throw Exception(
+          'Anlık fotoğraf kaydedilemedi. Gönderim izni sunucuda reddedildi.',
+        );
+      }
       rethrow;
     }
   }

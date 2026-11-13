@@ -1,3 +1,4 @@
+import '../../core/utils/date_format.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../../core/data/oracle_firestore_bridge.dart';
 
@@ -366,10 +367,6 @@ class CoupleService {
     await _saveLocal(cid, word);
   }
 
-  /// Depolama/sıralama için tarih: 2026-03-17
-  static String _isoDate(DateTime d) =>
-      "${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-
   // ── Eşleşme ────────────────────────────────────────────────
   /// Yeni bir çift oluşturur, davet kodunu döndürür.
   static Future<String> createCouple(String secretWord) async {
@@ -663,7 +660,7 @@ class CoupleService {
       'from': uid,
       'img': imgCipher,
       'meta': metaCipher,
-      'date': _isoDate(date), // düz — sıralama/başlık için
+      'date': formatIsoDate(date), // düz — sıralama/başlık için
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -734,10 +731,7 @@ class CoupleService {
   }
 
   // ── Günün Sorusu ───────────────────────────────────────────
-  static String todayKey() {
-    final n = DateTime.now();
-    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
-  }
+  static String todayKey() => formatIsoDate(DateTime.now());
 
   /// Bugünün soru-cevap belgesini canlı dinler.
   static Stream<DailyAnswers> todayAnswersStream(

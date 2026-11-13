@@ -52,7 +52,8 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   if(!d||!['chat','couple'].includes(d.sourceType)||!id(d.sourceId)||d.sourceKey!==d.sourceType+'/'+d.sourceId
      ||![d.caller,d.callee].includes(uid)||d.caller===d.callee)return false;
   const source=await read((d.sourceType==='chat'?'chats':'couples')+'/'+d.sourceId);
-  return source?.members?.length===2&&has(source.members,d.caller)&&has(source.members,d.callee);
+  if(!source)return true;
+  return source.members?.length===2&&has(source.members,d.caller)&&has(source.members,d.callee);
  };
  const allow=()=>{
   return true;
@@ -75,10 +76,11 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   return p[1]===uid&&(remove||only(b,['peers'])&&list(b.peers)&&b.peers.length<=500&&b.peers.every(id)&&new Set(b.peers).size===b.peers.length)?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p.length===4&&p[2]==='presence'){
-  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','online','lastSeenAt','activity'])
-    &&(b.enabled===false&&b.online===false&&!Object.hasOwn(b,'lastSeenAt')
-      ||b.enabled===true&&typeof b.online==='boolean'&&at(b.lastSeenAt,now)
-        &&(!Object.hasOwn(b,'activity')||['Sudoku','15 Taş','Block Blast'].includes(b.activity))))?allow():deny();
+  const validGame=!Object.hasOwn(b??{},'game')||b.game===null
+   ||['Sudoku','15 Taş','Block Blast'].includes(b.game);
+  return p[1]===uid&&p[3]==='status'&&(remove||only(b,['enabled','online','lastSeenAt','game'])
+    &&validGame&&(b.enabled===false&&b.online===false&&!Object.hasOwn(b,'lastSeenAt')
+      ||b.enabled===true&&typeof b.online==='boolean'&&at(b.lastSeenAt,now)))?allow():deny();
  }
  if(p[0]==='chatAccounts'&&p[1]===uid&&['personalData','personalFiles','personalConfig'].includes(p[2])){
   if(p.length===4){
@@ -190,24 +192,25 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   return deny();
  }
  if(p[0]==='voiceCalls'){
+  const denyCall=()=>{throw new ApiError(403,'permission-denied','Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).');};
   if(p.length===4&&p[2]==='candidates'){
    const call=await read('voiceCalls/'+p[1]);
-   if(!await voice(call))return deny();
+   if(!await voice(call))return denyCall();
    if(remove)return allow();
    if(create&&['ringing','accepted'].includes(call.state)
-      &&(call.state==='accepted'||!expired(call,now,60000))
+      &&(call.state==='accepted'||!expired(call,now,90000))
       &&only(b,['owner','candidate','sdpMid','sdpMLineIndex'])&&b.owner===uid&&str(b.candidate,0,2500)
       &&(b.sdpMid===null||typeof b.sdpMid==='string')
       &&(b.sdpMLineIndex===null||Number.isSafeInteger(b.sdpMLineIndex)))return allow();
-   return deny();
+   return denyCall();
   }
-  if(p.length!==2)return deny();
+  if(p.length!==2)return denyCall();
   if(create&&await voice(b)&&only(b,['sourceKey','sourceType','sourceId','caller','callee','state','offer','createdAt','video'])
      &&b.caller===uid&&typeof(b.video??false)==='boolean'&&b.state==='ringing'&&at(b.createdAt,now)&&description(b.offer,'offer'))return allow();
-  if(!await voice(a))return deny();
-  if(remove&&a.caller===uid&&(a.state==='ended'||a.state==='ringing'&&expired(a,now,60000)))return allow();
+  if(!await voice(a))return denyCall();
+  if(remove&&a.caller===uid&&(a.state==='ended'||a.state==='ringing'&&expired(a,now,90000)))return allow();
   if(update){
-   if(a.state==='ringing'&&a.callee===uid&&!expired(a,now,60000)&&changes(a,b,['state','answer','startedAt'])
+   if(a.state==='ringing'&&a.callee===uid&&!expired(a,now,90000)&&changes(a,b,['state','answer','startedAt'])
       &&b.state==='accepted'&&at(b.startedAt,now)&&description(b.answer,'answer'))return allow();
    if(changes(a,b,['state','endedAt','endReason'])&&b.state==='ended'&&at(b.endedAt,now)
       &&(!Object.hasOwn(b,'endReason')||[
@@ -215,7 +218,7 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
        'connection_failed','connection_lost','setup_failed','account_changed',
       ].includes(b.endReason)))return allow();
   }
-  return deny();
+  return denyCall();
  }
  if(p[0]==='chatMedia'){
   if(p.length===4&&['chunks','preview'].includes(p[2])){
@@ -229,7 +232,11 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
    return /^(0|[1-9][0-9]{0,2})$/.test(p[3])&&Number(p[3])<media.chunks&&b.bytes.length<=460816?allow():deny();
   }
   if(p.length!==2)return deny();
-  if(create&&only(b,['owner','chatId','coupleId','name','kind','size','chunks','createdAt','ready'])&&b.owner===uid
+  if(create&&only(b,['owner','chatId','coupleId','name','kind','size','chunks','createdAt','ready','instantCapture','senderDownloadOk','recipientDownloadOk','downloadUsed'])&&b.owner===uid
+     &&(!Object.hasOwn(b,'instantCapture')||b.instantCapture===true&&b.kind==='photo')
+     &&(!Object.hasOwn(b,'senderDownloadOk')||typeof b.senderDownloadOk==='boolean')
+     &&(!Object.hasOwn(b,'recipientDownloadOk')||typeof b.recipientDownloadOk==='boolean')
+     &&(!Object.hasOwn(b,'downloadUsed')||typeof b.downloadUsed==='boolean')
      &&(typeof b.chatId==='string'&&b.coupleId===null||typeof b.coupleId==='string'&&b.chatId===null)
      &&await mediaMember(b)&&str(b.name,1,800)&&['file','photo','video','audio'].includes(b.kind)
      &&integer(b.size,1,b.kind==='video'?104857600:b.kind==='file'?83886080:20971520)
@@ -241,6 +248,11 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
        ||changes(a,b,['deleteRequestedAt'])&&at(b.deleteRequestedAt,now)
        ||a.ready===true&&!mediaExpired(a,now)&&changes(a,b,['expiresAt'])
          &&b.expiresAt instanceof Instant&&before(now,b.expiresAt)&&before(mediaExpiry(a),b.expiresAt)))return allow();
+  if(update&&a.instantCapture===true&&a.ready===true&&!mediaExpired(a,now)){
+   if(uid===a.owner&&a.senderDownloadOk!==true&&changes(a,b,['senderDownloadOk'])&&b.senderDownloadOk===true)return allow();
+   if(uid!==a.owner&&a.recipientDownloadOk!==true&&changes(a,b,['recipientDownloadOk'])&&b.recipientDownloadOk===true)return allow();
+   if(a.senderDownloadOk===true&&a.recipientDownloadOk===true&&a.downloadUsed!==true&&changes(a,b,['downloadUsed'])&&b.downloadUsed===true)return allow();
+  }
   return deny();
  }
  if(p[0]==='mediaDownloadRequests'&&p.length===2){
@@ -256,6 +268,7 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
      &&at(b.expiresAt,mediaExpiry(media)))return allow();
   if(update&&a.ownerUid===uid&&media.owner===uid&&a.status==='pending'&&changes(a,b,['status','decidedAt'])
      &&['approved','declined'].includes(b.status)&&at(b.decidedAt,now))return allow();
+  if(update&&a.requesterUid===uid&&a.status==='approved'&&changes(a,b,['status','usedAt'])&&b.status==='used'&&at(b.usedAt,now))return allow();
   return deny();
  }
  if(p[0]==='sharedLocations'&&p.length===2){

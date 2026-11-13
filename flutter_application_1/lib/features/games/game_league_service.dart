@@ -42,12 +42,32 @@ class GameLeagueService {
     return DateTime.utc(now.year, quarter * 3 + 1);
   }
 
+  static List<String> recentSeasons([DateTime? date]) {
+    final now = (date ?? DateTime.now()).toUtc();
+    final current = seasonId(now);
+    final start = DateTime.utc(
+      now.year,
+      ((now.month - 1) ~/ 3) * 3 + 1,
+    );
+    final previousEnd = start;
+    if (now.difference(previousEnd) < const Duration(days: 30)) {
+      final previous = DateTime.utc(start.year, start.month - 1);
+      final quarter = ((previous.month - 1) ~/ 3) + 1;
+      return [
+        current,
+        '${previous.year}-Q$quarter',
+      ];
+    }
+    return [current];
+  }
+
   static CollectionReference<Map<String, dynamic>> _entries(
     String game, [
     DateTime? date,
+    String? season,
   ]) => FirebaseFirestore.instance
       .collection('gameLeagues')
-      .doc(seasonId(date))
+      .doc(season ?? seasonId(date))
       .collection('games')
       .doc(game)
       .collection('entries');
@@ -55,11 +75,13 @@ class GameLeagueService {
   static Stream<List<GameLeagueEntry>> leaderboard(
     String game, [
     DateTime? date,
+    String? season,
   ]) async* {
     await CoupleService.ensureReady();
     await for (final snapshot in _entries(
       game,
       date,
+      season,
     ).orderBy('score', descending: true).limit(100).snapshots()) {
       yield snapshot.docs.map(GameLeagueEntry.fromDocument).toList();
     }
@@ -68,11 +90,12 @@ class GameLeagueService {
   static Stream<DocumentSnapshot<Map<String, dynamic>>> myEntry(
     String game, [
     DateTime? date,
+    String? season,
   ]) async* {
     await CoupleService.ensureReady();
     final uid = CoupleService.uid;
     if (uid == null) throw StateError('Hesabına giriş yap.');
-    yield* _entries(game, date).doc(uid).snapshots();
+    yield* _entries(game, date, season).doc(uid).snapshots();
   }
 
   static Future<void> recordBestScore({

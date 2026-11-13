@@ -1,1 +1,5 @@
-Oyun ligi erişimi ve skor kaydı düzeltildi. Block Blast artık renkli parçaları çerçevesiz sürükleyip yerleştiriyor; son görülmede oynanan oyun gösteriliyor. Görüntülü arama bilgileri ekrana dokununca açılıyor.
+Aramalar düzeltildi.
+Bildirimler düzeltildi.
+Anlık foto atma kısmı düzeltildi.
+Mesajların geç gelmesi düzeltildi.
+Son görülmeler daha düzgün hale getirildi.

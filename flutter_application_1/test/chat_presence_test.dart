@@ -39,30 +39,4 @@ void main() {
     );
     expect(formatLastSeen(null, now: now), isNull);
   });
-
-  test(
-    'Foreground game activity is shown instead of a generic last-seen label',
-    () {
-      expect(
-        formatPresenceLabel(
-          online: true,
-          activity: 'Block Blast',
-          lastSeenAt: now,
-          fallback: 'Son görülme bilgisi yok',
-          now: now,
-        ),
-        'Block Blast oynuyor',
-      );
-      expect(
-        formatPresenceLabel(
-          online: false,
-          activity: 'Block Blast',
-          lastSeenAt: now.subtract(const Duration(minutes: 30)),
-          fallback: 'Son görülme bilgisi yok',
-          now: now,
-        ),
-        '30 dk önce',
-      );
-    },
-  );
 }

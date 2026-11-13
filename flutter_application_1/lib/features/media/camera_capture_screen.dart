@@ -68,15 +68,28 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
   }
 
   String _message(Object e) {
-    if (e is Exception && e is! CameraException) return userError(e);
-    if (e is CameraException) {
-      if (e.code.startsWith('CameraAccess')) {
-        return 'Kamera izni verilmedi. Telefon ayarlarından kamera iznini açıp tekrar dene.';
-      }
-      if (e.code.startsWith('AudioAccess')) {
-        return 'Video için mikrofon izni gerekiyor. Telefon ayarlarından izin verip tekrar dene.';
-      }
+    final blob = e is CameraException
+        ? '${e.code} ${e.description ?? ''}'.toLowerCase()
+        : e.toString().toLowerCase();
+    if (blob.contains('storage') ||
+        blob.contains('external_storage') ||
+        blob.contains('write_external') ||
+        blob.contains('depolama')) {
+      return 'Depolama izni kapalı, ayarlardan izin verin.';
     }
+    if (blob.contains('audioaccess') ||
+        blob.contains('microphone') ||
+        blob.contains('record_audio')) {
+      return 'Mikrofon izni kapalı, ayarlardan izin verin.';
+    }
+    if (blob.contains('cameraaccess') ||
+        (blob.contains('camera') &&
+            (blob.contains('permission') ||
+                blob.contains('denied') ||
+                blob.contains('access')))) {
+      return 'Kamera izni kapalı, ayarlardan izin verin.';
+    }
+    if (e is Exception && e is! CameraException) return userError(e);
     return 'Kamera kullanılamıyor. Başka bir uygulama kamerayı kullanıyorsa kapatıp tekrar dene.';
   }
 

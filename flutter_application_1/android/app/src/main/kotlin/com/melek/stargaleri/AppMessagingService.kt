@@ -48,6 +48,12 @@ class AppMessagingService : FlutterFirebaseMessagingService() {
             )
         )
         if (!enabled) return
+        val active = preferences.getString("flutter.active_chat_source", null)
+        val seenAt = preferences.getLong("flutter.active_chat_at", 0L)
+        val chatId = message.data["chatId"]
+        val viewing = chatId != null && System.currentTimeMillis() - seenAt < 20_000 &&
+            (active == chatId || active == "chat/$chatId" || active == "couple/$chatId")
+        if (viewing) return
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED
