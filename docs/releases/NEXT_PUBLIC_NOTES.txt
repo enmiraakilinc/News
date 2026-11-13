@@ -7,8 +7,4 @@ Yeniden yazmak için yeni davet gerekiyor.
 Günün sorusu kayıtları düzenlendi.
 Anılar, dilekler, ders notları yüklemede takılı kalmıyor.
 Şifremi unuttum eklendi.
-Bildirimde titreşim bildirimi seçeneği seçilebiliyor.
-Ders notları defter görünümünde.
-Turuncu tema rengi düzeltildi.
-Hata yazıları daha açık.
-Bozuk sürümde kararlı sürüme dönme uyarısı çıkıyor.
+
