@@ -229,8 +229,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   List<Widget> _buildNotes(String notes) {
     final colors = Theme.of(context).colorScheme;
-    final lines = notes.split('
-').where((l) => l.trim().isNotEmpty).toList();
+    final lines = notes.split('\n').where((l) => l.trim().isNotEmpty).toList();
     return lines.map((line) {
       final t = line.trim();
       if (t.startsWith('•') || t.startsWith('-')) {
