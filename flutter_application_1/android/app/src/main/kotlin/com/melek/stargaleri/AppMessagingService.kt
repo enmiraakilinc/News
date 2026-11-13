@@ -48,6 +48,9 @@ class AppMessagingService : FlutterFirebaseMessagingService() {
             )
         )
         if (!enabled) return
+        val seen = getSharedPreferences("chat_push_events", Context.MODE_PRIVATE)
+        val eventIds = seen.getStringSet("seen", emptySet())?.toMutableList() ?: mutableListOf()
+        if (eventId in eventIds) return
         val morse = preferences.getBoolean("flutter.morse_vibration_notifications", false)
         if (morse) {
             MorseVibration.play(this)
@@ -66,9 +69,6 @@ class AppMessagingService : FlutterFirebaseMessagingService() {
             checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED
         ) return
 
-        val seen = getSharedPreferences("chat_push_events", Context.MODE_PRIVATE)
-        val eventIds = seen.getStringSet("seen", emptySet())?.toMutableList() ?: mutableListOf()
-        if (eventId in eventIds) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(
