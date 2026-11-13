@@ -162,15 +162,20 @@ class _UpdateDialogState extends State<UpdateDialog> {
               if (info.notes.trim().isNotEmpty)
                 Container(
                   width: double.infinity,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.35,
+                  ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: colors.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: colors.outlineVariant),
                   ),
-                  child: Column(
+                  child: SingleChildScrollView(
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: _buildNotes(info.notes),
+                    ),
                   ),
                 ),
 
