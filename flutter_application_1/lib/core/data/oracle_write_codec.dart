@@ -1,3 +1,4 @@
+// Yazma isteklerini sunucunun beklediği biçime çevirir.
 import 'dart:typed_data';
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 // Native SDK sentinel adapter, pinned and tested against interface 8.0.5.

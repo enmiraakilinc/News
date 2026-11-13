@@ -1,3 +1,4 @@
+// Hesap kodu, oturum ve şifre sıfırlama kaydını yönetir.
 import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -183,6 +184,50 @@ class ChatAccount {
       CoupleService.resetConnection();
       revision.value++;
     }
+  }
+
+  static Future<void> sendPasswordReset(String code) async {
+    var email = '';
+    var status = 'sent';
+    var detail = '';
+    try {
+      await CoupleService.ensureReady();
+      email = await _loginEmail(code);
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+    } catch (error) {
+      status = 'error';
+      detail = error.toString();
+      await _logPasswordReset(email, status, detail);
+      rethrow;
+    }
+    await _logPasswordReset(email, status, detail);
+  }
+
+  static Future<void> _logPasswordReset(
+    String email,
+    String status,
+    String detail,
+  ) async {
+    try {
+      final endpoint = await WakeupService.endpoint();
+      final user = FirebaseAuth.instance.currentUser;
+      if (endpoint == null || user == null) return;
+      final token = await user.getIdToken();
+      await http
+          .post(
+            Uri.parse('$endpoint/account/password-reset-log'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'email': email,
+              'status': status,
+              'detail': detail,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   static Future<void> changePassword(

@@ -1,3 +1,4 @@
+// Sohbet bildirimini cihaza yazar.
 import 'dart:async';
 
 import '../../core/utils/random_id.dart';

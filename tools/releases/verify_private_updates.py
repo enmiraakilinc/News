@@ -1,4 +1,4 @@
-"""Live private update verification with one temporary account, cleaned finally.
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: verify_private_updates.py. Live private update verification with one temporary account, cleaned finally.
 Never prints or persists credentials, Firebase tokens, or private download URLs.
 """
 import hashlib

@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';

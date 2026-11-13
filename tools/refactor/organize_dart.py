@@ -1,4 +1,4 @@
-"""One-time path-checked source reorganization, run from workspace root."""
+"""Çalışma alanını düzenlemek için elle çalıştırılan betik. Dosya: organize_dart.py. One-time path-checked source reorganization, run from workspace root."""
 import json,os,re,shutil
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]

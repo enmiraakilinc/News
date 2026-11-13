@@ -1,4 +1,4 @@
-"""Install the bridge in a separate directory; never mutate Firebase records."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: deploy_remote.py. Install the bridge in a separate directory; never mutate Firebase records."""
 import base64
 from pathlib import Path
 import os, subprocess, tarfile, io, json
@@ -94,4 +94,4 @@ WantedBy=timers.target
         run('sudo','-n','systemctl','enable','neural-sync')
         run('sudo','-n','systemctl','restart','neural-sync')
     run('sudo','-n','systemctl','reload','nginx')
-    print(json.dumps({'deployed':True,'applicationCutover':False,'firestoreModified':False,'api':'https://158.180.38.94','mode':'read-migration-bridge','mirrorStarted':bool(options.get('credential'))}))
+    print(json.dumps({'deployed':True,'applicationCutover':False,'firestoreModified':False,'api':os.environ.get('NEURAL_PUBLIC_URL','').rstrip('/'),'mode':'read-migration-bridge','mirrorStarted':bool(options.get('credential'))}))

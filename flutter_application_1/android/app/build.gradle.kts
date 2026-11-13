@@ -40,6 +40,11 @@ android {
             runCatching { String(Base64.getDecoder().decode(it)) == "NEURAL_POSTGRES_PRIMARY=true" }.getOrDefault(false)
         } ?: false
         buildConfigField("boolean", "POSTGRES_PRIMARY", postgresPrimary.toString())
+        val publicUrl = (project.findProperty("dart-defines") as String?)?.split(',')?.firstNotNullOfOrNull { item ->
+            val decoded = runCatching { String(Base64.getDecoder().decode(item)) }.getOrNull()
+            decoded?.takeIf { it.startsWith("NEURAL_PUBLIC_URL=") }?.substring("NEURAL_PUBLIC_URL=".length)
+        } ?: System.getenv("NEURAL_PUBLIC_URL") ?: ""
+        buildConfigField("String", "PUBLIC_URL", "\"${publicUrl.replace("\"", "")}\"")
         applicationId = "com.melek.stargaleri"
         minSdk = flutter.minSdkVersion
         targetSdk = 36

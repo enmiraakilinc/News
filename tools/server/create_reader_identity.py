@@ -1,4 +1,4 @@
-"""Provision the explicitly approved read-only Firestore mirror identity."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: create_reader_identity.py. Provision the explicitly approved read-only Firestore mirror identity."""
 from pathlib import Path
 import base64,getpass,json,os,subprocess,sys,time
 ROOT=Path(__file__).resolve().parents[2]

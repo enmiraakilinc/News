@@ -1,3 +1,4 @@
+// Sohbet balonunun ölçü ve renk kuralıdır.
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'reaction_picker.dart';

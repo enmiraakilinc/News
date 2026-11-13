@@ -1,4 +1,4 @@
-"""Send a short-lived admin read token over SSH; no credentials are persisted."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: snapshot_firestore.py. Send a short-lived admin read token over SSH; no credentials are persisted."""
 from pathlib import Path
 import json
 import sys

@@ -1,3 +1,4 @@
+// Medyanın ne kadar duracağını sorar.
 import 'package:flutter/material.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/user_errors.dart';

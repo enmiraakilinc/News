@@ -288,6 +288,12 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/morse").setMethodCallHandler { call, result ->
+            if (call.method == "play") {
+                MorseVibration.play(this)
+                result.success(null)
+            } else result.notImplemented()
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/permissions").setMethodCallHandler { call, result ->
             fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
             when (call.method) {

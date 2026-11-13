@@ -1,3 +1,4 @@
+// Sayaç bildirimini açık tutan sayfadır.
 import 'dart:async';
 import '../../core/widgets/date_input.dart';
 import 'package:flutter/material.dart';

@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'package:flutter_application_1/features/calls/call_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

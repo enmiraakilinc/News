@@ -1,0 +1,32 @@
+<!-- Yönetim sayfasıdır. Şifre sıfırlama kayıtları ve sürüm geri alma burada durur. -->
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yönetim</title>
+  <link rel="stylesheet" href="/admin/panel.css">
+</head>
+<body>
+  <main>
+    <h1>Yönetim</h1>
+    <h2>Sürüm Geri Alma (Rollback)</h2>
+    <table>
+      <thead>
+        <tr><th>Sürüm</th><th>Build</th><th>SHA-256</th><th>İndirme</th><th></th></tr>
+      </thead>
+      <tbody id="releases"></tbody>
+    </table>
+    <p>Şifre sıfırlama postalarının gidip gitmediği burada görünür.</p>
+    <button type="button" id="refresh">Yenile</button>
+    <table>
+      <thead>
+        <tr><th>Zaman</th><th>E-posta</th><th>Sonuç</th><th>Ayrıntı</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty">Kayıt yok.</p>
+  </main>
+  <script src="/admin/panel.js"></script>
+</body>
+</html>

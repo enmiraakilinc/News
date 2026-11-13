@@ -1,3 +1,4 @@
+// Yerel belge değerlerinin türünü korur.
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 import 'oracle_codec.dart';
 

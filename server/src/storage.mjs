@@ -1,3 +1,4 @@
+// Hesabın depolama doluluğunu hesaplar.
 import {statfs} from 'node:fs/promises';
 
 let cached, validUntil = 0;

@@ -1,0 +1,19 @@
+.screen { width: 336px; height: 480px; background-color: #1b140f; flex-direction: column; }
+.tabs { height: 36px; flex-direction: row; }
+.tab { width: 168px; height: 36px; text-align: center; color: #f6e7d8; font-size: 16px; }
+.on { background-color: #ed820e; color: #2b1604; }
+.list { width: 336px; height: 420px; }
+.row { width: 336px; padding: 8px; border-bottom-width: 1px; border-bottom-color: #3b2a20; }
+.title { color: #fff6ea; font-size: 16px; }
+.body { color: #f0d7c2; font-size: 14px; margin-top: 8px; }
+.page, .thread { width: 320px; margin-left: 8px; flex-direction: column; }
+.link { color: #ed820e; font-size: 14px; margin-top: 6px; }
+.msgs { width: 320px; height: 150px; }
+.msg { width: 320px; margin-bottom: 4px; }
+.mine { color: #ffe0bf; font-size: 14px; text-align: right; }
+.theirs { color: #fff6ea; font-size: 14px; }
+.quick, .keys { flex-direction: row; flex-wrap: wrap; width: 320px; }
+.key { width: 28px; height: 24px; margin: 1px; text-align: center; color: #2b1604; background-color: #f0d2b4; font-size: 12px; }
+.send { width: 72px; background-color: #ed820e; }
+.draft { color: #fff; font-size: 14px; height: 20px; }
+.status { color: #c9a88f; font-size: 12px; }

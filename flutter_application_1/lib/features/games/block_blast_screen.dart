@@ -1,3 +1,4 @@
+// Blok oyununun ekranıdır.
 import 'dart:async';
 import 'dart:math';
 

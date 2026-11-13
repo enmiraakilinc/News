@@ -1,3 +1,4 @@
+// İzinli belge sorgusunu derler.
 import {ApiError,queryAllowed} from './access.mjs';
 export function compileQuery(q,uid,{count=false}={}) {
  queryAllowed(q,uid);

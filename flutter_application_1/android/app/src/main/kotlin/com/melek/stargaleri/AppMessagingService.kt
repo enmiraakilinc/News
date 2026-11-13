@@ -48,6 +48,13 @@ class AppMessagingService : FlutterFirebaseMessagingService() {
             )
         )
         if (!enabled) return
+        val morse = preferences.getBoolean("flutter.morse_vibration_notifications", false)
+        if (morse) {
+            MorseVibration.play(this)
+            eventIds.add(eventId)
+            seen.edit().putStringSet("seen", eventIds.takeLast(64).toSet()).apply()
+            return
+        }
         val active = preferences.getString("flutter.active_chat_source", null)
         val seenAt = preferences.getLong("flutter.active_chat_at", 0L)
         val chatId = message.data["chatId"]

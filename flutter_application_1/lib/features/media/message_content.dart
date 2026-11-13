@@ -1,3 +1,4 @@
+// Mesajın metin veya medya gövdesini çizer.
 import 'dart:convert';
 import 'dart:async';
 import 'chat_media.dart';

@@ -1,3 +1,4 @@
+// İlk kareden sonra eklentilerin açılmasını bekler.
 import 'dart:async';
 import 'package:flutter/material.dart';
 

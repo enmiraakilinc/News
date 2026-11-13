@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 import {streamReleaseAsset} from './release_asset.mjs';
 const json = (status, message) => Response.json({message}, {status, headers:{'Cache-Control':'no-store'}});
 // Access is granted by the administrator, never by client-writable profiles.

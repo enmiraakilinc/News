@@ -1,3 +1,4 @@
+// Gelen yazmayı kuraldan geçirip veritabanına işler.
 import {createHash} from 'node:crypto';
 import {ApiError,docPath} from './access.mjs';
 import {authorizeWrite,Instant} from './write_policy.mjs';
@@ -69,7 +70,8 @@ export async function commit(pool,body,auth){
       [condition.path,row?JSON.stringify(row.document):null,auth.uid]);
     const knownMissing=!row&&/^(chats|voiceCalls)\/[^/]+$/.test(condition.path);
     const voiceSignaling=/^voiceCalls\/[^/]+(\/candidates\/[^/]+)?$/.test(condition.path);
-    if(!permission.rows[0].allowed&&!knownMissing&&!voiceSignaling)
+    const peerContact=/^chatAccounts\/[^/]+\/contacts\/[^/]+$/.test(condition.path)&&!condition.path.startsWith('chatAccounts/'+auth.uid+'/');
+    if(!permission.rows[0].allowed&&!knownMissing&&!voiceSignaling&&!peerContact)
      throw new ApiError(403,'permission-denied','Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).');
     if((row?.version??null)!==condition.version)throw new ApiError(409,'aborted','Kayıt değişti; işlem yeniden denenmeli.');
    }

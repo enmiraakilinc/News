@@ -1,4 +1,4 @@
-"""Read attachment references near the requested timestamp, without message contents."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: find_requested_video.py. Read attachment references near the requested timestamp, without message contents."""
 import json
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession

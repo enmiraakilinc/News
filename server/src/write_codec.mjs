@@ -1,3 +1,4 @@
+// Yazma gövdesini veritabanı alanlarına çevirir.
 import {isDeepStrictEqual as equal} from 'node:util';
 import {ApiError} from './access.mjs';
 import {Instant} from './write_policy.mjs';

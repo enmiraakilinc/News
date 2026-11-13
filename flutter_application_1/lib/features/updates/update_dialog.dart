@@ -1,3 +1,4 @@
+// APK indirme ve kurma penceresidir. Geri almada uyarıyı da gösterir.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -138,7 +139,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
               const SizedBox(height: 14),
               Text(
-                info.name.isEmpty
+                info.rollback
+                    ? "Kararlı sürüme geri dönmeniz gerekiyor"
+                    : info.name.isEmpty
                     ? "Yeni sürüm mevcut"
                     : "Yeni sürüm ${info.name}",
                 style: TextStyle(

@@ -1,3 +1,4 @@
+// Sohbet fotoğraf, ses ve videosunu yükler ve siler.
 import '../../core/data/oracle_media_batch.dart';
 import 'dart:convert';
 import 'dart:typed_data';

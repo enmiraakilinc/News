@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:io';
 import 'package:flutter_application_1/core/data/oracle_personal_store.dart';
 import 'package:flutter_application_1/core/data/personal_cloud.dart';
@@ -227,7 +228,7 @@ void main() {
     expect(
       () => OracleDataClient(
         token: () async => null,
-        base: Uri.parse('http://158.180.38.94'),
+        base: Uri.parse('http://example.invalid'),
       ),
       throwsArgumentError,
     );

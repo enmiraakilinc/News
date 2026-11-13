@@ -1,3 +1,4 @@
+// Haber ekranının görünüşünü ayarlar.
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_theme.dart';

@@ -7,7 +7,7 @@ geçiş süresince mevcut Firebase bağlantısını kullanır.
 
 ## 24 Ekim 2026 durumu
 
-- HTTPS: https://158.180.38.94. IP için güvenilir sertifika ve otomatik yenileme
+- HTTPS adresi `NEURAL_PUBLIC_URL` ortam değişkeninden okunur. Sertifika yenileme
   kuruldu; yenileme denemesi başarıyla doğrulandı.
 - HTTP 80 yalnızca sertifika doğrulama ve HTTPS yönlendirmesidir.
 - PostgreSQL 18 yerel bağlantılara açıktır. Node.js 22 API'si

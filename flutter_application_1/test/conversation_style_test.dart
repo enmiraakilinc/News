@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -144,27 +145,36 @@ void main() {
     final preview = Platform.environment['CHAT_PREVIEW_DIR'];
     if (preview != null) {
       await tester.runAsync(() async {
-        final loader = FontLoader('PreviewUI')
-          ..addFont(
-            File(
-              'C:/Windows/Fonts/arial.ttf',
-            ).readAsBytes().then(ByteData.sublistView),
-          );
-        await loader.load();
-        final icons = FontLoader('MaterialIcons')
-          ..addFont(
-            File(
-              'C:/Users/mkund/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
-            ).readAsBytes().then(ByteData.sublistView),
-          );
-        await icons.load();
-        final emoji = FontLoader('PreviewEmoji')
-          ..addFont(
-            File(
-              'C:/Windows/Fonts/seguiemj.ttf',
-            ).readAsBytes().then(ByteData.sublistView),
-          );
-        await emoji.load();
+        final home =
+            Platform.environment['HOME'] ??
+            Platform.environment['USERPROFILE'] ??
+            '';
+        final windir = Platform.environment['WINDIR'] ?? '';
+        final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? '';
+        Future<void> loadFont(String family, List<String> candidates) async {
+          for (final path in candidates) {
+            final file = File(path);
+            if (!file.existsSync()) continue;
+            final loader = FontLoader(family)
+              ..addFont(file.readAsBytes().then(ByteData.sublistView));
+            await loader.load();
+            return;
+          }
+        }
+
+        await loadFont('PreviewUI', [
+          if (windir.isNotEmpty) '$windir/Fonts/arial.ttf',
+          '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+          if (home.isNotEmpty) '$home/.local/share/fonts/arial.ttf',
+        ]);
+        await loadFont('MaterialIcons', [
+          if (flutterRoot.isNotEmpty)
+            '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+        ]);
+        await loadFont('PreviewEmoji', [
+          if (windir.isNotEmpty) '$windir/Fonts/seguiemj.ttf',
+          '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf',
+        ]);
       });
     }
     final key = GlobalKey();

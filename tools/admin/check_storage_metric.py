@@ -1,4 +1,4 @@
-"""Read authoritative aggregate Firestore storage; never download user media."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: check_storage_metric.py. Read authoritative aggregate Firestore storage; never download user media."""
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path

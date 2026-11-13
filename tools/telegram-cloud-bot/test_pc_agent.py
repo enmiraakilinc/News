@@ -1,3 +1,4 @@
+"""Telegram bulut botunun kurulum betiği. Dosya: test_pc_agent.py."""
 import importlib.util
 import json
 from pathlib import Path

@@ -1,3 +1,4 @@
+// Sohbet balonu ve ortak sohbet parçalarıdır.
 import '../media/media_expiry_dialog.dart';
 import '../media/media_expiry_scope.dart';
 import 'conversation_style.dart';

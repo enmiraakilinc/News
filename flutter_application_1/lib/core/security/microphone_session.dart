@@ -1,3 +1,4 @@
+// Sesli not kaydı sırasında mikrofonu ön planda tutar. Sesli not ekranı bunu kullanır.
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

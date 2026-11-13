@@ -1,4 +1,4 @@
-"""Run compiled API queries with real PostgreSQL RLS inside a rolled-back fixture."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: test_compiled_queries.py. Run compiled API queries with real PostgreSQL RLS inside a rolled-back fixture."""
 from pathlib import Path
 import json,subprocess,sys
 ROOT=Path(__file__).resolve().parents[2]

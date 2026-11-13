@@ -1,3 +1,4 @@
+"""Telegram bulut botunun kurulum betiği. Dosya: test_codex_bridge.py."""
 import importlib.util
 from pathlib import Path
 import tempfile

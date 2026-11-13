@@ -1,3 +1,4 @@
+// Uygulama ayarları ekranıdır.
 import '../updates/update_check_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

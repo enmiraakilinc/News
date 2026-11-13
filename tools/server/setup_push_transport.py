@@ -1,4 +1,4 @@
-"""Connect the approved VPS to the existing Worker without moving Google keys."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: setup_push_transport.py. Connect the approved VPS to the existing Worker without moving Google keys."""
 from pathlib import Path
 import json
 import secrets

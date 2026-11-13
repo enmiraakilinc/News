@@ -1,3 +1,4 @@
+// Mesaja tepki seçme penceresidir.
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/widgets/emoji_picker.dart';

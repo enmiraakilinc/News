@@ -1,4 +1,4 @@
-"""Exercise deployed rules with isolated synthetic users; remove fixtures finally."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: verify_media_access.py. Exercise deployed rules with isolated synthetic users; remove fixtures finally."""
 import base64
 from datetime import datetime, timedelta, timezone
 import json

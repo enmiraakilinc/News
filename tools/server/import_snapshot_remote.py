@@ -1,4 +1,4 @@
-"""Import a verified snapshot into an isolated PostgreSQL database; verify every document."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: import_snapshot_remote.py. Import a verified snapshot into an isolated PostgreSQL database; verify every document."""
 import gzip,hashlib,json,pathlib,subprocess,os
 def import_snapshot(options):
     os.umask(0o077)

@@ -1,4 +1,4 @@
-"""Publish an already reviewed release; never build or modify security rules."""
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: publish.py. Publish an already reviewed release; never build or modify security rules."""
 import argparse
 import hashlib
 import json

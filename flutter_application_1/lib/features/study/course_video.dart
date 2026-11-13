@@ -1,3 +1,4 @@
+// Ders notuna bağlı videoyu açar.
 import 'dart:io';
 import '../../core/data/oracle_media_batch.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

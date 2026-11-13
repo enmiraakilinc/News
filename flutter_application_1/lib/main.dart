@@ -1,3 +1,4 @@
+// Uygulamanın giriş noktasıdır. Pencereyi açar ve arka plan işini başlatır.
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';

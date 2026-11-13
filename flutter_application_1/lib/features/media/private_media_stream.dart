@@ -1,3 +1,4 @@
+// Özel medyayı parça parça okur.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

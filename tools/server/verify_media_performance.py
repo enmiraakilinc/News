@@ -1,13 +1,14 @@
-"""Disposable HTTPS binary transfer/peer isolation benchmark; no real media."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_media_performance.py. Disposable HTTPS binary transfer/peer isolation benchmark; no real media."""
 import base64,hashlib,json,os,sys,time,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 import requests
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import sql,remote
+from tools.runtime_config import public_url
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key'];accounts=[];paths=[]
-identity='https://identitytoolkit.googleapis.com/v1/';base='https://158.180.38.94';q=lambda v:"'"+v.replace("'","''")+"'"
+identity='https://identitytoolkit.googleapis.com/v1/';base=public_url();q=lambda v:"'"+v.replace("'","''")+"'"
 try:
  for _ in range(3):
   r=requests.post(identity+'accounts:signUp',params={'key':key},json={'returnSecureToken':True},timeout=20);r.raise_for_status();accounts.append(r.json())

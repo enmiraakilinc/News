@@ -1,3 +1,4 @@
+// Aramadaki mikrofon ve hoparlör yolunu ayarlar.
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 /// Only affects the remote call tracks, never the phone's global volume.

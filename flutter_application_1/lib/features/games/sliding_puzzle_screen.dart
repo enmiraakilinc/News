@@ -1,3 +1,4 @@
+// Kaydırmalı bulmacanın ekranıdır.
 import 'dart:async';
 import 'dart:math';
 

@@ -1,6 +1,6 @@
 # Mevcut Telegram botunun bulut geliştirmeye hazırlanması
 
-İncelenen kaynak: `C:\Users\mkund\Desktop\telegram-bulut-bot`.
+İncelenen kaynak: `NEURAL_BOT_DIR` veya ev dizini altındaki `telegram-bulut-bot`.
 İnceleme tarihi: 17 Ekim 2026. Bot çalıştırılmadı, Telegram'a mesaj gönderilmedi, dış klasördeki kaynaklar değiştirilmedi. Gizli değerler bu belgeye alınmadı.
 
 ## Şu an ne var?

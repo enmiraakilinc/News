@@ -1,17 +1,20 @@
+// Sunucudaki depolama doluluğunu kontrol eder.
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
+import '../wakeup/wakeup_service.dart';
 
 class StorageMonitor {
   static final warning = ValueNotifier<bool>(false);
   static Future<Map<String, dynamic>?> check() async {
     await CoupleService.ensureReady();
     final uid = CoupleService.uid;
-    const endpoint = 'https://158.180.38.94';
+    final endpoint = await WakeupService.endpoint();
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (endpoint == null) return null;
     if (token == null) return null;
     final response = await http
         .get(

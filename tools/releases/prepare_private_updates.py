@@ -1,4 +1,4 @@
-"""Stage private update metadata and explicitly grant existing chat members.
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: prepare_private_updates.py. Stage private update metadata and explicitly grant existing chat members.
 
 Does not upload APKs, change repository visibility, or remove the legacy route.
 Run without --apply for a read-only review. No credentials are printed.

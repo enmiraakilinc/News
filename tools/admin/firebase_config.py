@@ -1,4 +1,4 @@
-"""Read technical Firebase identifiers from the existing app configuration."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: firebase_config.py. Read technical Firebase identifiers from the existing app configuration."""
 import json
 from pathlib import Path
 

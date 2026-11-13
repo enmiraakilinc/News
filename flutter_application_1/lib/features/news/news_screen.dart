@@ -1,3 +1,4 @@
+// Haber listesini gösterir.
 import '../updates/update_check_tile.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/news_theme.dart';
@@ -116,6 +117,10 @@ class _NewsScreenState extends State<_NewsScreen> {
     if (previous != null &&
         previous < _articles.length &&
         await contentNotificationEnabled(kNotifNews)) {
+      if (await morseVibrationEnabled()) {
+        await playMorseVibration();
+        return;
+      }
       await FlutterLocalNotificationsPlugin().show(
         kNotifNews.id,
         'Haberler',

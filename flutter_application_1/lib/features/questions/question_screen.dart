@@ -1,5 +1,8 @@
+// Günün sorusunu ve iki cevabı gösterir.
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../pair/couple_service.dart';
+import '../pair/badge_service.dart';
 import '../../core/notifications/notif_prefs.dart';
 import '../pair/paired_gate.dart';
 
@@ -124,10 +127,26 @@ class QuestionScreen extends StatelessWidget {
   }
 }
 
-class _QuestionView extends StatelessWidget {
+class _QuestionView extends StatefulWidget {
   final String coupleId;
   final String secret;
   const _QuestionView({required this.coupleId, required this.secret});
+
+  @override
+  State<_QuestionView> createState() => _QuestionViewState();
+}
+
+class _QuestionViewState extends State<_QuestionView> {
+  DailyAnswers? _cached;
+  bool _seen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    CoupleService.readCachedTodayAnswers().then((value) {
+      if (mounted && value != null) setState(() => _cached = value);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,9 +179,26 @@ class _QuestionView extends StatelessWidget {
         ],
       ),
       body: StreamBuilder<DailyAnswers>(
-        stream: CoupleService.todayAnswersStream(coupleId, secret, qIndex),
+        stream: CoupleService.todayAnswersStream(
+          widget.coupleId,
+          widget.secret,
+          qIndex,
+        ),
         builder: (context, snap) {
-          final data = snap.data ?? DailyAnswers();
+          final live = snap.data;
+          final data = live == null
+              ? (_cached ?? DailyAnswers())
+              : (live.myAnswer == null &&
+                    live.partnerAnswer == null &&
+                    _cached != null &&
+                    (_cached!.myAnswer != null || _cached!.partnerAnswer != null))
+              ? _cached!
+              : live;
+          if (data.myAnswer != null && data.partnerAnswer != null && !_seen) {
+            _seen = true;
+            unawaited(BadgeService.markQuestionSeen());
+            unawaited(CoupleService.markQuestionSeen());
+          }
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(

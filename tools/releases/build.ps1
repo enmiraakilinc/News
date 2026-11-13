@@ -8,10 +8,14 @@ $releaseVersion = $Matches[1]
 $releaseCode = $Matches[2]
 $outputDir = [IO.Path]::GetFullPath((Join-Path $workspaceRoot "artifacts/releases/$releaseVersion"))
 if (!$outputDir.StartsWith($workspaceRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Output escaped workspace.' }
-$env:JAVA_HOME = 'C:/Users/mkund/jdk17'
-$flutterPath = 'C:/Users/mkund/flutter/bin/flutter.bat'
-$aaptPath = 'C:/Users/mkund/AppData/Local/Android/Sdk/build-tools/36.0.0/aapt.exe'
-$signerPath = 'C:/Users/mkund/AppData/Local/Android/Sdk/build-tools/36.0.0/apksigner.bat'
+if (-not $env:JAVA_HOME) { throw 'JAVA_HOME tanımlı değil.' }
+$flutterCommand = Get-Command flutter.bat -ErrorAction SilentlyContinue
+$flutterPath = if ($env:FLUTTER_ROOT) { Join-Path $env:FLUTTER_ROOT 'bin/flutter.bat' } elseif ($flutterCommand) { $flutterCommand.Source } else { throw 'FLUTTER_ROOT tanımlı değil.' }
+$sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android/Sdk' }
+$buildTools = Get-ChildItem -LiteralPath (Join-Path $sdk 'build-tools') -Directory | Sort-Object Name -Descending | Select-Object -First 1
+if (-not $buildTools) { throw 'Android build-tools bulunamadı.' }
+$aaptPath = Join-Path $buildTools.FullName 'aapt.exe'
+$signerPath = Join-Path $buildTools.FullName 'apksigner.bat'
 # Build Android only, without unrelated desktop plugin symlinks.
 $previousWindowsFlag = [Environment]::GetEnvironmentVariable('FLUTTER_WINDOWS', 'Process')
 $env:FLUTTER_WINDOWS = 'false'
@@ -20,6 +24,7 @@ try {
     $buildArguments = @('build', 'apk', '--release', '--target-platform', 'android-arm64', '--tree-shake-icons')
     if (!$FirebaseReads) { $buildArguments += '--dart-define=NEURAL_POSTGRES_READS=true' }
     if ($PostgresPrimary) { $buildArguments += '--dart-define=NEURAL_POSTGRES_PRIMARY=true' }
+    if ($env:NEURAL_PUBLIC_URL) { $buildArguments += "--dart-define=NEURAL_PUBLIC_URL=$($env:NEURAL_PUBLIC_URL)" }
     & $flutterPath @buildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     $builtApk = Join-Path $appPath 'build/app/outputs/flutter-apk/app-release.apk'

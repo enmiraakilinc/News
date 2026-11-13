@@ -1,3 +1,4 @@
+// Son görülme kaydını yazar.
 import {ApiError} from './access.mjs';
 // Ephemeral foreground activity does not enter the durable message outbox or
 // commit-receipt history. The one existing opt-in record is updated in place.

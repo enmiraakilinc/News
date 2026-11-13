@@ -1,3 +1,4 @@
+// Sunucu kuralının otomatik sınamasıdır.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authorizeWrite,Instant} from '../src/write_policy.mjs';
@@ -22,7 +23,11 @@ test('default deny protects config and another personal account',async()=>{
  await denied(run('chatAccounts/bob/contacts/alice',null,{alias:'Alice'}));
  await denied(run('chatProfiles/bob',null,{name:'Alice'}));
  await run('chatAccounts/alice/contacts/bob',null,{alias:'Bob',avatarEmoji:'🌻'});
- await denied(run('chatAccounts/alice/contacts/bob',{alias:'Bob'},null));
+ await run('chatAccounts/alice/contacts/bob',{alias:'Bob'},null);
+ await run('chatAccounts/bob/contacts/direct',{alias:'Alice'},null);
+ await denied(run('chatAccounts/bob/contacts/other',{alias:'Alice'},null));
+ await run('chats/direct',{group:false,members:['alice','bob']},null);
+ await denied(run('chats/direct',{group:true,members:['alice','bob','cara']},null));
 });
 test('chat notification device tokens are scoped to their owner',async()=>{
  const token={token:'fcm-device-token-123456789',updatedAt:now};

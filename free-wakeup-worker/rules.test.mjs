@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 import {before,after,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';

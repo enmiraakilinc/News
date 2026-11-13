@@ -1,4 +1,4 @@
-"""Apply the reviewed expiry migration without rebuilding APKs or restarting sync."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: deploy_media_expiry.py. Apply the reviewed expiry migration without rebuilding APKs or restarting sync."""
 from pathlib import Path
 import json,sys
 ROOT=Path(__file__).resolve().parents[2]

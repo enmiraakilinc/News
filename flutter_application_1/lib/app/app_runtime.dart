@@ -1,3 +1,4 @@
+// Bildirim, Morse titreşimi ve açılışta sürüm geri alma kontrolünü çalıştırır.
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +10,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../features/pair/couple_service.dart';
 import '../core/notifications/notif_prefs.dart';
 import '../features/updates/update_service.dart';
+import '../features/updates/update_dialog.dart';
 import '../features/pair/badge_service.dart';
 import '../features/location/location_share.dart';
 import '../features/media/chat_media.dart';
@@ -103,12 +105,16 @@ Future<void> checkIncomingContent() async {
       }
       final allowed = await contentNotificationEnabled(kind);
       if (allowed && partnerCount > seen) {
-        await flutterLocalNotificationsPlugin.show(
-          kind.id,
-          'Güncelleme',
-          await notifText(kind),
-          const NotificationDetails(android: incomingDetails),
-        );
+        if (await morseVibrationEnabled()) {
+          await playMorseVibration();
+        } else {
+          await flutterLocalNotificationsPlugin.show(
+            kind.id,
+            'Güncelleme',
+            await notifText(kind),
+            const NotificationDetails(android: incomingDetails),
+          );
+        }
       }
       await prefs.setInt(kind.seenKey, partnerCount);
     }
@@ -141,12 +147,16 @@ Future<void> checkUpdateAndNotify() async {
       priority: Priority.defaultPriority,
       autoCancel: true,
     );
-    await flutterLocalNotificationsPlugin.show(
-      kUpdateNotifId,
-      'Güncelleme',
-      'Yeni bir güncelleme mevcut. Uygulamayı güncelleyin.',
-      const NotificationDetails(android: details),
-    );
+    if (await morseVibrationEnabled()) {
+      await playMorseVibration();
+    } else {
+      await flutterLocalNotificationsPlugin.show(
+        kUpdateNotifId,
+        'Güncelleme',
+        'Yeni bir güncelleme mevcut. Uygulamayı güncelleyin.',
+        const NotificationDetails(android: details),
+      );
+    }
     await prefs.setInt('notified_update_code', info.code);
   } catch (_) {
     // İnternet yok / hata — sessizce geç.
@@ -254,6 +264,20 @@ void runBackgroundDispatcher() {
   });
 }
 
+Future<void> _offerRollback() async {
+  final info = await UpdateService.checkForUpdate();
+  if (info == null || !info.rollback) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = appNavigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => UpdateDialog(info: info),
+    );
+  });
+}
+
 /// Firebase, izinler ve arka plan görevi — UI açıldıktan sonra, bloklamadan.
 Future<void> initializeBackground(void Function() dispatcher) async {
   try {
@@ -270,6 +294,7 @@ Future<void> initializeBackground(void Function() dispatcher) async {
       await prefs.setString('my_uid', u);
     }
     await checkIncomingContent();
+    unawaited(_offerRollback());
   } catch (_) {}
 
   try {
@@ -393,12 +418,16 @@ Future<void> _initFcm() async {
         priority: Priority.defaultPriority,
         autoCancel: true,
       );
-      flutterLocalNotificationsPlugin.show(
-        kUpdateNotifId,
-        n.title ?? 'Güncelleme',
-        n.body ?? 'Yeni bir güncelleme mevcut.',
-        const NotificationDetails(android: details),
-      );
+      if (await morseVibrationEnabled()) {
+        await playMorseVibration();
+      } else {
+        flutterLocalNotificationsPlugin.show(
+          kUpdateNotifId,
+          n.title ?? 'Güncelleme',
+          n.body ?? 'Yeni bir güncelleme mevcut.',
+          const NotificationDetails(android: details),
+        );
+      }
     });
   } catch (_) {
     // İzin yok / hata — sessizce geç.
@@ -406,6 +435,10 @@ Future<void> _initFcm() async {
 }
 
 Future<void> _showChatNotification() async {
+  if (await morseVibrationEnabled()) {
+    await playMorseVibration();
+    return;
+  }
   await flutterLocalNotificationsPlugin.show(
     kNotifChats.id,
     'Güncelleme',

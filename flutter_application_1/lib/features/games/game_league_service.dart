@@ -1,3 +1,4 @@
+// Oyun skorunu kaydeder.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../chat/chat_service.dart';

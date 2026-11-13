@@ -1,4 +1,4 @@
-"""Archive generated/history files without deleting originals or touching Git/config."""
+"""Çalışma alanını düzenlemek için elle çalıştırılan betik. Dosya: organize_workspace.py. Archive generated/history files without deleting originals or touching Git/config."""
 from pathlib import Path
 import json,re
 root=Path(__file__).resolve().parents[2]

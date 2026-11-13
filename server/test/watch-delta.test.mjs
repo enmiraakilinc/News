@@ -1,3 +1,4 @@
+// Sunucu kuralının otomatik sınamasıdır.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {WatchDelta,affectsWatch} from '../src/watch_delta.mjs';

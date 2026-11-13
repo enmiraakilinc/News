@@ -1,3 +1,5 @@
+// Ders notlarını okur ve kaydeder.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -254,7 +256,7 @@ class LocalCourseRepository extends CourseRepository {
 
   @override
   Stream<List<LessonFolder>> folders({String? parent}) async* {
-    final data = await _read();
+    final data = await _read().timeout(const Duration(seconds: 6));
     yield data.entries
         .where((e) => (e.value as Map)['parent'] == parent)
         .map(
@@ -270,7 +272,7 @@ class LocalCourseRepository extends CourseRepository {
 
   @override
   Stream<List<LessonNote>> notes(String course) async* {
-    final data = await _read();
+    final data = await _read().timeout(const Duration(seconds: 6));
     final row = data[course] as Map?;
     yield ((row?['notes'] as List?) ?? [])
         .map((e) => LessonNote.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -453,12 +455,14 @@ class SharedCourseRepository extends CourseRepository {
   String _open(String text) => CoupleService.decodePrivateText(text, secret);
   @override
   Stream<List<LessonFolder>> folders({String? parent}) async* {
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 6));
+    var got = false;
     yield* _courses
         .orderBy('createdAt')
         .snapshots()
-        .map(
-          (s) => s.docs
+        .map((s) {
+          got = true;
+          return s.docs
               .where((d) => d.data()['parent'] == parent)
               .map(
                 (d) => LessonFolder(
@@ -468,27 +472,47 @@ class SharedCourseRepository extends CourseRepository {
                   color: d.data()['color'] as String?,
                 ),
               )
-              .toList(),
+              .toList();
+        })
+        .timeout(
+          const Duration(seconds: 6),
+          onTimeout: (sink) {
+            if (!got) {
+              sink.addError(TimeoutException('Dersler yüklenemedi.'));
+              sink.close();
+            }
+          },
         );
   }
 
   @override
   Stream<List<LessonNote>> notes(String course) async* {
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 6));
+    var got = false;
     yield* _courses
         .doc(course)
         .collection('entries')
         .orderBy('createdAt')
         .snapshots()
-        .map(
-          (s) => s.docs
+        .map((s) {
+          got = true;
+          return s.docs
               .map(
                 (d) => LessonNote.fromJson(
                   jsonDecode(_open(d.data()['cipher'] as String))
                       as Map<String, dynamic>,
                 ),
               )
-              .toList(),
+              .toList();
+        })
+        .timeout(
+          const Duration(seconds: 6),
+          onTimeout: (sink) {
+            if (!got) {
+              sink.addError(TimeoutException('Notlar yüklenemedi.'));
+              sink.close();
+            }
+          },
         );
   }
 

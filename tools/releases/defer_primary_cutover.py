@@ -1,4 +1,4 @@
-"""Restore compatibility only if primary has never accepted writes.
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: defer_primary_cutover.py. Restore compatibility only if primary has never accepted writes.
 
 Used when final source verification is blocked by the free Firestore quota.
 Never use after the primary mode was enabled.

@@ -1,3 +1,4 @@
+// Anı defteri ekranıdır.
 import '../../core/utils/date_format.dart';
 import '../../core/utils/sync_state.dart';
 import 'dart:async';
@@ -68,8 +69,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   Future<void> _init() async {
-    final cid = await CoupleService.coupleId();
-    final sec = await CoupleService.secret();
+    String? cid;
+    String? sec;
+    try {
+      cid = await CoupleService.coupleId().timeout(const Duration(seconds: 6));
+      sec = await CoupleService.secret().timeout(const Duration(seconds: 6));
+    } catch (_) {}
     await _loadLocal();
     if (!mounted) return;
     setState(() {
@@ -598,13 +603,24 @@ class _TimelineScreenState extends State<TimelineScreen> {
         final shared = snap.data ?? [];
         final bosVeYerelYok = shared.isEmpty && _localItems.isEmpty;
         if (bosVeYerelYok) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                "Henüz anı yok.\n'Anı Ekle' ile ilk fotoğrafınızı ekleyin.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Henüz anı yok.\n'Anı Ekle' ile ilk fotoğrafınızı ekleyin.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _retryShared,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Yenile'),
+                  ),
+                ],
               ),
             ),
           );

@@ -1,3 +1,4 @@
+// Medya parçalarını toplu okur.
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 import 'oracle_firestore_bridge.dart';
 import 'oracle_client.dart';

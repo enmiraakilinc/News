@@ -1,3 +1,4 @@
+// Haber üzerine not tutar.
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../../core/data/personal_cloud.dart';

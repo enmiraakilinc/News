@@ -1,3 +1,4 @@
+// Aramanın durumunu ve neden bittiğini tutar.
 import 'dart:async';
 import 'dart:io';
 
@@ -90,7 +91,7 @@ String voiceCallFailureMessage(Object error, {required bool video}) {
           'Arama zaman aşımına uğradı. Sunucu yanıt vermedi.',
         'resource-exhausted' =>
           'Hizmetin kullanım sınırına ulaşıldı. Daha sonra yeniden dene.',
-        _ => '${error.code}: ${error.message ?? 'Arama tamamlanamadı.'}',
+        _ => 'Sunucu aramayı tamamlayamadı. Biraz sonra yeniden dene.',
       };
     }
   }

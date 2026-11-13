@@ -1,4 +1,4 @@
-"""Exercise VPS extension routes using only disposable identities/PG rows."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_server_extensions.py. Exercise VPS extension routes using only disposable identities/PG rows."""
 import json, sys, uuid, subprocess
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -6,9 +6,10 @@ import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.server.ssh_admin import execute
+from tools.runtime_config import public_url
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key']
-base='https://158.180.38.94'
+base=public_url()
 accounts=[]
 paths=[]
 def sql_run(sql):

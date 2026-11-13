@@ -1,4 +1,4 @@
-"""Owner-controlled local PC bridge. No BOT_TOKEN, admin key or cloud AI required.
+"""Telegram bulut botunun kurulum betiği. Dosya: pc_agent.py. Owner-controlled local PC bridge. No BOT_TOKEN, admin key or cloud AI required.
 
 Run only while you want remote control enabled. Code execution is opt-in.
 """

@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 export async function notifyCall(request, env, {fetch: fetcher, token}) {
   const reply=(status,message)=>Response.json({message},{status});
   const auth=request.headers.get('Authorization')??'';

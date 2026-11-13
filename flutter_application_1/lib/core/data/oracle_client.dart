@@ -1,3 +1,4 @@
+// PostgreSQL API'sine kimlik doğrulamalı istek atar.
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -45,7 +46,14 @@ class OracleDataClient {
     Uri? base,
     this.timeout = const Duration(seconds: 5),
   }) : _http = client ?? http.Client(),
-       base = base ?? Uri.parse('https://158.180.38.94') {
+       base =
+           base ??
+           Uri.parse(
+             const String.fromEnvironment(
+               'NEURAL_PUBLIC_URL',
+               defaultValue: 'https://localhost',
+             ),
+           ) {
     if (this.base.scheme != 'https' ||
         this.base.userInfo.isNotEmpty ||
         this.base.query.isNotEmpty ||

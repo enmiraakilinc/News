@@ -1,3 +1,4 @@
+// Eski hatırlatma işçisinden gelen imzalı uyanmayı doğrular.
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {ApiError} from './access.mjs';
 export function authenticateLegacyWake(headers,raw,{secret=process.env.NEURAL_PUSH_SECRET,now=Date.now()}={}){

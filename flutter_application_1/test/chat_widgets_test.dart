@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/features/media/media_names_screen.dart';

@@ -1,4 +1,4 @@
-"""One-time authorized migration of the owner's existing bot.
+"""Telegram bulut botunun kurulum betiği. Dosya: activate_existing.py. One-time authorized migration of the owner's existing bot.
 
 Does not change subscriptions, paid plans, or the app release. Run only after
 reviewing the tested Worker and receiving explicit migration authorization.
@@ -20,6 +20,8 @@ import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from tools.runtime_config import bot_dir
 BOT = ROOT/'tools/telegram-cloud-bot'
 PRIVATE = ROOT/'private/credentials'
 BACKUP = ROOT/'private/backups/telegram-cloud-migration'
@@ -166,7 +168,7 @@ if __name__ == '__main__':
     else:print('Render transition already committed.',flush=True)
     (PRIVATE/'telegram-pc-secret.dpapi').write_bytes(protect(state['PC_SECRET']))
     pc_config={'worker_url':url,'secret_file':str(PRIVATE/'telegram-pc-secret.dpapi'),
-      'projects':{'uygulama':str(local_app),'bot':'C:/Users/mkund/Desktop/telegram-bulut-bot'}}
+      'projects':{'uygulama':str(local_app),'bot':bot_dir()}}
     (PRIVATE/'telegram-pc-config.json').write_text(json.dumps(pc_config,indent=2),encoding='utf-8')
     report={'worker':url,'bot_username':me['username'],'github_transition_prepared':True,
       'no_subscription_changes':True,'webhook_verified':False,'pc_verified':False,

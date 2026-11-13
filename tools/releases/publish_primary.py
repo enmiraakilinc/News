@@ -1,4 +1,4 @@
-"""Publish a release APK after primary cutover; never change migration state."""
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: publish_primary.py. Publish a release APK after primary cutover; never change migration state."""
 import argparse,hashlib,json,re,subprocess,sys,time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import gh,sql,remote,REPO,REPO_ID
 from tools.admin.firebase_config import admin_session,PROJECT_ID
+from tools.runtime_config import public_url, releases_dir
 
 PUBLIC_NOTES=(ROOT/'docs/releases/NEXT_PUBLIC_NOTES.txt').read_text(encoding='utf-8-sig').strip()
 if not PUBLIC_NOTES or len(PUBLIC_NOTES)>1000:raise ValueError('Public release notes must contain 1–1000 characters.')
@@ -23,11 +24,11 @@ def publish(version):
     assert report['abi']==['arm64-v8a'] and not report['debuggable']
     assert hashlib.sha256(apk.read_bytes()).hexdigest()==report['sha256'] and apk.stat().st_size==report['bytes']
     assert sql("SELECT value FROM neural.settings WHERE key='primary_writes'")=='true'
-    health=requests.get('https://158.180.38.94/health',timeout=20);health.raise_for_status()
+    health=requests.get(public_url()+'/health',timeout=20);health.raise_for_status()
     assert health.json()['mode']=='primary'
     before=json.loads(sql("SELECT document FROM neural.documents WHERE path='config/private_app_version'"))
     assert int(before['fields']['code']['integerValue'])<=report['code']
-    staged=remote("import subprocess\nprint(subprocess.check_output(['sudo','sha256sum',"+repr('/var/lib/neural/releases/'+version+'.apk')+"],text=True).split()[0])\n")
+    staged=remote("import subprocess\nprint(subprocess.check_output(['sudo','sha256sum',"+repr(releases_dir()+'/'+version+'.apk')+"],text=True).split()[0])\n")
     assert staged==report['sha256'],'Stage the immutable private VPS APK first'
     repository=json.loads(gh('api',f'repositories/{REPO_ID}'))
     assert repository['id']==REPO_ID and repository['full_name']==REPO

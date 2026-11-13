@@ -1,3 +1,4 @@
+// Kişiye verilen yerel adı saklar.
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../media/message_content.dart';
@@ -15,12 +16,10 @@ class ContactNames {
   static final Map<String, String> _names = {};
   static final Map<String, ChatProfile> _avatars = {};
   static ChatProfile? avatar(String id) => _avatars[id];
-  static final Set<String> removed = {};
   static void reset() {
     ChatMedia.clearCache();
     _names.clear();
     _avatars.clear();
-    removed.clear();
     changes.value++;
   }
 
@@ -49,20 +48,8 @@ class ContactNames {
           prefs.getString(key)!,
         );
       }
-      await prefs.setStringList(
-        'removed_contacts_$uid',
-        prefs.getStringList('removed_contacts') ?? [],
-      );
     }
     _names.clear();
-    removed
-      ..clear()
-      ..addAll(
-        prefs.getStringList(
-              uid == null ? 'removed_contacts' : 'removed_contacts_$uid',
-            ) ??
-            [],
-      );
     for (final key in prefs.getKeys().where((key) => key.startsWith(prefix))) {
       _names[key.substring(prefix.length)] = prefs.getString(key)!;
     }
@@ -74,12 +61,12 @@ class ContactNames {
         ).get().timeout(const Duration(seconds: 8));
         if (CoupleService.uid != uid) return;
         final existing = snapshot.docs.map((d) => d.id).toSet();
-        final missing = {..._names.keys, ...removed}.difference(existing);
-        // Upload legacy device aliases once; remote records always win afterwards.
+        final missing = _names.keys.toSet().difference(existing);
         for (final id in missing) {
+          final alias = _names[id];
+          if (alias == null) continue;
           await _contacts(uid).doc(id).set({
-            if (_names[id] != null) 'alias': _names[id],
-            'hidden': removed.contains(id),
+            'alias': alias,
           }, SetOptions(merge: true));
         }
         for (final doc in snapshot.docs) {
@@ -95,13 +82,7 @@ class ContactNames {
             _names[doc.id] = data['alias'] as String;
             await prefs.setString('$prefix${doc.id}', data['alias'] as String);
           }
-          if (data['hidden'] == true) {
-            removed.add(doc.id);
-          } else {
-            removed.remove(doc.id);
-          }
         }
-        await prefs.setStringList('removed_contacts_$uid', removed.toList());
       } catch (_) {
         // Offline devices keep their last saved contact names.
       }
@@ -127,25 +108,6 @@ class ContactNames {
     await (await SharedPreferences.getInstance()).setString(
       '${_prefix(uid)}$id',
       clean,
-    );
-    changes.value++;
-  }
-
-  static Future<void> setHidden(String id, bool hidden) async {
-    final uid = CoupleService.uid;
-    if (uid != null) {
-      await _contacts(
-        uid,
-      ).doc(id).set({'hidden': hidden}, SetOptions(merge: true));
-    }
-    if (hidden) {
-      removed.add(id);
-    } else {
-      removed.remove(id);
-    }
-    await (await SharedPreferences.getInstance()).setStringList(
-      uid == null ? 'removed_contacts' : 'removed_contacts_$uid',
-      removed.toList(),
     );
     changes.value++;
   }

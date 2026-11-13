@@ -1,4 +1,4 @@
-"""Read-only point-in-time Firestore snapshot. Never prints document contents."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: firestore_snapshot_remote.py. Read-only point-in-time Firestore snapshot. Never prints document contents."""
 import concurrent.futures
 import datetime
 import gzip

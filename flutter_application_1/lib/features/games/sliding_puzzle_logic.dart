@@ -1,3 +1,4 @@
+/// Kaydırmalı bulmacanın kurallarını hesaplar.
 List<int>? slidePuzzleTile(List<int> tiles, int tileIndex) {
   if (tiles.length != 16 || tileIndex < 0 || tileIndex >= tiles.length) {
     return null;

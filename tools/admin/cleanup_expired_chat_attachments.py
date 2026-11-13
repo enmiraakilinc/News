@@ -1,4 +1,4 @@
-"""Remove only inline chat attachments older than 48 hours; leave message text/history."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: cleanup_expired_chat_attachments.py. Remove only inline chat attachments older than 48 hours; leave message text/history."""
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path

@@ -1,3 +1,4 @@
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: repair_firestore_pair.py."""
 from __future__ import annotations
 
 import argparse

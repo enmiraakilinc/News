@@ -1,3 +1,4 @@
+// Sunucu işlerinin belge okuma yardımcılarıdır.
 import {createHash} from 'node:crypto';
 import {ApiError} from './access.mjs';
 

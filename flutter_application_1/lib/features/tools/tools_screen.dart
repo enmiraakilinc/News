@@ -1,3 +1,4 @@
+// Araçlar listesidir.
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
