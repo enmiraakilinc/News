@@ -1,4 +1,4 @@
-"""Scoped local ChatGPT-authenticated Codex jobs; no API-key fallback."""
+"""Telegram bulut botunun kurulum betiği. Dosya: codex_bridge.py. Scoped local ChatGPT-authenticated Codex jobs; no API-key fallback."""
 import json
 import os
 import shutil

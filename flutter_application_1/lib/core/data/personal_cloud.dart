@@ -1,3 +1,4 @@
+// Kişisel belgeleri bulut kopyasıyla eşler.
 import 'dart:math';
 import 'dart:convert';
 import 'dart:io';

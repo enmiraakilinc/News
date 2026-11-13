@@ -1,3 +1,4 @@
+// Birden fazla mesajın seçilmesini sağlar.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

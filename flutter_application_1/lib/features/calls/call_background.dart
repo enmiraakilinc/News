@@ -1,3 +1,4 @@
+// Uygulama arkadayken aramayı sürdürür.
 import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';

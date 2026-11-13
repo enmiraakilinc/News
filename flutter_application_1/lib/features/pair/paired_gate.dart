@@ -15,6 +15,7 @@ class PairedGate extends StatefulWidget {
 
 class _PairedGateState extends State<PairedGate> {
   bool _loading = true;
+  bool _failed = false;
   String? _cid;
   String? _sec;
 
@@ -25,14 +26,32 @@ class _PairedGateState extends State<PairedGate> {
   }
 
   Future<void> _load() async {
-    final cid = await CoupleService.coupleId();
-    final sec = await CoupleService.secret();
-    if (!mounted) return;
-    setState(() {
-      _cid = cid;
-      _sec = sec;
-      _loading = false;
-    });
+    if (mounted && !_loading) {
+      setState(() {
+        _loading = true;
+        _failed = false;
+      });
+    }
+    try {
+      final cid = await CoupleService.coupleId().timeout(
+        const Duration(seconds: 6),
+      );
+      final sec = await CoupleService.secret().timeout(
+        const Duration(seconds: 6),
+      );
+      if (!mounted) return;
+      setState(() {
+        _cid = cid;
+        _sec = sec;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _failed = true;
+      });
+    }
   }
 
   @override
@@ -41,6 +60,17 @@ class _PairedGateState extends State<PairedGate> {
       return Scaffold(
         appBar: AppBar(title: Text(widget.title)),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_failed) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.title)),
+        body: Center(
+          child: TextButton(
+            onPressed: _load,
+            child: const Text('Yüklenemedi. Yeniden dene.'),
+          ),
+        ),
       );
     }
     if (_cid == null || _sec == null) {

@@ -1,3 +1,4 @@
+// Birincil modda belge okuma ve yazmayı sunucuya yollar.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

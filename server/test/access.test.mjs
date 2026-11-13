@@ -1,3 +1,4 @@
+// Sunucu kuralının otomatik sınamasıdır.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {docPath,queryAllowed,validateCommit} from '../src/access.mjs';

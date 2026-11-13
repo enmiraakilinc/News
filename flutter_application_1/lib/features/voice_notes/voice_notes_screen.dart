@@ -1,3 +1,4 @@
+// Sesli not kaydeder ve listeler.
 import '../../core/utils/sync_state.dart';
 import 'dart:async';
 import 'dart:convert';

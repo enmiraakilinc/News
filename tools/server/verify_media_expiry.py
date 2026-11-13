@@ -1,4 +1,4 @@
-"""Test media extension over HTTPS with disposable users and three tiny rows."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_media_expiry.py. Test media extension over HTTPS with disposable users and three tiny rows."""
 import json,sys,uuid
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
@@ -6,9 +6,10 @@ import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import sql
+from tools.runtime_config import public_url
 config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text(encoding='utf-8'))
 key=config['client'][0]['api_key'][0]['current_key'];accounts=[];paths=[]
-identity='https://identitytoolkit.googleapis.com/v1/';base='https://158.180.38.94'
+identity='https://identitytoolkit.googleapis.com/v1/';base=public_url()
 q=lambda value:"'"+value.replace("'","''")+"'"
 stamp=lambda value:{'timestampValue':value.isoformat().replace('+00:00','Z')}
 text=lambda value:{'stringValue':value}

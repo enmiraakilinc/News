@@ -1,3 +1,4 @@
+// Yerelde tutulan belgeler üzerinde sorgu çalıştırır.
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 import 'oracle_codec.dart';
 import 'oracle_local_values.dart';

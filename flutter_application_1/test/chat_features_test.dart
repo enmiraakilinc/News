@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter/material.dart';

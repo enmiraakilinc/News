@@ -1,4 +1,4 @@
-"""Run the pending primary-write layer in an isolated PostgreSQL database."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: test_primary_writes.py. Run the pending primary-write layer in an isolated PostgreSQL database."""
 from pathlib import Path
 import base64,io,json,sys,tarfile,uuid
 ROOT=Path(__file__).resolve().parents[2]

@@ -1,3 +1,4 @@
+// Bağlantı kesilince yazmaları sıraya alır.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

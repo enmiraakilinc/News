@@ -1,3 +1,4 @@
+// Sunucu kuralının otomatik sınamasıdır.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mediaPaths} from '../src/access.mjs';

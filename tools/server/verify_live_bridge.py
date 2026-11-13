@@ -1,14 +1,15 @@
-"""Probe with disposable users and owner-only fixtures; no real chats modified."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_live_bridge.py. Probe with disposable users and owner-only fixtures; no real chats modified."""
 from pathlib import Path
 import concurrent.futures,json,queue,sys,time,threading
 import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.admin.firebase_config import admin_session
+from tools.runtime_config import public_url
 info=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text())
 API_KEY=info['client'][0]['api_key'][0]['current_key']
 PROJECT=info['project_info']['project_id']
-BASE='https://158.180.38.94'
+BASE=public_url()
 FIRESTORE='https://firestore.googleapis.com/v1/projects/'+PROJECT+'/databases/(default)/documents/'
 accounts=[]
 def checked(response):

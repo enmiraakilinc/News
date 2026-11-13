@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 // A signed VPS request can use FCM transport without receiving Google credentials.
 export async function internalPush(request,env,{fetch:fetcher=fetch,token}){
  const reject=status=>new Response('',{status});

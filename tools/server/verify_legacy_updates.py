@@ -1,4 +1,4 @@
-"""Check the legacy private update path without notifying real users."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_legacy_updates.py. Check the legacy private update path without notifying real users."""
 import argparse,json,sys
 from pathlib import Path
 import requests

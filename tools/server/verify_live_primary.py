@@ -1,16 +1,17 @@
-"""HTTPS primary read/write, SSE and isolation checks with disposable users."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_live_primary.py. HTTPS primary read/write, SSE and isolation checks with disposable users."""
 import json,sys,uuid
 from pathlib import Path
 import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.releases.primary_cutover import sql
+from tools.runtime_config import public_url
 
 def main():
     config=json.loads((ROOT/'flutter_application_1/android/app/google-services.json').read_text())
     key=config['client'][0]['api_key'][0]['current_key']
     identity='https://identitytoolkit.googleapis.com/v1/'
-    base='https://158.180.38.94'
+    base=public_url()
     accounts=[];paths=[]
     try:
         for _ in range(2):

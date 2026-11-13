@@ -1,3 +1,4 @@
+// Sunucu ile uygulama arasındaki belge alanlarını çevirir.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';

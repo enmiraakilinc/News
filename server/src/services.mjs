@@ -1,3 +1,4 @@
+// Hesap, arama ve bildirim gibi sunucu işlerini toplar.
 import {randomUUID} from 'node:crypto';
 import {ApiError} from './access.mjs';
 import {ServiceStore,str,bool,members,requirePair} from './service_store.mjs';

@@ -1,10 +1,11 @@
-"""Validate the current private VPS download with a disposable identity only."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: verify_vps_updates.py. Validate the current private VPS download with a disposable identity only."""
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 import requests
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from tools.server.ssh_admin import execute
+from tools.runtime_config import public_url
 
 def fixture(uid,remove=False):
     script='''import json,subprocess
@@ -29,7 +30,7 @@ def main():
     result=requests.post(base+'accounts:signUp',params={'key':key},json={'returnSecureToken':True},timeout=20)
     result.raise_for_status();identity=result.json();uid=identity['localId'];token=identity['idToken'];created=False
     try:
-        endpoint='https://158.180.38.94/updates/latest'
+        endpoint=public_url()+'/updates/latest'
         assert requests.get(endpoint,timeout=20).status_code==401
         headers={'Authorization':'Bearer '+token}
         assert requests.get(endpoint,headers=headers,timeout=20).status_code==403

@@ -1,3 +1,4 @@
+// Yükleme zaman aşımı ve yenileme durumunu gösterir.
 import 'package:flutter/material.dart';
 import 'user_errors.dart';
 

@@ -1,4 +1,4 @@
-"""Report storage without exposing content. --cleanup removes expired chat invites only."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: audit_server_storage.py. Report storage without exposing content. --cleanup removes expired chat invites only."""
 import argparse
 import base64
 from collections import defaultdict

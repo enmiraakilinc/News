@@ -1,3 +1,4 @@
+// Ortak dilek listesidir.
 import '../../core/utils/sync_state.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,8 +52,12 @@ class _WishesScreenState extends State<WishesScreen> {
   }
 
   Future<void> _load() async {
-    final cid = await CoupleService.coupleId();
-    final sec = await CoupleService.secret();
+    String? cid;
+    String? sec;
+    try {
+      cid = await CoupleService.coupleId().timeout(const Duration(seconds: 6));
+      sec = await CoupleService.secret().timeout(const Duration(seconds: 6));
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _coupleId = cid;
@@ -269,13 +274,24 @@ class _WishesScreenState extends State<WishesScreen> {
         }
         final wishes = snap.data ?? [];
         if (wishes.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                "Henüz dilek yok.\n'Dilek Ekle' ile ilk hayalinizi yazın 🌠",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Henüz dilek yok.\n'Dilek Ekle' ile ilk hayalinizi yazın 🌠",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _retryShared,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Yenile'),
+                  ),
+                ],
               ),
             ),
           );

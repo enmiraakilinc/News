@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';

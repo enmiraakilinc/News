@@ -1,3 +1,4 @@
+// Sunucu kuralının otomatik sınamasıdır.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Instant} from '../src/write_policy.mjs';

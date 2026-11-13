@@ -1,4 +1,4 @@
-"""Explicitly approved 1.16.0 publication and guarded primary cutover.
+"""APK derleme, doğrulama ve yayınlama betiği. Dosya: primary_cutover.py. Explicitly approved 1.16.0 publication and guarded primary cutover.
 
 Run prepare before freezing legacy writes; activate compares every source
 document version before stopping replication. Never rolls primary writes back.
@@ -11,7 +11,8 @@ import requests
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tools.admin.firebase_config import PROJECT_ID, admin_session
-from tools.server.ssh_admin import SSH, KEY, HOST
+from tools.server.ssh_admin import SSH
+from tools.runtime_config import public_url, ssh_host, ssh_key
 
 GH = os.environ.get('GH_CLI') or shutil.which('gh') or 'gh'
 REPO_ID = 1426918054
@@ -24,8 +25,8 @@ def gh(*args):
     return subprocess.check_output([GH, *args], text=True, encoding='utf-8').strip()
 
 def remote(script):
-    result = subprocess.run([SSH, '-i', str(KEY), '-o', 'BatchMode=yes',
-        '-o', 'ConnectTimeout=15', HOST, 'python3 -'], input=script,
+    result = subprocess.run([SSH, '-i', str(ssh_key()), '-o', 'BatchMode=yes',
+        '-o', 'ConnectTimeout=15', ssh_host(), 'python3 -'], input=script,
         text=True, encoding='utf-8', capture_output=True, timeout=180, check=True)
     return result.stdout.strip()
 
@@ -128,7 +129,7 @@ def activate():
     assert destination()==source, 'Mirror changed during stop; primary remains disabled'
     sql("BEGIN; UPDATE neural.settings SET value='true' WHERE key='primary_writes'; COMMIT;")
     for attempt in range(5):
-        result=requests.get('https://158.180.38.94/v1/capabilities',timeout=20)
+        result=requests.get(public_url()+'/v1/capabilities',timeout=20)
         result.raise_for_status()
         if result.json()['primaryWrites'] is True:break
         time.sleep(1)

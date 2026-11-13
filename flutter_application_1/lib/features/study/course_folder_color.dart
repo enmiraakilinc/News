@@ -1,3 +1,4 @@
+// Ders klasörünün rengini tutar.
 import 'package:flutter/material.dart';
 import '../../core/utils/user_errors.dart';
 import 'course_repository.dart';

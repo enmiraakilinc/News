@@ -1,3 +1,4 @@
+// Uygulama penceresini, temayı ve ilk ekranı kurar.
 import 'package:flutter/material.dart';
 import '../features/account/chat_account.dart';
 import '../core/theme/chat_theme.dart';

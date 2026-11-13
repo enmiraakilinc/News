@@ -1,3 +1,4 @@
+// Kişi ayrıntısı ekranıdır.
 import '../chat/conversation_style.dart';
 import 'package:flutter/material.dart';
 import 'contact_names.dart';

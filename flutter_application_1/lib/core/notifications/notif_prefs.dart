@@ -1,55 +1,67 @@
+// Bildirim anahtarlarını ve Morse titreşimini yönetir.
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'notification_permission.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../features/chat/chat_notification_service.dart';
 
-Future<void> editChatNotifications(BuildContext context) async {
-  var enabled = await chatNotificationsEnabled();
-  if (!context.mounted) return;
-  await showModalBottomSheet<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, update) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Telefon bildirimleri'),
-              subtitle: const Text(
-                'Sohbet içindeki +N rozeti bu ayardan bağımsızdır.',
-              ),
-              value: enabled,
-              onChanged: (value) async {
-                if (value) {
-                  final granted = await FlutterLocalNotificationsPlugin()
-                      .resolvePlatformSpecificImplementation<
-                        AndroidFlutterLocalNotificationsPlugin
-                      >()
-                      ?.requestNotificationsPermission();
-                  if (granted == false) return;
-                }
-                await setChatNotifications(value);
-                if (ctx.mounted) update(() => enabled = value);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit_notifications_outlined),
-              title: const Text('Sohbet bildirim yazısını değiştir'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                await editNotifText(context, kNotifChats);
-              },
-            ),
-          ],
-        ),
-      ),
-    ),
+const kChatNotificationsKey = 'chat_notifications_enabled';
+const kMorseVibrationKey = 'morse_vibration_notifications';
+const kMorsePattern = <int>[
+  0,
+  350,
+  150,
+  350,
+  350,
+  120,
+  120,
+  120,
+  120,
+  120,
+  120,
+  120,
+];
+const _morseChannel = MethodChannel('app/morse');
+
+Future<bool> morseVibrationEnabled() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  return prefs.getBool(kMorseVibrationKey) ?? false;
+}
+
+Future<void> playMorseVibration() async {
+  try {
+    await _morseChannel.invokeMethod('play');
+    return;
+  } catch (_) {
+    await HapticFeedback.vibrate();
+  }
+  await FlutterLocalNotificationsPlugin().show(
+    8971,
+    '',
+    '',
+    NotificationDetails(android: morseNotificationDetails()),
   );
 }
 
-const kChatNotificationsKey = 'chat_notifications_enabled';
+AndroidNotificationDetails morseNotificationDetails() =>
+    AndroidNotificationDetails(
+      'morse_mh',
+      'Titreşim bildirimi',
+      channelDescription: 'Mors M H titreşimi',
+      importance: Importance.defaultImportance,
+      priority: Priority.high,
+      playSound: false,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(kMorsePattern),
+      silent: true,
+      autoCancel: true,
+      visibility: NotificationVisibility.secret,
+      timeoutAfter: 2800,
+    );
 Future<void> migrateNotificationPreferences() async {
   final p = await SharedPreferences.getInstance();
   await p.reload();
@@ -136,8 +148,17 @@ class ContentNotificationSettings extends StatelessWidget {
                   ...kAllContentNotifs,
                   kNotifUpdates,
                   kNotifStorage,
-                ])
+                ]) ...[
         FeatureNotificationSwitch(kind: kind),
+        if (kind == kNotifChats) ...[
+          ListTile(
+            leading: const Icon(Icons.edit_notifications_outlined),
+            title: const Text('Bildirim yazısını özelleştir'),
+            onTap: () => editNotifText(context, kNotifChats),
+          ),
+          const MorseNotificationSwitch(),
+        ],
+      ],
     ],
   );
 }
@@ -214,10 +235,12 @@ class _FeatureNotificationSwitchState extends State<FeatureNotificationSwitch> {
                 /* The saved preference still gates delivery. */
               }
             } catch (_) {
-              if (context.mounted) {
+              if (context.mounted && _enabled != value) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Ayar kaydedilemedi. Yeniden dene.'),
+                    content: Text(
+                      'Bildirim tercihi telefona yazılamadı. Yeniden dene.',
+                    ),
                   ),
                 );
               }
@@ -231,11 +254,6 @@ class _FeatureNotificationSwitchState extends State<FeatureNotificationSwitch> {
 Future<void> setChatNotifications(bool value) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
-  final oldValue =
-      prefs.getBool('content_notification_chats') ??
-      prefs.getBool(kChatNotificationsKey) ??
-      prefs.getBool(kPushBarKey) ??
-      false;
   await prefs.setBool(kChatNotificationsKey, value);
   await prefs.setBool('content_notification_chats', value);
   if (!value) {
@@ -244,13 +262,43 @@ Future<void> setChatNotifications(bool value) async {
   try {
     await ChatNotificationService.sync(value);
   } catch (error) {
-    if (value) {
-      await prefs.setBool(kChatNotificationsKey, oldValue);
-      await prefs.setBool('content_notification_chats', oldValue);
-      rethrow;
-    }
-    debugPrint('Chat notification device cleanup failed: $error');
+    debugPrint('Chat notification device sync failed: $error');
   }
+}
+
+class MorseNotificationSwitch extends StatefulWidget {
+  const MorseNotificationSwitch({super.key});
+  @override
+  State<MorseNotificationSwitch> createState() =>
+      _MorseNotificationSwitchState();
+}
+
+class _MorseNotificationSwitchState extends State<MorseNotificationSwitch> {
+  bool? _enabled;
+  @override
+  void initState() {
+    super.initState();
+    morseVibrationEnabled().then((value) {
+      if (mounted) setState(() => _enabled = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+    title: const Text('Titreşim Bildirimi'),
+    subtitle: const Text(
+      'Açıkken bildirim çubuğuna yazı düşmez. Telefon M (-- ) ve H (....) ritminde titrer.',
+    ),
+    value: _enabled ?? false,
+    onChanged: _enabled == null
+        ? null
+        : (value) async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool(kMorseVibrationKey, value);
+            if (mounted) setState(() => _enabled = value);
+            if (value) await playMorseVibration();
+          },
+  );
 }
 
 class ChatNotificationsSwitch extends StatefulWidget {

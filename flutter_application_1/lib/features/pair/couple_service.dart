@@ -1,3 +1,4 @@
+// Eşleşmeyi, ortak veriyi ve günün sorusu kaydını yönetir.
 import '../../core/utils/date_format.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../../core/data/oracle_firestore_bridge.dart';
@@ -166,8 +167,30 @@ class CoupleService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kCoupleId);
     await prefs.remove(_kSecret);
-    // Sekme önbelleği eski çiftin içeriğini taşımasın.
     clearStreamCache();
+  }
+
+  static Future<void> severPair() async {
+    await ensureReady();
+    final cid = await coupleId();
+    final sec = await secret();
+    if (cid == null) return;
+    final invites = await _db
+        .collection('invites')
+        .where('coupleId', isEqualTo: cid)
+        .get();
+    final batch = _db.batch();
+    final seen = <String>{};
+    for (final invite in invites.docs) {
+      seen.add(invite.id);
+      batch.delete(invite.reference);
+    }
+    if (sec != null && !seen.contains(_loginId(sec))) {
+      batch.delete(_db.collection('invites').doc(_loginId(sec)));
+    }
+    batch.delete(_db.collection('couples').doc(cid));
+    await batch.commit();
+    await unpairLocal();
   }
 
   // ── Oturum hazırlığı ───────────────────────────────────────
@@ -257,14 +280,22 @@ class CoupleService {
     String? cacheKey,
     Stream<T> Function() build,
   ) async* {
+    var received = false;
     if (cacheKey != null) {
       final onceki = _sonDeger[cacheKey];
-      if (onceki is T) yield onceki;
+      if (onceki is T) {
+        received = true;
+        yield onceki;
+      }
     }
-    await ensureReady().timeout(const Duration(seconds: 20));
-    var received = false;
+    try {
+      await ensureReady().timeout(const Duration(seconds: 6));
+    } catch (error) {
+      if (!received) yield* Stream<T>.error(error);
+      return;
+    }
     await for (final deger in build().timeout(
-      const Duration(seconds: 25),
+      const Duration(seconds: 6),
       onTimeout: (sink) {
         if (!received) {
           sink.addError(TimeoutException('Kayıtlar yüklenemedi.'));
@@ -671,11 +702,8 @@ class CoupleService {
     String secret, {
     int limit = 12,
   }) {
-    // Önbelleğe ALINMAZ: her anı çözülmüş bir fotoğraf taşır. Bellekte tutmak
-    // onlarca MB'ı kalıcı olarak canlı tutar ve çöp toplayıcıyı sürekli
-    // çalıştırıp tüm uygulamayı yavaşlatır.
     return _gated(
-      null,
+      'timeline',
       () => _db
           .collection('couples')
           .doc(coupleId)
@@ -739,7 +767,7 @@ class CoupleService {
     String secret,
     int qIndex,
   ) {
-    return _gated('questions', () {
+    return _gated('questions-${todayKey()}', () {
       final me = uid;
       return _db
           .collection('couples')
@@ -767,9 +795,36 @@ class CoupleService {
                 }
               });
             }
-            return DailyAnswers(myAnswer: mine, partnerAnswer: partner);
+            final result = DailyAnswers(myAnswer: mine, partnerAnswer: partner);
+            if (mine != null || partner != null) {
+              unawaited(_cacheTodayAnswers(result));
+            }
+            return result;
           });
     });
+  }
+
+  static Future<void> _cacheTodayAnswers(DailyAnswers answers) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'question_cache_${todayKey()}',
+      jsonEncode({
+        'mine': answers.myAnswer,
+        'partner': answers.partnerAnswer,
+      }),
+    );
+  }
+
+  static Future<DailyAnswers?> readCachedTodayAnswers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('question_cache_${todayKey()}');
+    if (raw == null || raw.isEmpty) return null;
+    final map = jsonDecode(raw);
+    if (map is! Map) return null;
+    return DailyAnswers(
+      myAnswer: map['mine'] as String?,
+      partnerAnswer: map['partner'] as String?,
+    );
   }
 
   static Future<void> setTodayAnswer(String text) async {
@@ -779,9 +834,22 @@ class CoupleService {
     if (ref == null || sec == null || me == null) {
       throw Exception('Eşleşme yok');
     }
-
+    final cipher = _encrypt(text, sec);
     await ref.collection('questions').doc(todayKey()).set({
-      'answers': {me: _encrypt(text, sec)},
+      'answers': {me: cipher},
+    }, SetOptions(mergeFields: ['answers.$me']));
+    final cached = await readCachedTodayAnswers();
+    await _cacheTodayAnswers(
+      DailyAnswers(myAnswer: text, partnerAnswer: cached?.partnerAnswer),
+    );
+  }
+
+  static Future<void> markQuestionSeen() async {
+    final ref = await _coupleRef();
+    final me = uid;
+    if (ref == null || me == null) return;
+    await ref.collection('questions').doc(todayKey()).set({
+      'seenBy': FieldValue.arrayUnion([me]),
     }, SetOptions(merge: true));
   }
 

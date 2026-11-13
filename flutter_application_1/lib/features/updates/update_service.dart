@@ -1,3 +1,4 @@
+// Sunucu ve GitHub üzerindeki sürümü karşılaştırır.
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -77,6 +78,7 @@ class UpdateInfo {
   final String notes;
   final bool authenticated;
   final String? sha256;
+  final bool rollback;
   UpdateInfo({
     required this.code,
     required this.name,
@@ -84,6 +86,7 @@ class UpdateInfo {
     required this.notes,
     this.authenticated = false,
     this.sha256,
+    this.rollback = false,
   });
 }
 
@@ -127,7 +130,12 @@ class UpdateService {
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) return null;
     final code = (decoded['code'] as num?)?.toInt() ?? 0;
-    if (code <= currentCode) return null;
+    final rollback = decoded['rollback'] == true;
+    if (rollback) {
+      if (code >= currentCode) return null;
+    } else if (code <= currentCode) {
+      return null;
+    }
 
     String? abi;
     try {
@@ -159,6 +167,7 @@ class UpdateService {
       notes: (decoded['notes'] ?? '').toString(),
       authenticated: trustedPrivate,
       sha256: digest,
+      rollback: rollback,
     );
   }
 

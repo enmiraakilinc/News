@@ -1,3 +1,4 @@
+// Akışı elle yenilenebilir yapar.
 import 'dart:async';
 
 /// Re-evaluates time-dependent data without reconnecting to Firestore.

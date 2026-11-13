@@ -1,8 +1,14 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 let cached;
-export async function oracleMode(fetcher=fetch){
+function publicRoot(env){
+ const root=String(env?.NEURAL_PUBLIC_URL||'').replace(/\/$/,'');
+ if(!/^https:\/\/[^/]+$/.test(root))throw Error('capabilities');
+ return root;
+}
+export async function oracleMode(fetcher=fetch,env={}){
  if(cached&&cached.until>Date.now())return cached.primary;
  try{
-  const response=await fetcher('https://158.180.38.94/v1/capabilities',{signal:AbortSignal.timeout(5000)});
+  const response=await fetcher(publicRoot(env)+'/v1/capabilities',{signal:AbortSignal.timeout(5000)});
   if(!response.ok)throw Error('capabilities');
   const data=await response.json();
   if(typeof data.primaryWrites!=='boolean')throw Error('capabilities');
@@ -11,7 +17,7 @@ export async function oracleMode(fetcher=fetch){
 }
 export async function proxyOracle(request,env,{fetch:fetcher=fetch,scheduledUid}={}){
  if(!env.NEURAL_PUSH_SECRET)return null;
- const mode=await oracleMode(fetcher);
+ const mode=await oracleMode(fetcher,env);
  if(mode===false)return null;
  if(mode===null)return Response.json({message:'Sunucuya şu anda ulaşılamıyor. Biraz sonra dene.'},{status:503});
  const url=new URL(request.url),headers={'content-type':'application/json'};
@@ -25,7 +31,7 @@ export async function proxyOracle(request,env,{fetch:fetcher=fetch,scheduledUid}
   headers['x-neural-time']=time;headers['x-neural-signature']=Array.from(signature,v=>v.toString(16).padStart(2,'0')).join('');
  }else{headers.authorization=request.headers.get('authorization')??'';}
  try{
-  const response=await fetcher('https://158.180.38.94'+path,{method:'POST',headers,body,signal:AbortSignal.timeout(20000)});
+  const response=await fetcher(publicRoot(env)+path,{method:'POST',headers,body,signal:AbortSignal.timeout(20000)});
   const result=await response.json();
   return Response.json({message:result.message??result.error?.message??'İşlem tamamlanamadı.',...(result.email?{email:result.email}:{})},{status:response.status,headers:{'cache-control':'no-store'}});
  }catch{return Response.json({message:'Sunucuya şu anda ulaşılamıyor. Biraz sonra dene.'},{status:503});}

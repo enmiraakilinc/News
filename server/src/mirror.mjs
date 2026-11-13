@@ -1,3 +1,4 @@
+// Firestore kopyasını PostgreSQL'de güncel tutan ayrı süreçtir.
 import {initializeApp,applicationDefault} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import pg from 'pg';

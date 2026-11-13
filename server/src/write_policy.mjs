@@ -1,3 +1,4 @@
+// Hangi belgenin kim tarafından yazılabileceğini belirler.
 import {isDeepStrictEqual as equal} from 'node:util';
 import {ApiError,docPath} from './access.mjs';
 
@@ -96,10 +97,15 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   }
   return deny();
  }
+ if(p[0]==='chatAccounts'&&p.length===4&&p[2]==='contacts'&&!b&&p[1]!==uid){
+  const chat=await read('chats/'+p[3]);
+  return chat&&chat.group!==true&&Array.isArray(chat.members)&&chat.members.length===2&&chat.members.includes(uid)&&chat.members.includes(p[1])?allow():deny();
+ }
  if(p[0]==='chatAccounts'&&p.length===4&&p[1]===uid){
   const kind=p[2],key=p[3];
   if(kind==='contacts'){
-   if(!b||!only(b,['alias','hidden','avatarEmoji','avatarPhoto'])||!image(b))return deny();
+   if(!b)return allow();
+   if(!only(b,['alias','hidden','avatarEmoji','avatarPhoto'])||!image(b))return deny();
    if('alias'in b&&!str(b.alias,1,60)||'hidden'in b&&typeof b.hidden!=='boolean')return deny();
    return allow();
   }
@@ -147,11 +153,12 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
        ||!('createdAt'in b)&&before(now,b.expiresAt)&&!before(now.add(3900000),b.expiresAt)))return allow();
   }
   if(update&&a.owner!==uid&&a.usedBy===null&&activeInvite(a,now)&&changes(a,b,['usedBy'])&&b.usedBy===uid)return allow();
-  if(remove&&a?.owner===uid)return allow();
+  if(remove&&(a?.owner===uid||a?.usedBy===uid))return allow();
   return deny();
  }
  if(p[0]==='chats'){
   if(p.length===2){
+   if(remove&&a&&a.group!==true&&Array.isArray(a.members)&&a.members.length===2&&a.members.includes(uid))return allow();
    if(update&&await member('chats',p[1])&&changes(a,b,['updatedAt'])&&at(b.updatedAt,now))return allow();
    if(!create||!only(b,['group','title','members','names','createdBy','updatedAt','inviteCode'])
      ||b.createdBy!==uid||!has(b.members,uid)||b.members.length<2||b.members.length>20

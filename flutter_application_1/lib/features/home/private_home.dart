@@ -1,3 +1,4 @@
+// Çiftin ana sayfası ve özellik kısayollarıdır.
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -19,6 +20,7 @@ import '../timeline/timeline_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../wishes/wishes_screen.dart';
 import '../pair/badge_service.dart';
+import '../../core/utils/sync_state.dart';
 import '../chat/chat_unread.dart';
 import '../settings/app_settings_screen.dart';
 import '../study/course_screen.dart';
@@ -350,10 +352,11 @@ class _CounterScreenState extends State<CounterScreen> {
       borderRadius: BorderRadius.circular(14),
       onTap: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => ekran));
-        // Bölüm görüldü → rozeti sıfırla (elimizdeki sayımla, ağa çıkmadan)
-        // ve ardından kalanları tek sorguda tazele.
-        if (notif != null) await BadgeService.markSeenWith(_sayimlar, [notif]);
         await _rozetleriYenile();
+        if (notif != null) {
+          await BadgeService.markSeenWith(_sayimlar, [notif]);
+          if (mounted) setState(() => _rozetler.remove(notif.collection));
+        }
       },
       child: Container(
         decoration: BoxDecoration(
@@ -887,6 +890,25 @@ class _CounterScreenState extends State<CounterScreen> {
     return StreamBuilder<List<CoupleNote>>(
       stream: _notesStream,
       builder: (context, snap) {
+        if (snap.hasError) {
+          return SyncError(
+            label: 'Notlar',
+            error: snap.error,
+            onRetry: () {
+              final cid = _coupleId;
+              final sec = _secret;
+              if (cid == null || sec == null) return;
+              CoupleService.resetConnection();
+              setState(() => _notesStream = CoupleService.notesStream(cid, sec));
+            },
+          );
+        }
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
         final all = snap.data ?? [];
         final ozel = all.where((n) => n.date != null).toList()
           ..sort((a, b) => a.date!.compareTo(b.date!));

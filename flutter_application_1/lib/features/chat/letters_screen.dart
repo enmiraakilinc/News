@@ -1,3 +1,4 @@
+// Mektup sohbetinin ekranıdır.
 import '../media/message_content.dart';
 import 'search/message_search.dart';
 import '../contacts/contact_names.dart';

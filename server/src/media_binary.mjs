@@ -1,3 +1,4 @@
+// Medya dosyasını yetkisi olana verir.
 import {ApiError,mediaPaths} from './access.mjs';
 
 export function encodeMediaBatch(paths,rows){

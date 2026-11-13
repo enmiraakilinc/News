@@ -1,3 +1,4 @@
+// Kişi listesi ve kalıcı kişi silmedir.
 import '../chat/delivery_status.dart';
 import 'contact_names.dart';
 import '../chat/search/message_search.dart';
@@ -19,7 +20,6 @@ import '../location/location_share.dart';
 import '../media/chat_media.dart';
 import 'contact_details_screen.dart';
 import '../../core/utils/user_errors.dart';
-import '../../core/notifications/notif_prefs.dart';
 import '../account/chat_account_screen.dart';
 
 class _UnreadMessagesDivider extends StatelessWidget {
@@ -71,7 +71,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
   late Future<String?> _profile;
   String? _profileName;
   List<Conversation> _conversations = [];
-  Set<String> _removed = {};
 
   Future<String?> _loadProfile() async {
     if (widget.profileLoader != null) return widget.profileLoader!();
@@ -103,7 +102,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _contactsChanged() {
-    if (mounted) setState(() => _removed = ContactNames.removed.toSet());
+    if (mounted) setState(() {});
   }
 
   Future<void> _refreshContacts() async {
@@ -125,7 +124,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
-  Future<void> _remove(Conversation chat) => _removeId(chat.id);
+  Future<void> _remove(Conversation chat) async {
+    if (chat.group) return;
+    await _removeId(chat.id);
+  }
 
   Future<void> _removeId(String id) async {
     final ok = await showDialog<bool>(
@@ -133,7 +135,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Kişiyi silmek istediğine emin misin?'),
         content: const Text(
-          'Bu kişi hesabının sohbet listesinden kaldırılacak. Mesajlar karşı taraftan silinmez.',
+          'Bu kişi her iki taraftan da silinir. Yeniden konuşmak için yeni bir davet kodu gerekir.',
         ),
         actions: [
           TextButton(
@@ -149,7 +151,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
     );
     if (ok != true) return;
     try {
-      await ContactNames.setHidden(id, true);
+      if (id == ContactNames.posniId) {
+        await CoupleService.severPair();
+      } else {
+        await ChatService.deleteDirect(id);
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -166,34 +172,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
       }
       return;
     }
-    _removed = ContactNames.removed.toSet();
     if (mounted) setState(() {});
   }
 
   bool _busy = false;
-
-  Future<void> _restoreContacts() async {
-    try {
-      for (final id in _removed.toList()) {
-        await ContactNames.setHidden(id, false);
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              userError(
-                error,
-                fallback: 'Kişilerin tümü geri getirilemedi. Yeniden dene.',
-              ),
-            ),
-          ),
-        );
-      }
-      return;
-    }
-    if (mounted) setState(() => _removed.clear());
-  }
 
   void _retry() {
     CoupleService.resetConnection();
@@ -334,8 +316,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
     await _run(() async {
       final id = await ChatService.acceptInvite(code);
       await ContactNames.save(id, alias);
-      await ContactNames.setHidden(id, false);
-      _removed = ContactNames.removed.toSet();
       if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -462,17 +442,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 },
         ),
         IconButton(
-          onPressed: () => editChatNotifications(context),
-          icon: const Icon(Icons.notifications_outlined),
-          tooltip: 'Sohbet bildirim yazısı',
-        ),
-        if (_removed.isNotEmpty)
-          IconButton(
-            onPressed: _restoreContacts,
-            icon: const Icon(Icons.person_add_alt),
-            tooltip: 'Silinen kişileri geri getir',
-          ),
-        IconButton(
           onPressed: _busy ? null : _group,
           icon: const Icon(Icons.group_add_outlined),
           tooltip: 'Grup kur',
@@ -481,8 +450,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     ),
     body: Column(
       children: [
-        if (!_removed.contains(ContactNames.posniId))
-          Card(
+        Card(
             margin: const EdgeInsets.all(16),
             child: ListTile(
               leading: const ContactAvatar(contactId: ContactNames.posniId),
@@ -633,9 +601,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             child: CircularProgressIndicator(),
                           );
                         }
-                        _conversations = snapshot.data!
-                            .where((chat) => !_removed.contains(chat.id))
-                            .toList();
+                        _conversations = snapshot.data!.toList();
                         if (_conversations.isEmpty) {
                           return const Center(
                             child: Padding(
@@ -702,15 +668,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                         if (mounted) setState(() {});
                                       }
                                     },
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(
+                                    itemBuilder: (_) => [
+                                      const PopupMenuItem(
                                         value: 'rename',
                                         child: Text('Adını değiştir'),
                                       ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Kişiyi sil'),
-                                      ),
+                                      if (!chat.group)
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('Kişiyi sil'),
+                                        ),
                                     ],
                                   ),
                                 ],
@@ -807,11 +774,11 @@ class _ConversationScreenState extends State<ConversationScreen>
   Future<void> _action(Future<void> Function() operation) async {
     try {
       await operation();
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('İşlem tamamlanamadı. Tekrar dene.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
       }
     }
   }

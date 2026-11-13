@@ -1,3 +1,4 @@
+// İstekteki Firebase oturumunu doğrular.
 import {getAuth} from 'firebase-admin/auth';
 import {ApiError} from './access.mjs';
 export async function authenticate(request) {

@@ -1,3 +1,4 @@
+// Giriş ekranı ve şifremi unuttum düğmesidir.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'chat_account.dart';
@@ -82,6 +83,30 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
       _oldPassword.clear();
     } catch (e) {
       if (mounted) setState(() => _error = ChatAccount.errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _forgot() async {
+    final code = _code.text.trim();
+    if (code.isEmpty) {
+      setState(() => _error = 'Önce hesap kodunu yaz.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ChatAccount.sendPasswordReset(code);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Şifre sıfırlama bağlantısı gönderildi.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = ChatAccount.errorMessage(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -184,6 +209,11 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
                     : 'Mevcut sohbetlerimi hesabıma bağla',
               ),
             ),
+            if (_login)
+              TextButton(
+                onPressed: _busy ? null : _forgot,
+                child: const Text('Şifremi unuttum'),
+              ),
           ],
           if (_busy)
             const Padding(

@@ -1,1 +1,1 @@
-"""Workspace development and release tooling."""
+"""Proje bakım betiği. Dosya: __init__.py. Workspace development and release tooling."""

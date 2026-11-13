@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {handle,WakeRateLimiter} from './worker.mjs';

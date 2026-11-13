@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/features/media/chat_media.dart';

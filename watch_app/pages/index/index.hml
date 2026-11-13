@@ -1,0 +1,48 @@
+<div class="screen">
+  <div class="tabs">
+    <text class="tab {{tab === 'news' ? 'on' : ''}}" onclick="showNews">Haberler</text>
+    <text class="tab {{tab === 'chats' ? 'on' : ''}}" onclick="showChats">Sohbetler</text>
+  </div>
+
+  <list class="list" if="{{tab === 'news' && article < 0}}">
+    <list-item for="{{news}}" tid="id" class="row" @click="openArticle">
+      <text class="title">{{$item.title}}</text>
+    </list-item>
+  </list>
+
+  <div class="page" if="{{tab === 'news' && article >= 0}}">
+    <text class="title">{{news[article].title}}</text>
+    <text class="body">{{news[article].summary}}</text>
+    <text class="link" onclick="closeArticle">Geri</text>
+  </div>
+
+  <list class="list" if="{{tab === 'chats' && chat < 0}}">
+    <list-item for="{{chats}}" tid="id" class="row" @click="openChat">
+      <text class="title">{{$item.title}}</text>
+    </list-item>
+  </list>
+
+  <div class="thread" if="{{tab === 'chats' && chat >= 0}}">
+    <text class="link" onclick="closeChat">Geri</text>
+    <list class="msgs">
+      <list-item for="{{chats[chat].messages}}" tid="id" class="msg">
+        <text class="{{$item.fromMe ? 'mine' : 'theirs'}}">{{$item.text}}</text>
+      </list-item>
+    </list>
+    <div class="quick">
+      <text class="key" onclick="quickOk">Tamam</text>
+      <text class="key" onclick="quickSoon">Geliyorum</text>
+      <text class="key" onclick="quickLater">Sonra</text>
+    </div>
+    <text class="draft">{{draft}}</text>
+    <div class="keys">
+      <text class="key" for="{{keys}}" @click="typeKey">{{$item}}</text>
+    </div>
+    <div class="quick">
+      <text class="key" onclick="backspace">Sil</text>
+      <text class="key" onclick="space">Boşluk</text>
+      <text class="key send" onclick="send">Gönder</text>
+    </div>
+  </div>
+  <text class="status">{{status}}</text>
+</div>

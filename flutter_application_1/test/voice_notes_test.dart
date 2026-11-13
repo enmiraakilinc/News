@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:async';
 import 'package:flutter_application_1/core/security/microphone_session.dart';
 import 'dart:io';

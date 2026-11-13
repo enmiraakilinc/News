@@ -1,7 +1,10 @@
+// Ana sayfadaki okunmamış rozetleri sayar.
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/notifications/notif_prefs.dart';
+import '../../core/utils/date_format.dart';
 
 /// Gizli bölümdeki kırmızı "+N" rozetleri.
 ///
@@ -21,19 +24,24 @@ class BadgeService {
     List<String> partners,
   ) async {
     if (kind.collection == 'questions') {
-      // Günün sorusu farklı yapıda: her günün belgesinde answers{uid: cevap}.
-      // Bu belgeler küçük (birkaç KB), tamamını okumak sorun değil.
-      final snap = await base.collection('questions').get();
-      int c = 0;
-      for (final d in snap.docs) {
-        final ans = d.data()['answers'];
-        if (ans is Map) {
-          for (final k in ans.keys) {
-            if (partners.contains(k.toString())) c++;
-          }
+      final prefs = await SharedPreferences.getInstance();
+      final day = formatIsoDate(DateTime.now());
+      if (prefs.getString('question_seen_day') == day) return 0;
+      final snap = await base.collection('questions').doc(day).get();
+      final data = snap.data();
+      final me = FirebaseAuth.instance.currentUser?.uid;
+      final seenBy = data?['seenBy'];
+      if (me != null && seenBy is List && seenBy.contains(me)) {
+        await prefs.setString('question_seen_day', day);
+        return 0;
+      }
+      final ans = data?['answers'];
+      if (ans is Map) {
+        for (final k in ans.keys) {
+          if (partners.contains(k.toString())) return 1;
         }
       }
-      return c;
+      return 0;
     }
     final agg = await base
         .collection(kind.collection)
@@ -94,6 +102,11 @@ class BadgeService {
   }
 
   /// Elde hazır sayımlarla "görüldü" işaretler — ağa çıkmaz.
+  static Future<void> markQuestionSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('question_seen_day', formatIsoDate(DateTime.now()));
+  }
+
   static Future<void> markSeenWith(
     Map<String, int> counts,
     List<ContentNotif> kinds,

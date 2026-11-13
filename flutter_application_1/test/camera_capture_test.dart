@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:async';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:flutter/material.dart';

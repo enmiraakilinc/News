@@ -1,4 +1,4 @@
-"""Read only the requested Defne screenshot attachments; never print message bodies."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: inspect_defne_screenshot.py. Read only the requested Defne screenshot attachments; never print message bodies."""
 import base64
 import json
 import sys

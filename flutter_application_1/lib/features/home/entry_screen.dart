@@ -1,3 +1,4 @@
+// Uygulama açılınca görünen karşılama ekranıdır.
 import 'package:flutter/material.dart';
 import '../news/news_screen.dart';
 import 'dart:async';

@@ -1,4 +1,4 @@
-"""Decrypt a verified local backup. The recovery key must stay outside GitHub."""
+"""Proje bakım betiği. Dosya: decrypt_backup.py. Decrypt a verified local backup. The recovery key must stay outside GitHub."""
 import argparse
 import base64
 import json

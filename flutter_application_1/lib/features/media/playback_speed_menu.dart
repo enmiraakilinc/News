@@ -1,3 +1,4 @@
+// Ses oynatma hızını seçtirir.
 import 'package:flutter/material.dart';
 
 class PlaybackSpeedMenu extends StatelessWidget {

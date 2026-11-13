@@ -1,3 +1,4 @@
+// Arama sırasındaki düğmeleri çizer.
 import 'package:flutter/material.dart';
 
 /// Separate local microphone, audio route, and incoming sound controls.

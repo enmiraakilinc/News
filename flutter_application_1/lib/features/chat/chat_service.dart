@@ -1,3 +1,4 @@
+// Mesaj gönderme, okuma ve birebir sohbeti silmeyi yapar.
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
@@ -258,6 +259,49 @@ class ChatService {
       if (data['usedBy'] == null) tx.update(ref, {'usedBy': _uid});
       return id;
     });
+  }
+
+  static Future<void> deleteDirect(String chatId) async {
+    await CoupleService.ensureReady();
+    final ref = _db.collection('chats').doc(chatId);
+    final doc = await ref.get();
+    final data = doc.data();
+    final members = List<String>.from(data?['members'] ?? const []);
+    if (data == null ||
+        data['group'] == true ||
+        members.length != 2 ||
+        !members.contains(_uid)) {
+      throw Exception('Bu bağlantı bulunamadı.');
+    }
+    final peer = members.firstWhere((id) => id != _uid);
+    while (true) {
+      final page = await ref.collection('messages').limit(400).get();
+      if (page.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final message in page.docs) {
+        batch.delete(message.reference);
+      }
+      await batch.commit();
+      if (page.docs.length < 400) break;
+    }
+    final batch = _db.batch();
+    final code = data['inviteCode'];
+    if (code is String && code.isNotEmpty) {
+      final invite = await _db.collection('chatInvites').doc(code).get();
+      if (invite.exists) batch.delete(invite.reference);
+    }
+    batch.delete(
+      _db.collection('chatAccounts').doc(_uid).collection('contacts').doc(chatId),
+    );
+    batch.delete(
+      _db
+          .collection('chatAccounts')
+          .doc(peer)
+          .collection('contacts')
+          .doc(chatId),
+    );
+    batch.delete(ref);
+    await batch.commit();
   }
 
   static Stream<List<Conversation>> conversations() => _ready(

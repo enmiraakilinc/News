@@ -1,3 +1,4 @@
+// Sunucu adresini çözer ve hatırlatma uyanmasını kaydeder.
 import '../reminders/reminder_service.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -13,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/random_id.dart';
 import '../../core/utils/user_errors.dart';
+import '../../core/data/neural_endpoint.dart';
 
 class WakeupService {
   static const channel = MethodChannel('app/wakeup');
@@ -37,8 +39,10 @@ class WakeupService {
       .collection('wakePermissions')
       .doc(permissionId(sourceKey, device));
   static Future<String?> endpoint() async {
-    if (const bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY')) {
-      return 'https://158.180.38.94';
+    final defined = neuralPublicUrl();
+    if (const bool.fromEnvironment('NEURAL_POSTGRES_PRIMARY') &&
+        defined != null) {
+      return defined;
     }
     try {
       final data =
@@ -53,7 +57,7 @@ class WakeupService {
         return uri.toString();
       }
     } catch (_) {}
-    return null;
+    return defined;
   }
 
   static Future<void> register() async {

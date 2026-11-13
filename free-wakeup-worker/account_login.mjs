@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 // Codes are login identifiers, never a substitute for the Firebase password.
 // No passwords pass through this worker; alias documents stay owner-only.
 export async function resolveAccount(request, env, {fetch: fetcher=fetch, token}={}) {

@@ -1,3 +1,4 @@
+// İki tarafta görünen kişi adını çözer.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../pair/couple_service.dart';

@@ -1,3 +1,4 @@
+// Blok oyununun kurallarını hesaplar.
 import 'dart:math';
 
 const blockBlastBoardSize = 8;

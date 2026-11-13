@@ -1,3 +1,4 @@
+// Birincil modda birden fazla yazmayı tek işlemde gönderir.
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart';
 import 'oracle_codec.dart';
 import 'oracle_primary_store.dart';

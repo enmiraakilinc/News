@@ -1,4 +1,4 @@
-"""Deploy backward-compatible binary media and optional presence after tests."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: deploy_media_performance.py. Deploy backward-compatible binary media and optional presence after tests."""
 from pathlib import Path
 import sys
 ROOT=Path(__file__).resolve().parents[2]

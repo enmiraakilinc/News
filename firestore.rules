@@ -73,6 +73,12 @@ service cloud.firestore {
         && request.resource.data.get('avatarPhoto', '') is string
         && request.resource.data.get('avatarPhoto', '').size() <= 32768
         && (request.resource.data.get('avatarEmoji', '') == '' || request.resource.data.get('avatarPhoto', '') == '');
+      allow delete: if girisYapti() && (request.auth.uid == userId
+        || (exists(/databases/$(database)/documents/chats/$(contactId))
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(contactId)).data.members
+          && userId in get(/databases/$(database)/documents/chats/$(contactId)).data.members
+          && get(/databases/$(database)/documents/chats/$(contactId)).data.group != true
+          && get(/databases/$(database)/documents/chats/$(contactId)).data.members.size() == 2));
     }
 
     match /chatAccounts/{userId}/personalConfig/presence {
@@ -207,7 +213,8 @@ service cloud.firestore {
         && resource.data.usedBy == null && davetAktif(resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy'])
         && request.resource.data.usedBy == request.auth.uid;
-      allow delete: if girisYapti() && resource.data.owner == request.auth.uid;
+      allow delete: if girisYapti()
+        && (resource.data.owner == request.auth.uid || resource.data.usedBy == request.auth.uid);
     }
 
     function davetAktif(data) {
@@ -330,6 +337,9 @@ service cloud.firestore {
       allow update: if sohbetUyesi(chatId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
         && request.resource.data.updatedAt == request.time;
+      allow delete: if sohbetUyesi(chatId)
+        && resource.data.group != true
+        && resource.data.members.size() == 2;
 
       match /typing/{userId} {
         allow read: if sohbetUyesi(chatId);

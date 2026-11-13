@@ -1,3 +1,4 @@
+// Firestore çağrılarını, birincil modda VPS üzerinden geçirir.
 import 'dart:io';
 import 'oracle_primary_store.dart';
 import 'oracle_primary_transport.dart';

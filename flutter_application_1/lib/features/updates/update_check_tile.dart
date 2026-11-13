@@ -1,3 +1,4 @@
+// Ayarlardan elle güncelleme kontrolü yapar.
 import 'package:flutter/material.dart';
 import 'update_service.dart';
 import 'update_dialog.dart';

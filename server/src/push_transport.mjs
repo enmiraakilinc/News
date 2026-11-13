@@ -1,3 +1,4 @@
+// Anlık bildirimi cihaza yollar.
 import {createHmac,randomUUID} from 'node:crypto';
 // Firebase credentials stay on the existing Worker; only FCM transport remains there.
 export async function deliverPush(message,{fetcher=fetch,secret=process.env.NEURAL_PUSH_SECRET,url=process.env.NEURAL_PUSH_URL}={}){

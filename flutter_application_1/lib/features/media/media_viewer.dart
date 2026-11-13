@@ -1,3 +1,4 @@
+// Fotoğraf ve videoyu açar.
 import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';

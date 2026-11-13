@@ -1,3 +1,4 @@
+// Kabul edilen ses dosyası türlerini tutar.
 /// Supported audio file extensions and Android MIME types.
 class AudioFileTypes {
   static const mimeTypes = <String, String>{

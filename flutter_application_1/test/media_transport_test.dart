@@ -1,3 +1,4 @@
+// İlgili ekran veya kuralın otomatik sınamasıdır.
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter_application_1/features/media/chat_media.dart';

@@ -1,3 +1,4 @@
+// Sohbet teması ve turuncu ana rengi tutar.
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/starred/starred_messages.dart';
@@ -90,7 +91,7 @@ class ChatThemes {
     final seed = value == 'love'
         ? const Color(0xff420303)
         : value == 'orange'
-        ? const Color(0xffcb5c0c)
+        ? const Color(0xFFED820E)
         : accent != null
         ? Color(accent!)
         : value == 'pastel'
@@ -125,9 +126,9 @@ class ChatThemes {
     }
     if (value == 'orange') {
       scheme = scheme.copyWith(
-        primary: const Color(0xffffb77f),
+        primary: const Color(0xFFED820E),
         onPrimary: const Color(0xff402000),
-        primaryContainer: const Color(0xffcb5c0c),
+        primaryContainer: const Color(0xFFED820E),
         onPrimaryContainer: Colors.black,
         surface: const Color(0xff211911),
         onSurface: const Color(0xffffeadb),

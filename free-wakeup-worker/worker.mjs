@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 import {internalPush} from './internal_push.mjs';
 import {oracleMode,proxyOracle} from './oracle_proxy.mjs';
 import {transitionUpdate} from './transition_update.mjs';

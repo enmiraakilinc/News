@@ -1,4 +1,4 @@
-"""Non-destructive access checks, protected backup install and aggregate status."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: check_server.py. Non-destructive access checks, protected backup install and aggregate status."""
 from pathlib import Path
 import sys,json
 ROOT=Path(__file__).resolve().parents[2]

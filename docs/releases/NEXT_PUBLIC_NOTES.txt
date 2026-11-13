@@ -1,5 +1,14 @@
-Aramalar düzeltildi.
-Bildirimler düzeltildi.
-Anlık foto atma kısmı düzeltildi.
-Mesajların geç gelmesi düzeltildi.
-Son görülmeler daha düzgün hale getirildi.
+Aramalar erken kapanmıyor.
+Yalnızca cevapsız arama sohbete yazılıyor.
+Son görülme saati düzeltildi.
+Anlık fotoğraf atma düzeltildi.
+Kişi silmek iki tarafta da kalıcı.
+Yeniden yazmak için yeni davet gerekiyor.
+Günün sorusu kayıtları düzenlendi.
+Anılar, dilekler, ders notları yüklemede takılı kalmıyor.
+Şifremi unuttum eklendi.
+Bildirimde titreşim bildirimi seçeneği seçilebiliyor.
+Ders notları defter görünümünde.
+Turuncu tema rengi düzeltildi.
+Hata yazıları daha açık.
+Bozuk sürümde kararlı sürüme dönme uyarısı çıkıyor.

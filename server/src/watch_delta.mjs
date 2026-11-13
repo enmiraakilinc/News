@@ -1,3 +1,4 @@
+// Saat bildirimini etkileyecek sohbet değişimini seçer.
 // Large file chunk uploads must not re-run unrelated message/photo queries.
 // ACL ancestors still invalidate dependent reads immediately.
 export function affectsWatch(request,changed){

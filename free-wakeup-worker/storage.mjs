@@ -1,3 +1,4 @@
+// Eski hatırlatma isteğini VPS adresine iletir.
 export const freeStorageBytes = 1024 ** 3;
 export async function checkStorage(env, {fetch: fetcher = fetch, token} = {}) {
   const now = new Date();

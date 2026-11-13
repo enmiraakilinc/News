@@ -1,4 +1,4 @@
-"""Provision only this new bot Worker; activate only after Render polling stops.
+"""Telegram bulut botunun kurulum betiği. Dosya: setup.py. Provision only this new bot Worker; activate only after Render polling stops.
 
 No credentials are read from the old source code. Secret inputs are never printed.
 """

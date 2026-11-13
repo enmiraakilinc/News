@@ -1,4 +1,4 @@
-"""Prepare a read-only legacy rule set. Apply only during an approved cutover.
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: freeze_legacy_writes.py. Prepare a read-only legacy rule set. Apply only during an approved cutover.
 
 API schema: https://firebase.google.com/docs/reference/rules/rest/v1/projects.releases/patch
 """

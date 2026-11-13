@@ -1,3 +1,4 @@
+// Teknik hataları kısa Türkçe cümleye çevirir.
 import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
@@ -8,7 +9,7 @@ String userError(
   String fallback = 'İşlem tamamlanamadı. Yeniden dene.',
 }) {
   if (error is TimeoutException || error is SocketException) {
-    return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+    return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
   }
   if (error is FileSystemException) {
     return 'Dosya okunamadı veya kaydedilemedi. Dosyanın hâlâ bulunduğunu ve telefonda boş alan olduğunu kontrol et.';
@@ -22,7 +23,7 @@ String userError(
         return 'Sunucu/sinyalleşme izni reddedildi (oturum veya kural yetkisi eksik).';
       case 'unavailable':
       case 'network-request-failed':
-        return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+        return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
       case 'resource-exhausted':
         return 'Hizmetin kullanım sınırına ulaşıldı. Daha sonra yeniden dene.';
       case 'not-found':
@@ -37,7 +38,7 @@ String userError(
       case 'too-many-requests':
         return 'Kısa sürede çok fazla deneme yapıldı. Biraz bekleyip yeniden dene.';
       case 'deadline-exceeded':
-        return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+        return 'Sunucu yanıt vermedi. Bağlantın yavaş olabilir; biraz sonra yeniden dene.';
       case 'storage-full':
         return 'Depolama alanı dolu. Gereksiz dosyaları kaldırıp yeniden dene.';
     }
@@ -91,12 +92,12 @@ String userError(
   if (lower.contains('timeout') ||
       lower.contains('deadline') ||
       lower.contains('zaman aş')) {
-    return 'Arama zaman aşımına uğradı. Bağlantı yetişmedi.';
+    return 'Sunucu yanıt vermedi. Bağlantın yavaş olabilir; biraz sonra yeniden dene.';
   }
   if (lower.contains('socket') ||
       lower.contains('network') ||
       lower.contains('failed host')) {
-    return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+    return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
   }
   if (lower.contains('in_use') ||
       lower.contains('notreadable') ||
@@ -115,7 +116,7 @@ String userError(
     r'exception|firebase|stacktrace|errno|https?://',
     caseSensitive: false,
   ).hasMatch(message)) {
-    return 'İnternet bağlantınız çok yavaş veya kesildi, arama kurulamadı.';
+    return 'İnternet bağlantın çok yavaş veya kesildi. Biraz sonra yeniden dene.';
   }
   if (message.isNotEmpty && message.length < 180) return message;
   return fallback;

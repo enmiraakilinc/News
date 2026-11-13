@@ -1,3 +1,4 @@
+// Defter görünümlü ders notu ekranıdır.
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -40,7 +41,7 @@ class PersonalCoursesScreen extends StatefulWidget {
 class _PersonalCoursesScreenState extends State<PersonalCoursesScreen> {
   late Future<String> _owner = _load();
   Future<String> _load() async {
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 6));
     final uid = CoupleService.uid;
     if (uid == null) throw Exception('Kişisel hesabın henüz hazır değil.');
     return uid;
@@ -324,8 +325,11 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
             stream: _stream,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return const Center(
-                  child: Text('Dersler yüklenemedi. Geri dönüp yeniden dene.'),
+                return Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => _stream = _folders()),
+                    child: const Text('Dersler yüklenemedi. Yeniden dene.'),
+                  ),
                 );
               }
               if (!snapshot.hasData) {
@@ -346,14 +350,12 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
                 );
               }
               return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 90),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
                 itemCount: folders.length,
-                itemBuilder: (context, i) => ListTile(
-                  leading: Icon(
-                    Icons.folder,
-                    color: courseFolderColors[folders[i].color],
-                  ),
-                  title: Text(folders[i].title),
+                itemBuilder: (context, i) => _NotebookRow(
+                  title: folders[i].title,
+                  subtitle: widget.parent == null ? 'Ders' : 'Konu',
+                  color: courseFolderColors[folders[i].color],
                   onTap: _busy
                       ? null
                       : () => Navigator.push<void>(
@@ -729,13 +731,19 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
               !snapshot.hasData)
             const LinearProgressIndicator(),
           for (final folder in folders)
-            ListTile(
-              dense: true,
-              leading: Icon(
-                Icons.folder,
-                color: courseFolderColors[folder.color],
+            _NotebookRow(
+              title: folder.title,
+              subtitle: 'Konu',
+              color: courseFolderColors[folder.color],
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CourseNotesScreen(
+                    repository: widget.repository,
+                    folder: folder,
+                  ),
+                ),
               ),
-              title: Text(folder.title),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -755,15 +763,6 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                     ),
                   ),
                 ],
-              ),
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CourseNotesScreen(
-                    repository: widget.repository,
-                    folder: folder,
-                  ),
-                ),
               ),
             ),
           const Divider(),
@@ -1097,38 +1096,12 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
     Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text('${photos.length} fotoğraf')),
-          body: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: photos.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 16),
-            itemBuilder: (context, index) => Column(
-              children: [
-                _image(photos[index]),
-                if (photos[index].text.isNotEmpty)
-                  CourseNoteText(photos[index].text),
-                TextButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          await _edit(photos[index]);
-                          if (context.mounted) Navigator.pop(context);
-                        },
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Açıklamayı düzenle'),
-                ),
-                TextButton.icon(
-                  onPressed: () async {
-                    await _delete(photos[index]);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Bu fotoğrafı sil'),
-                ),
-              ],
-            ),
-          ),
+        builder: (_) => _NotebookAlbum(
+          photos: photos,
+          image: _image,
+          busy: _busy,
+          onEdit: _edit,
+          onDelete: _delete,
         ),
       ),
     );
@@ -1192,8 +1165,13 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
               stream: _stream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Notlar yüklenemedi. Yeniden açmayı dene.'),
+                  return Center(
+                    child: TextButton(
+                      onPressed: () => setState(
+                        () => _stream = widget.repository.notes(widget.folder.id),
+                      ),
+                      child: const Text('Notlar yüklenemedi. Yeniden dene.'),
+                    ),
                   );
                 }
                 if (!snapshot.hasData) {
@@ -1549,3 +1527,181 @@ Future<bool> _confirm(BuildContext context, String message) async =>
       ),
     ) ==
     true;
+
+class _NotebookRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Color? color;
+  final VoidCallback? onTap;
+  final Widget trailing;
+  const _NotebookRow({
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+    required this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Material(
+      color: const Color(0xFFFFF6E4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: const BorderSide(color: Color(0xFFE7D3A1)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Container(width: 8, color: const Color(0xFFE53935)),
+              const SizedBox(width: 10),
+              Icon(Icons.menu_book_outlined, color: color ?? const Color(0xFF8A5A3B)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF8A5A3B),
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Color(0xFF3E2C1C),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              IconTheme(
+                data: const IconThemeData(color: Color(0xFF3E2C1C)),
+                child: trailing,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _NotebookAlbum extends StatefulWidget {
+  final List<LessonNote> photos;
+  final Widget Function(LessonNote note) image;
+  final bool busy;
+  final Future<void> Function(LessonNote note) onEdit;
+  final Future<void> Function(LessonNote note) onDelete;
+  const _NotebookAlbum({
+    required this.photos,
+    required this.image,
+    required this.busy,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  State<_NotebookAlbum> createState() => _NotebookAlbumState();
+}
+
+class _NotebookAlbumState extends State<_NotebookAlbum> {
+  late final PageController _pages = PageController();
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF3E2C1C),
+    appBar: AppBar(title: Text('Defter · ${widget.photos.length} sayfa')),
+    body: PageView.builder(
+      controller: _pages,
+      itemCount: widget.photos.length,
+      itemBuilder: (context, index) {
+        final photo = widget.photos[index];
+        return AnimatedBuilder(
+          animation: _pages,
+          builder: (context, child) {
+            final page = _pages.hasClients ? (_pages.page ?? index.toDouble()) : index.toDouble();
+            final delta = (index - page).clamp(-1.0, 1.0);
+            return Transform(
+              alignment: delta >= 0 ? Alignment.centerLeft : Alignment.centerRight,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY(delta * 0.8),
+              child: child,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF6E4),
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black45, blurRadius: 12, offset: Offset(4, 6)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(width: 14, color: const Color(0xFFE53935)),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Sayfa ${index + 1}',
+                            style: const TextStyle(color: Color(0xFF8A5A3B)),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(child: Center(child: widget.image(photo))),
+                          if (photo.text.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: CourseNoteText(photo.text),
+                            ),
+                          TextButton.icon(
+                            onPressed: widget.busy
+                                ? null
+                                : () async {
+                                    await widget.onEdit(photo);
+                                    if (context.mounted) Navigator.pop(context);
+                                  },
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Açıklamayı düzenle'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              await widget.onDelete(photo);
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Bu fotoğrafı sil'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}

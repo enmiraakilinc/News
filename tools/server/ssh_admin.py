@@ -1,20 +1,20 @@
-"""Run a reviewed Python maintenance script over the configured SSH connection."""
+"""Sunucuya kurulum veya canlı doğrulama betiği. Dosya: ssh_admin.py. Run a reviewed Python maintenance script over the configured SSH connection."""
 import argparse
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.runtime_config import ssh_host, ssh_key
 
-HOST = "opc@158.180.38.94"
 SSH = shutil.which("ssh") or "ssh"
-KEY = Path.home() / "İndirilenler" / "ssh-key-2026-10-30.key"
 
 def execute(script, *, timeout=1200):
     return subprocess.run(
-        [SSH, "-i", str(KEY), "-o", "BatchMode=yes",
+        [SSH, "-i", str(ssh_key()), "-o", "BatchMode=yes",
          "-o", "ConnectTimeout=15", "-o", "StrictHostKeyChecking=yes",
          "-o", "ServerAliveInterval=20",
-         "-o", "ServerAliveCountMax=3", HOST, "python3 -"],
+         "-o", "ServerAliveCountMax=3", ssh_host(), "python3 -"],
         input=script, text=True, encoding="utf-8", timeout=timeout,
         check=True,
     )

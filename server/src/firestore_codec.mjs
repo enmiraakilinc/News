@@ -1,3 +1,4 @@
+// Firestore belge biçimini sunucu biçimine çevirir.
 export function timestamp(t) {
  const start=new Date(Number(t.seconds)*1000).toISOString().slice(0,19);
  const nanos=String(t.nanoseconds).padStart(9,'0');

@@ -1,3 +1,4 @@
+// Sohbetteki ses kaydını çalar.
 import 'playback_speed_menu.dart';
 import 'dart:async';
 import 'dart:io';

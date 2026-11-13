@@ -1,4 +1,4 @@
-"""Check real anonymous-account linking, second-device login and contact isolation."""
+"""Firebase ve veri bakımı için elle çalıştırılan betik. Dosya: verify_chat_accounts.py. Check real anonymous-account linking, second-device login and contact isolation."""
 import json
 import secrets
 import uuid
