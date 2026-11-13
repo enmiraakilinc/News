@@ -8,9 +8,6 @@ import 'update_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 
-/// "Yeni sürüm var" penceresi. Güncelle'ye basınca APK'yı uygulama içinde
-/// ilerleme çubuğuyla indirir; inince Android kurulum ekranını doğrudan açar
-/// (tarayıcıya gitmeye gerek yok).
 class UpdateDialog extends StatefulWidget {
   final UpdateInfo info;
   const UpdateDialog({super.key, required this.info});
@@ -21,17 +18,18 @@ class UpdateDialog extends StatefulWidget {
 
 class _UpdateDialogState extends State<UpdateDialog> {
   bool _downloading = false;
-  double _progress = 0; // 0..1
+  double _progress = 0;
   int _receivedMB = 0;
   int _totalMB = 0;
+  String? _errorText;
 
   Future<void> _download() async {
-    final messenger = ScaffoldMessenger.of(context);
     setState(() {
       _downloading = true;
       _progress = 0;
       _receivedMB = 0;
       _totalMB = 0;
+      _errorText = null;
     });
     try {
       final dir = await getTemporaryDirectory();
@@ -85,7 +83,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
         client.close();
       }
 
-      // Kurulum ekranını doğrudan aç.
       final res = await OpenFilex.open(
         file.path,
         type: 'application/vnd.android.package-archive',
@@ -96,14 +93,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _downloading = false);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            "Güncelleme inemedi: ${e.toString().replaceFirst('Exception: ', '')}",
-          ),
-        ),
-      );
+      setState(() {
+        _downloading = false;
+        _errorText = 'Güncelleme inemedi: ${e.toString().replaceFirst("Exception: ", "")}';
+      });
     }
   }
 
@@ -111,21 +104,20 @@ class _UpdateDialogState extends State<UpdateDialog> {
   Widget build(BuildContext context) {
     final info = widget.info;
     final colors = Theme.of(context).colorScheme;
-    // İndirme sırasında geri tuşuyla kapatmayı engelle.
     return PopScope(
       canPop: !_downloading,
       child: Dialog(
         backgroundColor: colors.surface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Üst ikon
               Container(
-                width: 62,
-                height: 62,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: colors.surfaceContainerHighest,
                   shape: BoxShape.circle,
@@ -134,31 +126,29 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 child: Icon(
                   Icons.rocket_launch,
                   color: colors.primary,
-                  size: 30,
+                  size: 28,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Text(
                 info.rollback
-                    ? "Kararlı sürüme geri dönmeniz gerekiyor"
+                    ? 'Kararlı sürüme geri dönmeniz gerekiyor'
                     : info.name.isEmpty
-                    ? "Yeni sürüm mevcut"
-                    : "Yeni sürüm ${info.name}",
+                    ? 'Yeni sürüm mevcut'
+                    : 'Yeni sürüm ${info.name}',
                 style: TextStyle(
                   color: colors.onSurface,
-                  fontSize: 20,
+                  fontSize: 19,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 2),
               Text(
-                "Güncellemeye hazır 🎉",
+                'Güncellemeye hazır 🎉',
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
               ),
-              const SizedBox(height: 18),
-
-              // Changelog kartı
+              const SizedBox(height: 14),
               if (info.notes.trim().isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -168,17 +158,27 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: colors.outlineVariant),
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: _buildNotes(info.notes),
-                    ),
                   ),
                 ),
-
-              const SizedBox(height: 18),
-
-              // İndirme durumu ya da butonlar
+              if (_errorText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colors.errorContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _errorText!,
+                    style: TextStyle(color: colors.onErrorContainer, fontSize: 12),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
               if (_downloading) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -192,9 +192,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 const SizedBox(height: 8),
                 Text(
                   _progress > 0
-                      ? "İndiriliyor… %${(_progress * 100).toStringAsFixed(0)}"
-                            "${_totalMB > 0 ? '  ($_receivedMB/$_totalMB MB)' : ''}"
-                      : "İndiriliyor…",
+                      ? 'İndiriliyor… %${(_progress * 100).toStringAsFixed(0)}'
+                            '${_totalMB > 0 ? "  ($_receivedMB/$_totalMB MB)" : ""}'
+                      : 'İndiriliyor…',
                   style: TextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
@@ -206,7 +206,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text("Sonra"),
+                        child: const Text('Sonra'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -215,7 +215,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                       child: ElevatedButton.icon(
                         onPressed: _download,
                         icon: const Icon(Icons.download, size: 18),
-                        label: const Text("Güncelle"),
+                        label: const Text('Güncelle'),
                       ),
                     ),
                   ],
@@ -227,11 +227,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
     );
   }
 
-  /// Notları güzel biçimlendirir: "•" ile başlayan satırlar tikli madde,
-  /// diğerleri (örn "Yenilikler:") başlık.
   List<Widget> _buildNotes(String notes) {
     final colors = Theme.of(context).colorScheme;
-    final lines = notes.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    final lines = notes.split('
+').where((l) => l.trim().isNotEmpty).toList();
     return lines.map((line) {
       final t = line.trim();
       if (t.startsWith('•') || t.startsWith('-')) {
@@ -242,7 +241,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: EdgeInsets.only(top: 2, right: 8),
+                padding: const EdgeInsets.only(top: 2, right: 8),
                 child: Icon(
                   Icons.check_circle,
                   size: 15,

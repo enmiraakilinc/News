@@ -20,6 +20,7 @@ class _UpdateCheckTileState extends State<UpdateCheckTile> {
     if (_available != null) {
       await showDialog<void>(
         context: context,
+        barrierDismissible: false,
         builder: (_) => UpdateDialog(info: _available!),
       );
       return;
