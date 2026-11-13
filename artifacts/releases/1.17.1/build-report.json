@@ -1,0 +1,29 @@
+{
+  "version": "1.17.1",
+  "code": 2101,
+  "filename": "Neural-Haber-1.17.1-arm64.apk",
+  "bytes": 39577525,
+  "sha256": "0eba057a1384371eab147f6c6ea81111c7f8e80e90d9cf9caf253c590a5cd550",
+  "abi": [
+    "arm64-v8a"
+  ],
+  "signingVerified": true,
+  "debuggable": false,
+  "postgresPrimary": true,
+  "dataWriteMode": "postgres-primary",
+  "published": true,
+  "stagedOnVps": true,
+  "physicalDeviceTested": false,
+  "verification": {
+    "flutterTests": "229 passed",
+    "dartAnalyze": "passed",
+    "serverTests": "not run; Node.js is unavailable"
+  },
+  "livePrimaryEnabled": true,
+  "primaryCutoverRequired": false,
+  "sourceCommit": "66bfff7512802bcd37446d7d48b40aadef8bf65e",
+  "githubDownloadVerified": true,
+  "releaseUrl": "https://github.com/enmiraakilinc/News/releases/tag/v1.16.14",
+  "legacyMetadataUpdated": true,
+  "vpsMetadataUpdated": true
+}
