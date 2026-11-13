@@ -160,6 +160,9 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
   if(p.length===2){
    if(remove&&a&&a.group!==true&&Array.isArray(a.members)&&a.members.length===2&&a.members.includes(uid))return allow();
    if(update&&await member('chats',p[1])&&changes(a,b,['updatedAt'])&&at(b.updatedAt,now))return allow();
+   if(update&&await member('chats',p[1])&&changes(a,b,['lastReadAt'])&&map(b.lastReadAt)&&at(b.lastReadAt[uid],now)
+      &&Object.keys(b.lastReadAt).length<=20
+      &&Object.keys(b.lastReadAt).every(k=>k===uid||equal(b.lastReadAt[k],a?.lastReadAt?.[k])))return allow();
    if(!create||!only(b,['group','title','members','names','createdBy','updatedAt','inviteCode'])
      ||b.createdBy!==uid||!has(b.members,uid)||b.members.length<2||b.members.length>20
      ||new Set(b.members).size!==b.members.length||!b.members.every(u=>typeof u==='string')

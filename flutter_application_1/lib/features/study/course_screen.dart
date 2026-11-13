@@ -90,7 +90,9 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          widget.parent == null ? 'Ders klasörünü düzenle' : 'Konu klasörünü düzenle',
+          widget.parent == null
+              ? 'Ders klasörünü düzenle'
+              : 'Konu klasörünü düzenle',
         ),
         content: TextField(
           controller: controller,
@@ -433,7 +435,6 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
   );
   bool _busy = false;
   String _kind = 'text';
-  final _expandedNotes = <String>{};
   bool _showSearch = false;
   final _cleanedVideos = <String>{};
 
@@ -656,169 +657,6 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
     }
   }
 
-  late Stream<List<LessonFolder>> _topics = widget.repository.folders(
-    parent: widget.folder.id,
-  );
-
-  Future<void> _createTopic() async {
-    final controller = TextEditingController();
-    final title = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Yeni konu klasörü'),
-        content: TextField(
-          controller: controller,
-          maxLength: 100,
-          decoration: const InputDecoration(labelText: 'Konu adı'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Ekle'),
-          ),
-        ],
-      ),
-    );
-    Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
-    if (title == null || title.isEmpty || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await widget.repository.create(title, parent: widget.folder.id);
-      if (mounted) {
-        setState(
-          () => _topics = widget.repository.folders(parent: widget.folder.id),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Widget _topicFolders(AsyncSnapshot<List<LessonFolder>> snapshot) {
-    final folders = [...?snapshot.data]
-      ..sort((a, b) {
-        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-        return searchText(a.title).compareTo(searchText(b.title));
-      });
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(child: Text('Konular')),
-              TextButton.icon(
-                onPressed: _busy ? null : _createTopic,
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Konu ekle'),
-              ),
-            ],
-          ),
-          if (snapshot.hasError)
-            const Text('Konular yüklenemedi. Yeniden açmayı dene.'),
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData)
-            const LinearProgressIndicator(),
-          for (final folder in folders)
-            _NotebookRow(
-              title: folder.title,
-              subtitle: 'Konu',
-              color: courseFolderColors[folder.color],
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CourseNotesScreen(
-                    repository: widget.repository,
-                    folder: folder,
-                  ),
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Konu adını düzenle',
-                    onPressed: _busy ? null : () => _renameTopic(folder),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                  CourseFolderColorButton(
-                    repository: widget.repository,
-                    folder: folder,
-                    enabled: !_busy,
-                    onChanged: () => setState(
-                      () => _topics = widget.repository.folders(
-                        parent: widget.folder.id,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const Divider(),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _renameTopic(LessonFolder folder) async {
-    final controller = TextEditingController(text: folder.title);
-    final title = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Konu klasörünü düzenle'),
-        content: TextField(
-          controller: controller,
-          maxLength: 100,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Klasör adı'),
-          onSubmitted: (value) => Navigator.pop(ctx, value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Kaydet'),
-          ),
-        ],
-      ),
-    );
-    Future<void>.delayed(const Duration(milliseconds: 350), controller.dispose);
-    if (title == null || title.trim().isEmpty || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await widget.repository.renameFolder(folder.id, title);
-      if (mounted) {
-        setState(
-          () => _topics = widget.repository.folders(
-            parent: widget.folder.id,
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(userError(error))));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   @override
   void dispose() {
     _text.dispose();
@@ -1027,86 +865,6 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
     );
   }
 
-  Widget _album(List<LessonNote> photos) => Card(
-    margin: const EdgeInsets.only(bottom: 18),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${photos.length} fotoğraf',
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-            ),
-            itemCount: photos.length > 4 ? 4 : photos.length,
-            itemBuilder: (context, index) => ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _image(photos[index]),
-                  if (index == 3 && photos.length > 4)
-                    Material(
-                      color: Colors.black54,
-                      child: InkWell(
-                        onTap: () => _openAlbum(photos),
-                        child: Center(
-                          child: Text(
-                            '+${photos.length - 4}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          for (final photo in photos.where((photo) => photo.text.isNotEmpty))
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                photo.text,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          TextButton(
-            onPressed: () => _openAlbum(photos),
-            child: const Text('Fotoğrafları aç'),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  void _openAlbum(List<LessonNote> photos) {
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _NotebookAlbum(
-          photos: photos,
-          image: _image,
-          busy: _busy,
-          onEdit: _edit,
-          onDelete: _delete,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -1125,13 +883,7 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                 ),
               ),
             );
-            if (mounted) {
-              setState(
-                () => _topics = widget.repository.folders(
-                  parent: widget.folder.id,
-                ),
-              );
-            }
+            if (mounted) setState(() {});
           },
         ),
         IconButton(
@@ -1144,366 +896,340 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
         ),
       ],
     ),
-    body: StreamBuilder<List<LessonFolder>>(
-      stream: _topics,
-      builder: (context, topicsSnapshot) => Column(
-        children: [
-          if (_showSearch || _query.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: TextField(
-                controller: _query,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Bu klasördeki notlarda ara',
-                ),
+    body: Column(
+      children: [
+        if (_showSearch || _query.text.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: TextField(
+              controller: _query,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Bu klasördeki notlarda ara',
               ),
             ),
-          Expanded(
-            child: StreamBuilder<List<LessonNote>>(
-              stream: _stream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: TextButton(
-                      onPressed: () => setState(
-                        () => _stream = widget.repository.notes(widget.folder.id),
-                      ),
-                      child: const Text('Notlar yüklenemedi. Yeniden dene.'),
+          ),
+        Expanded(
+          child: StreamBuilder<List<LessonNote>>(
+            stream: _stream,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: TextButton(
+                    onPressed: () => setState(
+                      () => _stream = widget.repository.notes(widget.folder.id),
                     ),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final notes =
-                    snapshot.data!
-                        .where(
-                          (note) => searchText(
-                            note.text,
-                          ).contains(searchText(_query.text.trim())),
-                        )
-                        .toList()
-                      ..sort((a, b) {
-                        final order = a.created.compareTo(b.created);
-                        return order != 0 ? order : a.id.compareTo(b.id);
-                      });
-                for (final note in snapshot.data!) {
-                  if ((note.kind == 'video' || note.kind == 'audio') &&
-                      courseVideoExpired(note) &&
-                      _cleanedVideos.add(note.id)) {
-                    CourseVideo.remove(
-                      widget.repository,
-                      widget.folder.id,
-                      note,
-                    ).catchError((_) {
-                      _cleanedVideos.remove(note.id);
+                    child: const Text('Notlar yüklenemedi. Yeniden dene.'),
+                  ),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final notes =
+                  snapshot.data!
+                      .where(
+                        (note) => searchText(
+                          note.text,
+                        ).contains(searchText(_query.text.trim())),
+                      )
+                      .toList()
+                    ..sort((a, b) {
+                      final order = a.created.compareTo(b.created);
+                      return order != 0 ? order : a.id.compareTo(b.id);
                     });
-                  }
+              for (final note in snapshot.data!) {
+                if ((note.kind == 'video' || note.kind == 'audio') &&
+                    courseVideoExpired(note) &&
+                    _cleanedVideos.add(note.id)) {
+                  CourseVideo.remove(
+                    widget.repository,
+                    widget.folder.id,
+                    note,
+                  ).catchError((_) {
+                    _cleanedVideos.remove(note.id);
+                  });
                 }
-                final groups = <List<LessonNote>>[];
-                for (final note in notes) {
-                  if (note.kind == 'image' &&
-                      note.albumId != null &&
-                      groups.isNotEmpty &&
-                      groups.last.last.kind == 'image' &&
-                      groups.last.last.albumId == note.albumId) {
-                    groups.last.add(note);
-                  } else {
-                    groups.add([note]);
-                  }
-                }
-                return ListView.builder(
-                  reverse: false,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: groups.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return KeyedSubtree(
-                        key: const ValueKey('topics'),
-                        child: _topicFolders(topicsSnapshot),
-                      );
-                    }
-                    index--;
-                    if (groups[index].length > 1) {
-                      return KeyedSubtree(
-                        key: ValueKey(groups[index].first.albumId),
-                        child: _album(groups[index]),
-                      );
-                    }
-                    final note = groups[index].first;
-                    final long =
-                        note.text.length > 700 ||
-                        '\n'.allMatches(note.text).length >= 10;
-                    final expanded = _expandedNotes.contains(note.id);
-                    final preview = note.text.split('\n').take(10).join('\n');
-                    final shown = long && !expanded
-                        ? '${preview.substring(0, preview.length > 700 ? 700 : preview.length)}…'
-                        : note.text;
-                    return Card(
-                      key: ValueKey(note.id),
-                      margin: const EdgeInsets.only(bottom: 18),
-                      shape: note.kind == 'announcement'
-                          ? RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.tertiary,
-                                width: 2,
-                              ),
-                            )
-                          : null,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (note.kind == 'announcement')
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.campaign,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.tertiary,
+              }
+              if (notes.isEmpty) {
+                return const Center(
+                  child: Text('Bu defter boş. Aşağıdan ilk sayfayı ekle.'),
+                );
+              }
+              return PageView.builder(
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  final note = notes[index];
+                  final shown = note.text;
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Sayfa ${index + 1} / ${notes.length}',
+                          style: const TextStyle(color: Color(0xFF8A5A3B)),
+                        ),
+                        const SizedBox(height: 8),
+                        Card(
+                          key: ValueKey(note.id),
+                          margin: const EdgeInsets.only(bottom: 18),
+                          shape: note.kind == 'announcement'
+                              ? RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.tertiary,
+                                    width: 2,
+                                  ),
+                                )
+                              : null,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (note.kind == 'announcement')
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.campaign,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.tertiary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'Önemli duyuru!',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Önemli duyuru!',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                  ),
+                                Text(
+                                  note.kind == 'code'
+                                      ? 'Kod'
+                                      : note.kind == 'announcement'
+                                      ? 'Ders duyurusu'
+                                      : note.kind == 'image'
+                                      ? 'Görsel not'
+                                      : 'Not',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: 12),
+                                if (note.kind == 'audio')
+                                  TextButton.icon(
+                                    onPressed:
+                                        _busy ||
+                                            courseVideoExpired(note) ||
+                                            (widget.repository.shared &&
+                                                note.videoChunks == 0)
+                                        ? null
+                                        : () => _openAudio(note),
+                                    icon: const Icon(Icons.headphones),
+                                    label: Text(
+                                      courseVideoExpired(note)
+                                          ? 'Ses dosyasının bir haftalık süresi doldu'
+                                          : widget.repository.shared &&
+                                                note.videoChunks == 0
+                                          ? 'Ses yükleniyor…'
+                                          : 'Sesi dinle · 1 hafta saklanır',
+                                    ),
+                                  ),
+                                if (note.kind == 'video')
+                                  TextButton.icon(
+                                    onPressed:
+                                        _busy ||
+                                            courseVideoExpired(note) ||
+                                            (widget.repository.shared &&
+                                                note.videoChunks == 0)
+                                        ? null
+                                        : () => _openVideo(note),
+                                    icon: const Icon(Icons.play_circle_outline),
+                                    label: Text(
+                                      courseVideoExpired(note)
+                                          ? 'Videonun bir haftalık süresi doldu'
+                                          : widget.repository.shared &&
+                                                note.videoChunks == 0
+                                          ? 'Video yükleniyor…'
+                                          : 'Videoyu izle · 1 hafta saklanır',
+                                    ),
+                                  ),
+                                if (note.image != null) _image(note),
+                                if (note.image != null)
+                                  const SizedBox(height: 12),
+                                if (note.text.isNotEmpty)
+                                  note.kind == 'code'
+                                      ? SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: SelectableText(
+                                            shown,
+                                            style: const TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 14,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        )
+                                      : CourseNoteText(shown),
+                                const SizedBox(height: 12),
+                                const Divider(height: 1),
+                                Wrap(
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _edit(note),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
                                       ),
+                                      label: const Text('Düzenle'),
+                                    ),
+                                    IconButton(
+                                      tooltip: note.pinned
+                                          ? 'Sabitlemeyi kaldır'
+                                          : 'Notu sabitle',
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _pin(note),
+                                      icon: Icon(
+                                        note.pinned
+                                            ? Icons.push_pin
+                                            : Icons.push_pin_outlined,
+                                      ),
+                                    ),
+                                    if (note.text.isNotEmpty)
+                                      TextButton.icon(
+                                        onPressed: () async {
+                                          await Clipboard.setData(
+                                            ClipboardData(text: note.text),
+                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Kopyalandı.'),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(Icons.copy, size: 16),
+                                        label: const Text('Kopyala'),
+                                      ),
+                                    if (!widget.repository.shared)
+                                      IconButton(
+                                        tooltip: 'Hatırlatıcı kur',
+                                        onPressed: _busy
+                                            ? null
+                                            : () => ReminderService.pick(
+                                                context,
+                                                note.id,
+                                              ),
+                                        icon: const Icon(Icons.alarm_add),
+                                      ),
+                                    IconButton(
+                                      tooltip: 'Notu sil',
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _delete(note),
+                                      icon: const Icon(Icons.delete_outline),
                                     ),
                                   ],
                                 ),
-                              ),
-                            Text(
-                              note.kind == 'code'
-                                  ? 'Kod'
-                                  : note.kind == 'announcement'
-                                  ? 'Ders duyurusu'
-                                  : note.kind == 'image'
-                                  ? 'Görsel not'
-                                  : 'Not',
-                              style: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            const SizedBox(height: 12),
-                            if (note.kind == 'audio')
-                              TextButton.icon(
-                                onPressed:
-                                    _busy ||
-                                        courseVideoExpired(note) ||
-                                        (widget.repository.shared &&
-                                            note.videoChunks == 0)
-                                    ? null
-                                    : () => _openAudio(note),
-                                icon: const Icon(Icons.headphones),
-                                label: Text(
-                                  courseVideoExpired(note)
-                                      ? 'Ses dosyasının bir haftalık süresi doldu'
-                                      : widget.repository.shared &&
-                                            note.videoChunks == 0
-                                      ? 'Ses yükleniyor…'
-                                      : 'Sesi dinle · 1 hafta saklanır',
-                                ),
-                              ),
-                            if (note.kind == 'video')
-                              TextButton.icon(
-                                onPressed:
-                                    _busy ||
-                                        courseVideoExpired(note) ||
-                                        (widget.repository.shared &&
-                                            note.videoChunks == 0)
-                                    ? null
-                                    : () => _openVideo(note),
-                                icon: const Icon(Icons.play_circle_outline),
-                                label: Text(
-                                  courseVideoExpired(note)
-                                      ? 'Videonun bir haftalık süresi doldu'
-                                      : widget.repository.shared &&
-                                            note.videoChunks == 0
-                                      ? 'Video yükleniyor…'
-                                      : 'Videoyu izle · 1 hafta saklanır',
-                                ),
-                              ),
-                            if (note.image != null) _image(note),
-                            if (note.image != null) const SizedBox(height: 12),
-                            if (note.text.isNotEmpty)
-                              note.kind == 'code'
-                                  ? SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: SelectableText(
-                                        shown,
-                                        style: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 14,
-                                          height: 1.5,
-                                        ),
-                                      ),
-                                    )
-                                  : CourseNoteText(shown),
-                            if (long)
-                              TextButton(
-                                onPressed: () => setState(() {
-                                  if (expanded) {
-                                    _expandedNotes.remove(note.id);
-                                  } else {
-                                    _expandedNotes.add(note.id);
-                                  }
-                                }),
-                                child: Text(
-                                  expanded ? 'Daha az göster' : 'Devamını oku',
-                                ),
-                              ),
-                            const SizedBox(height: 12),
-                            const Divider(height: 1),
-                            Wrap(
-                              children: [
-                                TextButton.icon(
-                                  onPressed: _busy ? null : () => _edit(note),
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    size: 16,
-                                  ),
-                                  label: const Text('Düzenle'),
-                                ),
-                                IconButton(
-                                  tooltip: note.pinned
-                                      ? 'Sabitlemeyi kaldır'
-                                      : 'Notu sabitle',
-                                  onPressed: _busy ? null : () => _pin(note),
-                                  icon: Icon(
-                                    note.pinned
-                                        ? Icons.push_pin
-                                        : Icons.push_pin_outlined,
-                                  ),
-                                ),
-                                if (note.text.isNotEmpty)
-                                  TextButton.icon(
-                                    onPressed: () async {
-                                      await Clipboard.setData(
-                                        ClipboardData(text: note.text),
-                                      );
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Kopyalandı.'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.copy, size: 16),
-                                    label: const Text('Kopyala'),
-                                  ),
-                                if (!widget.repository.shared)
-                                  IconButton(
-                                    tooltip: 'Hatırlatıcı kur',
-                                    onPressed: _busy
-                                        ? null
-                                        : () => ReminderService.pick(
-                                            context,
-                                            note.id,
-                                          ),
-                                    icon: const Icon(Icons.alarm_add),
-                                  ),
-                                IconButton(
-                                  tooltip: 'Notu sil',
-                                  onPressed: _busy ? null : () => _delete(note),
-                                  icon: const Icon(Icons.delete_outline),
-                                ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DropdownButton<String>(
-                        isDense: true,
-                        value: _kind,
-                        onChanged: _busy
-                            ? null
-                            : (v) => setState(() => _kind = v!),
-                        items: const [
-                          DropdownMenuItem(value: 'text', child: Text('Not')),
-                          DropdownMenuItem(value: 'code', child: Text('Kod')),
-                          DropdownMenuItem(
-                            value: 'announcement',
-                            child: Text('Duyuru'),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        tooltip: 'Fotoğraflar ekle',
-                        onPressed: _busy ? null : () => _send(image: true),
-                        icon: const Icon(Icons.add_photo_alternate_outlined),
-                      ),
-                      IconButton(
-                        tooltip: 'Ses dosyası ekle (Drive / cihaz)',
-                        onPressed: _busy ? null : _sendAudio,
-                        icon: const Icon(Icons.audio_file_outlined),
-                      ),
-                      IconButton(
-                        tooltip: 'Ders videosu ekle',
-                        onPressed: _busy ? null : _sendVideo,
-                        icon: const Icon(Icons.video_library_outlined),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          enabled: !_busy,
-                          controller: _text,
-                          minLines: 1,
-                          maxLines: 4,
-                          maxLength: 50000,
-                          decoration: const InputDecoration(
-                            hintText: 'Notunu yaz…',
-                            counterText: '',
                           ),
                         ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    DropdownButton<String>(
+                      isDense: true,
+                      value: _kind,
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() => _kind = v!),
+                      items: const [
+                        DropdownMenuItem(value: 'text', child: Text('Not')),
+                        DropdownMenuItem(value: 'code', child: Text('Kod')),
+                        DropdownMenuItem(
+                          value: 'announcement',
+                          child: Text('Duyuru'),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      tooltip: 'Fotoğraflar ekle',
+                      onPressed: _busy ? null : () => _send(image: true),
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Ses dosyası ekle (Drive / cihaz)',
+                      onPressed: _busy ? null : _sendAudio,
+                      icon: const Icon(Icons.audio_file_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Ders videosu ekle',
+                      onPressed: _busy ? null : _sendVideo,
+                      icon: const Icon(Icons.video_library_outlined),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        enabled: !_busy,
+                        controller: _text,
+                        minLines: 1,
+                        maxLines: 4,
+                        maxLength: 50000,
+                        decoration: const InputDecoration(
+                          hintText: 'Notunu yaz…',
+                          counterText: '',
+                        ),
                       ),
-                      IconButton(
-                        tooltip: 'Notu ekle',
-                        onPressed: _busy ? null : () => _send(),
-                        icon: _busy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.send),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    IconButton(
+                      tooltip: 'Notu ekle',
+                      onPressed: _busy ? null : () => _send(),
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -1558,7 +1284,10 @@ class _NotebookRow extends StatelessWidget {
             children: [
               Container(width: 8, color: const Color(0xFFE53935)),
               const SizedBox(width: 10),
-              Icon(Icons.menu_book_outlined, color: color ?? const Color(0xFF8A5A3B)),
+              Icon(
+                Icons.menu_book_outlined,
+                color: color ?? const Color(0xFF8A5A3B),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Padding(
@@ -1592,116 +1321,6 @@ class _NotebookRow extends StatelessWidget {
           ),
         ),
       ),
-    ),
-  );
-}
-
-class _NotebookAlbum extends StatefulWidget {
-  final List<LessonNote> photos;
-  final Widget Function(LessonNote note) image;
-  final bool busy;
-  final Future<void> Function(LessonNote note) onEdit;
-  final Future<void> Function(LessonNote note) onDelete;
-  const _NotebookAlbum({
-    required this.photos,
-    required this.image,
-    required this.busy,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  State<_NotebookAlbum> createState() => _NotebookAlbumState();
-}
-
-class _NotebookAlbumState extends State<_NotebookAlbum> {
-  late final PageController _pages = PageController();
-
-  @override
-  void dispose() {
-    _pages.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF3E2C1C),
-    appBar: AppBar(title: Text('Defter · ${widget.photos.length} sayfa')),
-    body: PageView.builder(
-      controller: _pages,
-      itemCount: widget.photos.length,
-      itemBuilder: (context, index) {
-        final photo = widget.photos[index];
-        return AnimatedBuilder(
-          animation: _pages,
-          builder: (context, child) {
-            final page = _pages.hasClients ? (_pages.page ?? index.toDouble()) : index.toDouble();
-            final delta = (index - page).clamp(-1.0, 1.0);
-            return Transform(
-              alignment: delta >= 0 ? Alignment.centerLeft : Alignment.centerRight,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0012)
-                ..rotateY(delta * 0.8),
-              child: child,
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF6E4),
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black45, blurRadius: 12, offset: Offset(4, 6)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(width: 14, color: const Color(0xFFE53935)),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Sayfa ${index + 1}',
-                            style: const TextStyle(color: Color(0xFF8A5A3B)),
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(child: Center(child: widget.image(photo))),
-                          if (photo.text.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: CourseNoteText(photo.text),
-                            ),
-                          TextButton.icon(
-                            onPressed: widget.busy
-                                ? null
-                                : () async {
-                                    await widget.onEdit(photo);
-                                    if (context.mounted) Navigator.pop(context);
-                                  },
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Açıklamayı düzenle'),
-                          ),
-                          TextButton.icon(
-                            onPressed: () async {
-                              await widget.onDelete(photo);
-                              if (context.mounted) Navigator.pop(context);
-                            },
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Bu fotoğrafı sil'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     ),
   );
 }

@@ -15,7 +15,8 @@ class GameLeagueScreen extends StatefulWidget {
 
 class _GameLeagueScreenState extends State<GameLeagueScreen> {
   String _game = GameLeagueService.games.first.id;
-  late String _season = GameLeagueService.seasonId();
+  String? _season;
+  String? _continuation;
   late Stream<List<GameLeagueEntry>> _leaderboard;
   late Stream<DocumentSnapshot<Map<String, dynamic>>> _mine;
   Timer? _clock;
@@ -23,28 +24,41 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
   @override
   void initState() {
     super.initState();
-    _selectGame(_game);
+    _leaderboard = const Stream.empty();
+    _mine = const Stream.empty();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
+    });
+    unawaited(_openContinuation());
+  }
+
+  Future<void> _openContinuation() async {
+    late final String season;
+    try {
+      season = await GameLeagueService.continuationSeason().timeout(
+        const Duration(seconds: 20),
+      );
+    } catch (_) {
+      season = GameLeagueService.seasonId();
+    }
+    if (!mounted) return;
+    setState(() {
+      _continuation = season;
+      _selectSeason(season);
     });
   }
 
   void _selectGame(String game) {
     _game = game;
-    _leaderboard = GameLeagueService.leaderboard(game, null, _season);
-    _mine = GameLeagueService.myEntry(game, null, _season);
+    final season = _season;
+    if (season == null) return;
+    _leaderboard = GameLeagueService.leaderboard(game, null, season);
+    _mine = GameLeagueService.myEntry(game, null, season);
   }
 
   void _selectSeason(String season) {
     _season = season;
     _selectGame(_game);
-  }
-
-  DateTime _seasonEnd(String season) {
-    final parts = season.split('-Q');
-    final year = int.parse(parts.first);
-    final quarter = int.parse(parts.last);
-    return DateTime.utc(year, quarter * 3 + 1);
   }
 
   @override
@@ -53,18 +67,14 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
     super.dispose();
   }
 
-  String _remaining(DateTime end) {
-    final remaining = end.difference(DateTime.now().toUtc());
-    if (remaining.isNegative) return 'Sezon tamamlandı';
-    final days = remaining.inDays;
-    final hours = remaining.inHours % 24;
-    return '$days gün $hours saat kaldı';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final season = _season;
+    if (season == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final seasons = GameLeagueService.recentSeasons();
-    final end = _seasonEnd(_season);
+    if (!seasons.contains(season)) seasons.insert(0, season);
     final game = GameLeagueService.games.firstWhere((item) => item.id == _game);
     return Scaffold(
       appBar: AppBar(
@@ -110,21 +120,21 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       Text(
-                        'Sezon $_season',
+                        'Sezon $season',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ),
                 DropdownButton<String>(
-                  value: _season,
+                  value: season,
                   underline: const SizedBox.shrink(),
                   items: [
-                    for (final season in seasons)
+                    for (final item in seasons)
                       DropdownMenuItem(
-                        value: season,
+                        value: item,
                         child: Text(
-                          season == seasons.first ? 'Bu sezon' : season,
+                          item == _continuation ? 'Devam eden lig' : item,
                         ),
                       ),
                   ],
@@ -142,8 +152,8 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                 const Icon(Icons.schedule, size: 15, color: Color(0xffffd66b)),
                 const SizedBox(width: 6),
                 Text(
-                  _season == GameLeagueService.seasonId()
-                      ? _remaining(end)
+                  season == _continuation
+                      ? 'Bu lig devam ediyor'
                       : 'Geçmiş sezon',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -249,7 +259,9 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                           Card(
                             child: ListTile(
                               leading: const CircleAvatar(child: Text('…')),
-                              title: Text(myData?['displayName'] as String? ?? 'Sen'),
+                              title: Text(
+                                myData?['displayName'] as String? ?? 'Sen',
+                              ),
                               subtitle: const Text('İlk 100 dışında'),
                               trailing: Text('$myScore puan'),
                             ),

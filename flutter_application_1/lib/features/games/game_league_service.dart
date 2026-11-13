@@ -1,6 +1,8 @@
 // Oyun skorunu kaydeder.
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/utils/open_stream.dart';
 import '../chat/chat_service.dart';
 import '../pair/couple_service.dart';
 
@@ -45,21 +47,55 @@ class GameLeagueService {
 
   static List<String> recentSeasons([DateTime? date]) {
     final now = (date ?? DateTime.now()).toUtc();
-    final current = seasonId(now);
-    final start = DateTime.utc(
-      now.year,
-      ((now.month - 1) ~/ 3) * 3 + 1,
-    );
-    final previousEnd = start;
-    if (now.difference(previousEnd) < const Duration(days: 30)) {
-      final previous = DateTime.utc(start.year, start.month - 1);
-      final quarter = ((previous.month - 1) ~/ 3) + 1;
-      return [
-        current,
-        '${previous.year}-Q$quarter',
-      ];
+    final seasons = <String>[];
+    var cursor = DateTime.utc(now.year, ((now.month - 1) ~/ 3) * 3 + 1);
+    for (var i = 0; i < 4; i++) {
+      final quarter = ((cursor.month - 1) ~/ 3) + 1;
+      seasons.add('${cursor.year}-Q$quarter');
+      cursor = DateTime.utc(cursor.year, cursor.month - 3);
     }
-    return [current];
+    return seasons;
+  }
+
+  static Future<String> continuationSeason() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('league_continuation');
+    if (saved != null && RegExp(r'^20\d{2}-Q[1-4]$').hasMatch(saved)) {
+      return saved;
+    }
+    try {
+      await CoupleService.ensureReady().timeout(const Duration(seconds: 6));
+    } catch (_) {}
+    String? fullest;
+    var fullestCount = 0;
+    var probed = false;
+    for (final season in recentSeasons()) {
+      var count = 0;
+      for (final game in games) {
+        try {
+          final snap = await _entries(
+            game.id,
+            null,
+            season,
+          ).limit(20).get().timeout(const Duration(seconds: 6));
+          probed = true;
+          count += snap.docs.length;
+        } catch (_) {}
+      }
+      if (count > fullestCount) {
+        fullestCount = count;
+        fullest = season;
+      }
+    }
+    if (fullest != null) {
+      await prefs.setString('league_continuation', fullest);
+      return fullest;
+    }
+    final seasons = recentSeasons();
+    if (!probed && seasons.length > 1) return seasons[1];
+    final season = seasonId();
+    await prefs.setString('league_continuation', season);
+    return season;
   }
 
   static CollectionReference<Map<String, dynamic>> _entries(
@@ -77,27 +113,28 @@ class GameLeagueService {
     String game, [
     DateTime? date,
     String? season,
-  ]) async* {
-    await CoupleService.ensureReady();
-    await for (final snapshot in _entries(
-      game,
-      date,
-      season,
-    ).orderBy('score', descending: true).limit(100).snapshots()) {
-      yield snapshot.docs.map(GameLeagueEntry.fromDocument).toList();
-    }
-  }
+  ]) => openStreamAfter(
+    CoupleService.ensureReady,
+    () => _entries(game, date, season)
+        .orderBy('score', descending: true)
+        .limit(100)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map(GameLeagueEntry.fromDocument).toList(),
+        ),
+    message: 'Lig yüklenemedi.',
+  );
 
   static Stream<DocumentSnapshot<Map<String, dynamic>>> myEntry(
     String game, [
     DateTime? date,
     String? season,
-  ]) async* {
-    await CoupleService.ensureReady();
+  ]) => openStreamAfter(CoupleService.ensureReady, () {
     final uid = CoupleService.uid;
     if (uid == null) throw StateError('Hesabına giriş yap.');
-    yield* _entries(game, date, season).doc(uid).snapshots();
-  }
+    return _entries(game, date, season).doc(uid).snapshots();
+  }, message: 'Puanın yüklenemedi.');
 
   static Future<void> recordBestScore({
     required String game,
@@ -117,12 +154,16 @@ class GameLeagueService {
     if (uid == null) throw StateError('Hesabına giriş yap.');
     final name = (await ChatService.myName())?.trim();
     if (name == null || name.isEmpty) {
-      throw StateError('Lig tablosunda görünmek için önce sohbet adını belirle.');
+      throw StateError(
+        'Lig tablosunda görünmek için önce sohbet adını belirle.',
+      );
     }
 
-    final entry = _entries(game);
+    final entry = _entries(game, null, await continuationSeason());
     final reference = entry.doc(uid);
-    final current = await reference.get(const GetOptions(source: Source.server));
+    final current = await reference.get(
+      const GetOptions(source: Source.server),
+    );
     final best = current.data()?['score'] as int? ?? 0;
     final savedName = current.data()?['displayName'] as String?;
     if (best > score && savedName == name) return;

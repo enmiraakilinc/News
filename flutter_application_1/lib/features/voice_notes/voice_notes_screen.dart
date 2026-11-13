@@ -146,9 +146,15 @@ class _VoiceNotesScreenState extends State<VoiceNotesScreen> {
       setState(() => _loading = false);
       return;
     }
-    final cid = await CoupleService.coupleId();
-    final sec = await CoupleService.secret();
-    await _loadLocal();
+    String? cid;
+    String? sec;
+    try {
+      cid = await CoupleService.coupleId().timeout(const Duration(seconds: 6));
+      sec = await CoupleService.secret().timeout(const Duration(seconds: 6));
+    } catch (_) {}
+    try {
+      await _loadLocal();
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _coupleId = cid;

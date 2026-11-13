@@ -123,7 +123,7 @@ async function watch(body,auth,response){
   if(!flushTimer)flushTimer=setTimeout(()=>{flushTimer=null;if(!closed){dirty=false;void tick();}},25);
  }};subscriptions.add(sub);
  const poll=setInterval(()=>{if(dirty){dirty=false;void tick();}else if(!closed)response.write(': ping\n\n');},1000);
- const expiryPoll=setInterval(()=>{void tick();},30000);
+ const expiryPoll=setInterval(()=>{void tick();},3000);
  const expires=setTimeout(()=>response.end(),Math.max(1,Math.min(auth.expires-Date.now(),30*60*1000)));
  const close=()=>{closed=true;clearTimeout(flushTimer);clearInterval(poll);clearInterval(expiryPoll);clearTimeout(expires);subscriptions.delete(sub);};
  response.once('close',close);response.once('error',close);

@@ -1,5 +1,6 @@
 // Eşleşmeyi, ortak veriyi ve günün sorusu kaydını yönetir.
 import '../../core/utils/date_format.dart';
+import '../../core/utils/open_stream.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../../core/data/oracle_firestore_bridge.dart';
 
@@ -171,7 +172,7 @@ class CoupleService {
   }
 
   static Future<void> severPair() async {
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     final cid = await coupleId();
     final sec = await secret();
     if (cid == null) return;
@@ -276,37 +277,17 @@ class CoupleService {
   /// [cacheKey] verilirse: akış önce EN SON bilinen içeriği yayar, ardından
   /// sunucudan geleni. Böylece sekmeler ilk açılıştan sonra anında açılır;
   /// tazelenme arka planda sessizce olur.
-  static Stream<T> _gated<T>(
-    String? cacheKey,
-    Stream<T> Function() build,
-  ) async* {
-    var received = false;
-    if (cacheKey != null) {
-      final onceki = _sonDeger[cacheKey];
-      if (onceki is T) {
-        received = true;
-        yield onceki;
-      }
-    }
-    try {
-      await ensureReady().timeout(const Duration(seconds: 6));
-    } catch (error) {
-      if (!received) yield* Stream<T>.error(error);
-      return;
-    }
-    await for (final deger in build().timeout(
-      const Duration(seconds: 6),
-      onTimeout: (sink) {
-        if (!received) {
-          sink.addError(TimeoutException('Kayıtlar yüklenemedi.'));
-          sink.close();
-        }
-      },
-    )) {
-      received = true;
-      if (cacheKey != null) _sonDeger[cacheKey] = deger;
-      yield deger;
-    }
+  static Stream<T> _gated<T>(String? cacheKey, Stream<T> Function() build) {
+    final cached = cacheKey == null ? null : _sonDeger[cacheKey];
+    return openStreamAfter<T>(
+      ensureReady,
+      () => build().map((value) {
+        if (cacheKey != null) _sonDeger[cacheKey] = value;
+        return value;
+      }),
+      initial: cached is T ? cached : null,
+      message: 'Kayıtlar yüklenemedi.',
+    );
   }
 
   /// Eşleşme kaldırılınca/değişince önbellek başka çifte sızmasın.
@@ -317,7 +298,7 @@ class CoupleService {
   static Future<DocumentReference<Map<String, dynamic>>?> _coupleRef() async {
     final cid = await coupleId();
     if (cid == null) return null;
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     return _db.collection('couples').doc(cid);
   }
 
@@ -363,7 +344,7 @@ class CoupleService {
     final cid = await coupleId();
     final word = await secret();
     if (cid == null || word == null) return;
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     await _registerSecretLogin(cid, word);
   }
 
@@ -380,8 +361,12 @@ class CoupleService {
 
   static Future<void> signInWithSecret(String word) async {
     if (word.isEmpty) throw Exception('Gizli kelimeyi gir.');
-    await ensureReady();
-    final login = await _db.collection('invites').doc(_loginId(word)).get();
+    await ensureReady().timeout(const Duration(seconds: 12));
+    final login = await _db
+        .collection('invites')
+        .doc(_loginId(word))
+        .get()
+        .timeout(const Duration(seconds: 12));
     if (!login.exists) {
       throw Exception(
         'Gizli kelime bulunamadı. Kelimeyi kontrol edip tekrar dene.',
@@ -391,17 +376,19 @@ class CoupleService {
     final ref = _db.collection('couples').doc(cid);
     // Firestore validates the proof before granting private membership.
     // Non-members cannot read the stored secret hash.
-    await ref.update({
-      'members': FieldValue.arrayUnion([uid!]),
-      'joinProof': _secretCheck(word),
-    });
+    await ref
+        .update({
+          'members': FieldValue.arrayUnion([uid!]),
+          'joinProof': _secretCheck(word),
+        })
+        .timeout(const Duration(seconds: 12));
     await _saveLocal(cid, word);
   }
 
   // ── Eşleşme ────────────────────────────────────────────────
   /// Yeni bir çift oluşturur, davet kodunu döndürür.
   static Future<String> createCouple(String secretWord) async {
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     final u = uid;
     if (u == null) throw Exception('Bağlantı yok');
 
@@ -409,21 +396,25 @@ class CoupleService {
     final code = _sixDigitCode();
 
     final loginRef = _db.collection('invites').doc(_loginId(secretWord));
-    await _db.runTransaction((tx) async {
-      final existing = await tx.get(loginRef);
-      if (existing.exists) {
-        throw Exception(
-          'Bu gizli kelime kullanılıyor. Gizli kelime ile giriş yap.',
-        );
-      }
-      tx.set(coupleRef, {
-        'members': [u],
-        'secretCheck': _secretCheck(secretWord),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      tx.set(_db.collection('invites').doc(code), {'coupleId': coupleRef.id});
-      tx.set(loginRef, {'coupleId': coupleRef.id});
-    });
+    await _db
+        .runTransaction((tx) async {
+          final existing = await tx.get(loginRef);
+          if (existing.exists) {
+            throw Exception(
+              'Bu gizli kelime kullanılıyor. Gizli kelime ile giriş yap.',
+            );
+          }
+          tx.set(coupleRef, {
+            'members': [u],
+            'secretCheck': _secretCheck(secretWord),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          tx.set(_db.collection('invites').doc(code), {
+            'coupleId': coupleRef.id,
+          });
+          tx.set(loginRef, {'coupleId': coupleRef.id});
+        })
+        .timeout(const Duration(seconds: 20));
 
     await _saveLocal(coupleRef.id, secretWord);
     return code;
@@ -432,7 +423,7 @@ class CoupleService {
   /// Aynı çift için yeni davet kodu üretir. Eski kod tek kullanımlıktır,
   /// ama mevcut eşleşme devam etsin diye yenisi yeniden oluşturulabilir.
   static Future<String> reissueInviteCode({String? coupleId}) async {
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     final cid = coupleId ?? await CoupleService.coupleId();
     if (cid == null) throw Exception('Eşleşme bulunamadı.');
 
@@ -451,7 +442,7 @@ class CoupleService {
 
   /// Davet koduyla mevcut çifte katılır.
   static Future<void> joinCouple(String code, String secretWord) async {
-    await ensureReady();
+    await ensureReady().timeout(const Duration(seconds: 12));
     final u = uid;
     if (u == null) throw Exception('Bağlantı yok');
 
@@ -463,10 +454,14 @@ class CoupleService {
     final coupleId = inviteSnap.data()!['coupleId'] as String;
 
     // Secret verification is enforced by the server on this update.
-    await _db.collection('couples').doc(coupleId).update({
-      'members': FieldValue.arrayUnion([u]),
-      'joinProof': _secretCheck(secretWord),
-    });
+    await _db
+        .collection('couples')
+        .doc(coupleId)
+        .update({
+          'members': FieldValue.arrayUnion([u]),
+          'joinProof': _secretCheck(secretWord),
+        })
+        .timeout(const Duration(seconds: 12));
     await _registerSecretLogin(coupleId, secretWord);
     await _db.collection('invites').doc(code.trim()).delete();
 
@@ -528,6 +523,21 @@ class CoupleService {
     });
   }
 
+  static bool _letterVisible(Map<String, dynamic> data) {
+    if (data['scheduled'] == false) return true;
+    final open = data['openDate'];
+    return open is Timestamp && !open.toDate().isAfter(DateTime.now());
+  }
+
+  static Map<String, String> _stringMap(Object? raw) {
+    if (raw is! Map) return {};
+    return {
+      for (final entry in raw.entries)
+        if (entry.key is String && entry.value is String)
+          entry.key as String: entry.value as String,
+    };
+  }
+
   /// Mektupları canlı dinler (yeni gelince anında güncellenir).
   static Stream<List<Letter>> lettersStream(
     String coupleId,
@@ -564,10 +574,8 @@ class CoupleService {
           ).asyncMap((snap) async {
             final decoded = await decoder.decode(secret, {
               for (final doc in snap.docs)
-                if (doc.data()['scheduled'] == false ||
-                    !(doc.data()['openDate'] as Timestamp).toDate().isAfter(
-                      DateTime.now(),
-                    ))
+                if (_letterVisible(doc.data()) &&
+                    doc.data()['cipher'] is String)
                   doc.id: doc.data()['cipher'] as String,
             });
             final list = snap.docs.map((d) {
@@ -597,7 +605,7 @@ class CoupleService {
               }
               return Letter(
                 id: d.id,
-                reactions: Map<String, String>.from(data['reactions'] ?? {}),
+                reactions: _stringMap(data['reactions']),
                 edited: data['editedAt'] != null,
                 fromMe: data['from'] == uid,
                 emoji: (data['emoji'] ?? '💌').toString(),
@@ -605,7 +613,9 @@ class CoupleService {
                 sentDate: sentDate,
                 readByRecipient: readByRecipient,
                 readAt: readAt,
-                replyToId: data['replyTo'] as String?,
+                replyToId: data['replyTo'] is String
+                    ? data['replyTo'] as String
+                    : null,
                 text: metin, // açılmadıysa null
               );
             }).toList();
@@ -808,10 +818,7 @@ class CoupleService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       'question_cache_${todayKey()}',
-      jsonEncode({
-        'mine': answers.myAnswer,
-        'partner': answers.partnerAnswer,
-      }),
+      jsonEncode({'mine': answers.myAnswer, 'partner': answers.partnerAnswer}),
     );
   }
 

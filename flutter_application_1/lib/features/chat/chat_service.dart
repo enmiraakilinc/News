@@ -2,13 +2,15 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../pair/couple_service.dart';
+import '../../core/utils/open_stream.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../media/chat_media.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatProfile {
   final String name;
@@ -84,6 +86,34 @@ class ChatMessage {
   bool get unlocked => !scheduled || !openAt.isAfter(DateTime.now());
 }
 
+class ChatReadMemory {
+  static final seen = ValueNotifier<int>(0);
+  static final ids = <String>{};
+  static var _loaded = false;
+
+  static Future<void> ensure() async {
+    if (_loaded) return;
+    _loaded = true;
+    final prefs = await SharedPreferences.getInstance();
+    ids.addAll(prefs.getStringList('chat_read_ids') ?? const []);
+    seen.value++;
+  }
+
+  static Future<void> mark(String chatId, String messageId) async {
+    await ensure();
+    if (!ids.add('$chatId/$messageId')) return;
+    while (ids.length > 300) {
+      ids.remove(ids.first);
+    }
+    seen.value++;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('chat_read_ids', ids.toList());
+  }
+
+  static bool contains(String chatId, String messageId) =>
+      ids.contains('$chatId/$messageId');
+}
+
 class ChatService {
   static Future<void> setTyping(String id, bool typing) async {
     await CoupleService.ensureReady();
@@ -120,21 +150,19 @@ class ChatService {
 
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
   static String get _uid => CoupleService.uid!;
-  static Stream<T> _ready<T>(Stream<T> Function() source) async* {
-    await CoupleService.ensureReady().timeout(const Duration(seconds: 20));
-    var received = false;
-    await for (final value in source().timeout(
-      const Duration(seconds: 25),
-      onTimeout: (sink) {
-        if (!received) {
-          sink.addError(TimeoutException('Sohbet yüklenemedi.'));
-          sink.close();
-        }
-      },
-    )) {
-      received = true;
-      yield value;
-    }
+  static Stream<T> _ready<T>(Stream<T> Function() source) => openStreamAfter(
+    CoupleService.ensureReady,
+    source,
+    message: 'Sohbet yüklenemedi.',
+  );
+
+  static Map<String, String> _stringMap(Object? raw) {
+    if (raw is! Map) return {};
+    return {
+      for (final entry in raw.entries)
+        if (entry.key is String && entry.value is String)
+          entry.key as String: entry.value as String,
+    };
   }
 
   static Future<String?> myName({bool cacheOnly = false}) async {
@@ -224,41 +252,43 @@ class ChatService {
     if (!RegExp(r'^\d{8}$').hasMatch(code)) {
       throw Exception('8 haneli davet kodunu gir.');
     }
-    await CoupleService.ensureReady();
-    final name = await myName();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 12));
+    final name = await myName().timeout(const Duration(seconds: 12));
     if (name == null) throw Exception('Önce sohbet adını kaydet.');
-    return _db.runTransaction((tx) async {
-      final ref = _db.collection('chatInvites').doc(code.trim());
-      final invite = await tx.get(ref);
-      final data = invite.data();
-      if (data == null) throw Exception('Davet kodu bulunamadı.');
-      // Server rules enforce expiry independently of the phone clock.
-      final owner = data['owner'] as String;
-      if (owner == _uid) {
-        throw Exception(
-          'Bu senin kodun. Diğer kişi bu kodu girince ikinizde de sohbet açılır.',
-        );
-      }
-      if (data['usedBy'] != null && data['usedBy'] != _uid) {
-        throw Exception('Bu kod kullanılmış.');
-      }
-      final id = directId(owner, _uid);
-      final conversation = _db.collection('chats').doc(id);
-      final existing = await tx.get(conversation);
-      if (!existing.exists) {
-        tx.set(conversation, {
-          'group': false,
-          'title': '',
-          'members': [owner, _uid],
-          'names': {owner: data['name'], _uid: name},
-          'createdBy': _uid,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'inviteCode': code.trim(),
-        });
-      }
-      if (data['usedBy'] == null) tx.update(ref, {'usedBy': _uid});
-      return id;
-    });
+    return _db
+        .runTransaction((tx) async {
+          final ref = _db.collection('chatInvites').doc(code.trim());
+          final invite = await tx.get(ref);
+          final data = invite.data();
+          if (data == null) throw Exception('Davet kodu bulunamadı.');
+          // Server rules enforce expiry independently of the phone clock.
+          final owner = data['owner'] as String;
+          if (owner == _uid) {
+            throw Exception(
+              'Bu senin kodun. Diğer kişi bu kodu girince ikinizde de sohbet açılır.',
+            );
+          }
+          if (data['usedBy'] != null && data['usedBy'] != _uid) {
+            throw Exception('Bu kod kullanılmış.');
+          }
+          final id = directId(owner, _uid);
+          final conversation = _db.collection('chats').doc(id);
+          final existing = await tx.get(conversation);
+          if (!existing.exists) {
+            tx.set(conversation, {
+              'group': false,
+              'title': '',
+              'members': [owner, _uid],
+              'names': {owner: data['name'], _uid: name},
+              'createdBy': _uid,
+              'updatedAt': FieldValue.serverTimestamp(),
+              'inviteCode': code.trim(),
+            });
+          }
+          if (data['usedBy'] == null) tx.update(ref, {'usedBy': _uid});
+          return id;
+        })
+        .timeout(const Duration(seconds: 20));
   }
 
   static Future<void> deleteDirect(String chatId) async {
@@ -291,7 +321,11 @@ class ChatService {
       if (invite.exists) batch.delete(invite.reference);
     }
     batch.delete(
-      _db.collection('chatAccounts').doc(_uid).collection('contacts').doc(chatId),
+      _db
+          .collection('chatAccounts')
+          .doc(_uid)
+          .collection('contacts')
+          .doc(chatId),
     );
     batch.delete(
       _db
@@ -311,7 +345,8 @@ class ChatService {
         .snapshots()
         .map((snapshot) {
           final result = snapshot.docs
-              .map((doc) => _conversation(doc))
+              .map(_conversation)
+              .whereType<Conversation>()
               .toList();
           result.sort(
             (a, b) => (b.updatedAt ?? DateTime(2000)).compareTo(
@@ -322,17 +357,23 @@ class ChatService {
         }),
   );
 
-  static Conversation _conversation(
+  static Conversation? _conversation(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = doc.data()!;
+    final data = doc.data();
+    if (data == null || data['title'] is! String || data['members'] is! List) {
+      return null;
+    }
+    final members = (data['members'] as List).whereType<String>().toList();
+    if (members.isEmpty) return null;
+    final updated = data['updatedAt'];
     return Conversation(
       id: doc.id,
       group: data['group'] == true,
       title: data['title'] as String,
-      members: List<String>.from(data['members']),
-      names: Map<String, String>.from(data['names']),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      members: members,
+      names: _stringMap(data['names']),
+      updatedAt: updated is Timestamp ? updated.toDate() : null,
     );
   }
 
@@ -397,26 +438,35 @@ class ChatService {
               })
               .map((doc) {
                 final data = doc.data();
+                if (data['sender'] is! String || data['text'] is! String) {
+                  return null;
+                }
+                final sent = data['sentAt'];
+                final open = data['openAt'];
+                final readBy = data['readBy'];
                 return ChatMessage(
                   id: doc.id,
-                  reactions: Map<String, String>.from(data['reactions'] ?? {}),
+                  reactions: _stringMap(data['reactions']),
                   edited: data['editedAt'] != null,
                   scheduled: data['scheduled'] != false,
-                  pending:
-                      doc.metadata.hasPendingWrites && data['sentAt'] == null,
+                  pending: doc.metadata.hasPendingWrites && sent == null,
                   sender: data['sender'] as String,
                   text: data['text'] as String,
-                  sentAt:
-                      (data['sentAt'] as Timestamp?)?.toDate() ??
-                      (data['openAt'] as Timestamp?)?.toDate() ??
-                      DateTime.now(),
-                  openAt:
-                      (data['openAt'] as Timestamp?)?.toDate() ??
-                      DateTime.now(),
-                  replyTo: data['replyTo'] as String?,
-                  readBy: List<String>.from(data['readBy'] ?? []),
+                  sentAt: sent is Timestamp
+                      ? sent.toDate()
+                      : open is Timestamp
+                      ? open.toDate()
+                      : DateTime.now(),
+                  openAt: open is Timestamp ? open.toDate() : DateTime.now(),
+                  replyTo: data['replyTo'] is String
+                      ? data['replyTo'] as String
+                      : null,
+                  readBy: readBy is List
+                      ? readBy.whereType<String>().toList()
+                      : const [],
                 );
               })
+              .whereType<ChatMessage>()
               .toList();
           result.sort((a, b) => b.sentAt.compareTo(a.sentAt));
           return result;
@@ -429,7 +479,7 @@ class ChatService {
     DateTime? openAt, {
     String? replyTo,
   }) async {
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 12));
     if (openAt != null) {
       throw StateError('Sohbet mesajları ileri bir tarihe zamanlanamaz.');
     }
@@ -450,7 +500,7 @@ class ChatService {
       'replyTo': replyTo,
     });
     batch.update(ref, {'updatedAt': FieldValue.serverTimestamp()});
-    await batch.commit();
+    await batch.commit().timeout(const Duration(seconds: 20));
   }
 
   static Future<void> recordCallEvent(
@@ -485,6 +535,7 @@ class ChatService {
     if (message.mine || !message.unlocked || message.readBy.contains(_uid)) {
       return;
     }
+    await ChatReadMemory.mark(id, message.id);
     await _db
         .collection('chats')
         .doc(id)
@@ -493,6 +544,11 @@ class ChatService {
         .update({
           'readBy': FieldValue.arrayUnion([_uid]),
         });
+    try {
+      await _db.collection('chats').doc(id).update({
+        'lastReadAt': {_uid: FieldValue.serverTimestamp()},
+      });
+    } catch (_) {}
   }
 
   static Future<void> deleteMessage(String id, String messageId) async {

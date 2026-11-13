@@ -45,15 +45,19 @@ class ActiveConversation {
   }
 }
 
-int unreadMessageCount(Iterable<ChatMessage> messages, {String? userId}) =>
-    messages
-        .where(
-          (m) =>
-              m.sender != (userId ?? CoupleService.uid) &&
-              m.unlocked &&
-              !m.readBy.contains(userId ?? CoupleService.uid),
-        )
-        .length;
+int unreadMessageCount(
+  Iterable<ChatMessage> messages, {
+  String? userId,
+  String? chatId,
+}) => messages
+    .where(
+      (m) =>
+          m.sender != (userId ?? CoupleService.uid) &&
+          m.unlocked &&
+          !m.readBy.contains(userId ?? CoupleService.uid) &&
+          (chatId == null || !ChatReadMemory.contains(chatId, m.id)),
+    )
+    .length;
 
 int? unreadDividerIndex(List<ChatMessage> messages, {String? userId}) {
   final uid = userId ?? CoupleService.uid;
@@ -79,24 +83,35 @@ class ChatTotalBadge extends StatefulWidget {
 class _ChatTotalBadgeState extends State<ChatTotalBadge> {
   StreamSubscription<List<Conversation>>? _chats;
   final _subscriptions = <String, StreamSubscription<List<ChatMessage>>>{};
+  final _latest = <String, List<ChatMessage>>{};
   final _counts = <String, int>{};
+
+  void _recount() {
+    for (final entry in _latest.entries) {
+      _counts[entry.key] = unreadMessageCount(entry.value, chatId: entry.key);
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    ChatReadMemory.seen.addListener(_recount);
+    unawaited(ChatReadMemory.ensure());
     _chats = ChatService.conversations().listen((chats) {
       final ids = chats.map((chat) => chat.id).toSet();
       for (final id
           in _subscriptions.keys.where((id) => !ids.contains(id)).toList()) {
         _subscriptions.remove(id)?.cancel();
         _counts.remove(id);
+        _latest.remove(id);
       }
       for (final id in ids) {
         _subscriptions.putIfAbsent(
           id,
           () => ChatService.messages(id).listen((messages) {
-            if (mounted) {
-              setState(() => _counts[id] = unreadMessageCount(messages));
-            }
+            _latest[id] = messages;
+            _recount();
           }, onError: (Object _) {}),
         );
       }
@@ -106,6 +121,7 @@ class _ChatTotalBadgeState extends State<ChatTotalBadge> {
 
   @override
   void dispose() {
+    ChatReadMemory.seen.removeListener(_recount);
     _chats?.cancel();
     for (final sub in _subscriptions.values) {
       sub.cancel();

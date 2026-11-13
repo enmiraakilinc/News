@@ -23,14 +23,22 @@ class VoiceCalls {
   static CollectionReference<Map<String, dynamic>> get collection =>
       FirebaseFirestore.instance.collection('voiceCalls');
   static Future<bool> enabled() async {
+    final ref = FirebaseFirestore.instance.doc('config/voice_calls');
     try {
-      return (await FirebaseFirestore.instance
-                  .doc('config/voice_calls')
-                  .get(const GetOptions(source: Source.server)))
+      return (await ref
+                  .get(const GetOptions(source: Source.server))
+                  .timeout(const Duration(seconds: 8)))
               .data()?['enabled'] ==
           true;
     } catch (_) {
-      return false;
+      try {
+        return (await ref.get(
+              const GetOptions(source: Source.cache),
+            )).data()?['enabled'] ==
+            true;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
@@ -46,7 +54,7 @@ class VoiceCalls {
       await FeatureAccess.require('calls');
       await FeatureAccess.require('microphone');
       if (video) await FeatureAccess.require('camera');
-      await CoupleService.ensureReady();
+      await CoupleService.ensureReady().timeout(const Duration(seconds: 12));
       if (!await enabled()) {
         throw Exception('Sesli arama bu sürüm için henüz etkinleştirilmedi.');
       }
@@ -55,7 +63,8 @@ class VoiceCalls {
           (await FirebaseFirestore.instance
                   .collection(parts[0] == 'chat' ? 'chats' : 'couples')
                   .doc(parts[1])
-                  .get(const GetOptions(source: Source.server)))
+                  .get()
+                  .timeout(const Duration(seconds: 12)))
               .data();
       final members = List<String>.from(data?['members'] ?? []);
       if (members.length != 2 || !members.contains(CoupleService.uid)) {
@@ -106,9 +115,7 @@ class VoiceCalls {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(voiceCallFailureMessage(error, video: video)),
-          ),
+          SnackBar(content: Text(voiceCallFailureMessage(error, video: video))),
         );
       }
     }
@@ -347,7 +354,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   bool _speakerOn = false;
   Offset? _localVideoPosition;
-  bool _receiveMuted = false, _audioBusy = false;
+  bool _receiveMuted = false, _audioBusy = false, _restartedIce = false;
   List<CallAudioOutput> _audioOutputs = [];
   CallAudioOutput? _selectedAudioOutput;
   final _remoteAudioTracks = <String, MediaStreamTrack>{};
@@ -568,7 +575,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
           _candidateErrorShown = true;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(voiceCallFailureMessage(error, video: widget.video)),
+              content: Text(
+                voiceCallFailureMessage(error, video: widget.video),
+              ),
             ),
           );
         });
@@ -621,6 +630,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   void _connectionDropped() {
     _connected = false;
+    if (!_restartedIce && _peer != null) {
+      _restartedIce = true;
+      unawaited(_peer!.restartIce().catchError((_) {}));
+    }
     if (_started == null) {
       setState(() => _status = 'Bağlanıyor…');
       return;
@@ -641,9 +654,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     if (mounted && !_closing && !_ended) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            voiceCallFailureMessage(error, video: widget.video),
-          ),
+          content: Text(voiceCallFailureMessage(error, video: widget.video)),
         ),
       );
     }
@@ -940,9 +951,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       await _flush();
       CallBackground.notify(widget.reference.id, 'ring').catchError((error) {
         if (mounted && !_ended) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 voiceCallFailureMessage(error, video: widget.video),

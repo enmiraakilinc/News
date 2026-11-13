@@ -352,10 +352,16 @@ class _CounterScreenState extends State<CounterScreen> {
       borderRadius: BorderRadius.circular(14),
       onTap: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => ekran));
-        await _rozetleriYenile();
-        if (notif != null) {
-          await BadgeService.markSeenWith(_sayimlar, [notif]);
-          if (mounted) setState(() => _rozetler.remove(notif.collection));
+        final sayim = await BadgeService.partnerCounts();
+        if (notif != null && sayim.isNotEmpty) {
+          await BadgeService.markSeenWith(sayim, [notif]);
+        }
+        final r = sayim.isEmpty ? <String, int>{} : await BadgeService.unseenFrom(sayim);
+        if (mounted) {
+          setState(() {
+            _sayimlar = sayim;
+            _rozetler = r;
+          });
         }
       },
       child: Container(

@@ -416,6 +416,8 @@ class OraclePrimaryStore {
     Completer<void>? done;
     bool cancelled = false, waitingForNetwork = false;
     Timer? reconnect;
+    Timer? pull;
+    var pulling = false;
     var failures = 0;
     void emit() {
       if (!cancelled && isCurrent()) controller.add(_snapshot(view));
@@ -444,6 +446,38 @@ class OraclePrimaryStore {
           }
         });
         if (view.ready || cacheOnly || outbox.pending.isNotEmpty) emit();
+        if (!cacheOnly) {
+          pull = Timer.periodic(const Duration(seconds: 2), (_) {
+            if (pulling || cancelled || !isCurrent() || !networkEnabled) return;
+            pulling = true;
+            unawaited(() async {
+              try {
+                final data = await transport.post('/v1/read', request);
+                if (cancelled || !isCurrent()) return;
+                final rows = request['kind'] == 'document'
+                    ? (data['row'] == null
+                          ? <Map<String, dynamic>>[]
+                          : [Map<String, dynamic>.from(data['row'] as Map)])
+                    : _rows(data['rows']);
+                final same =
+                    rows.length == view.rows.length &&
+                    [
+                      for (var i = 0; i < rows.length; i++)
+                        rows[i]['path'] == view.rows[i]['path'] &&
+                            rows[i]['version'] == view.rows[i]['version'],
+                    ].every((ok) => ok);
+                if (same) return;
+                view.rows = rows;
+                view.ready = true;
+                view.fromCache = false;
+                emit();
+              } catch (_) {
+              } finally {
+                pulling = false;
+              }
+            }());
+          });
+        }
         while (!cancelled && isCurrent()) {
           if (cacheOnly || !networkEnabled) {
             waitingForNetwork = true;
@@ -535,6 +569,7 @@ class OraclePrimaryStore {
       } catch (error, stack) {
         if (!cancelled) controller.addError(error, stack);
       } finally {
+        pull?.cancel();
         await remote?.cancel();
         await local?.cancel();
         _views.remove(view);
@@ -546,6 +581,7 @@ class OraclePrimaryStore {
     cancel = () async {
       if (cancelled) return;
       cancelled = true;
+      pull?.cancel();
       reconnect?.cancel();
       if (done != null && !done!.isCompleted) done!.complete();
       await remote?.cancel();

@@ -74,7 +74,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Future<String?> _loadProfile() async {
     if (widget.profileLoader != null) return widget.profileLoader!();
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 8));
     final uid = CoupleService.uid;
     final remote = ChatService.myName().timeout(const Duration(seconds: 20));
     // Attach handlers immediately, even when a cached profile wins the race.
@@ -111,7 +111,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         await widget.contactLoader!();
         return;
       }
-      await CoupleService.ensureReady();
+      await CoupleService.ensureReady().timeout(const Duration(seconds: 8));
       await ContactNames.load();
     } catch (_) {
       /* Keep the visible list and local contact metadata. */
@@ -451,46 +451,46 @@ class _ContactsScreenState extends State<ContactsScreen> {
     body: Column(
       children: [
         Card(
-            margin: const EdgeInsets.all(16),
-            child: ListTile(
-              leading: const ContactAvatar(contactId: ContactNames.posniId),
-              title: Text(
-                ContactNames.name(ContactNames.posniId, 'Posni'),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: const Text('Mektuplar ve sohbet'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Sohbet adını değiştir',
-                    icon: const Icon(Icons.edit_outlined),
-                    onPressed: () async {
-                      await ContactNames.rename(
-                        context,
-                        ContactNames.posniId,
-                        'Posni',
-                      );
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (_) => _removeId(ContactNames.posniId),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'delete', child: Text('Kişiyi sil')),
-                    ],
-                  ),
-                ],
-              ),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LettersScreen()),
-                );
-                if (mounted) setState(() {});
-              },
+          margin: const EdgeInsets.all(16),
+          child: ListTile(
+            leading: const ContactAvatar(contactId: ContactNames.posniId),
+            title: Text(
+              ContactNames.name(ContactNames.posniId, 'Posni'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            subtitle: const Text('Mektuplar ve sohbet'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Sohbet adını değiştir',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () async {
+                    await ContactNames.rename(
+                      context,
+                      ContactNames.posniId,
+                      'Posni',
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (_) => _removeId(ContactNames.posniId),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'delete', child: Text('Kişiyi sil')),
+                  ],
+                ),
+              ],
+            ),
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LettersScreen()),
+              );
+              if (mounted) setState(() {});
+            },
           ),
+        ),
         Expanded(
           child: FutureBuilder<String?>(
             future: _profile,
@@ -589,19 +589,21 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: StreamBuilder<List<Conversation>>(
                       stream: _stream,
                       builder: (context, snapshot) {
-                        if (snapshot.hasError) {
+                        if (snapshot.hasData) {
+                          _conversations = snapshot.data!.toList();
+                        }
+                        if (snapshot.hasError && _conversations.isEmpty) {
                           return SyncError(
                             label: 'Sohbetler',
                             onRetry: _retry,
                             error: snapshot.error,
                           );
                         }
-                        if (!snapshot.hasData) {
+                        if (!snapshot.hasData && _conversations.isEmpty) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
                         }
-                        _conversations = snapshot.data!.toList();
                         if (_conversations.isEmpty) {
                           return const Center(
                             child: Padding(
@@ -726,9 +728,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     unawaited(
-      ActiveConversation.set(
-        resumed ? 'chat/${widget.conversation.id}' : null,
-      ),
+      ActiveConversation.set(resumed ? 'chat/${widget.conversation.id}' : null),
     );
   }
 
@@ -752,22 +752,41 @@ class _ConversationScreenState extends State<ConversationScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ActiveConversation.liveRefresh.addListener(_reconnect);
     _watchConversation();
+  }
+
+  DateTime? _reconnectAt;
+
+  void _reconnect() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (_reconnectAt != null && now.isBefore(_reconnectAt!)) return;
+    _reconnectAt = now.add(const Duration(seconds: 2));
+    setState(() {
+      _stream = ChatService.messages(
+        widget.conversation.id,
+        limit: _messageLimit,
+      );
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _watchConversation();
+    if (state == AppLifecycleState.resumed) _reconnect();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ActiveConversation.liveRefresh.removeListener(_reconnect);
     unawaited(ActiveConversation.set(null));
     super.dispose();
   }
 
   int _messageLimit = 100;
+  List<ChatMessage> _visibleMessages = [];
   late Stream<List<ChatMessage>> _stream = ChatService.messages(
     widget.conversation.id,
   );
@@ -883,9 +902,9 @@ class _ConversationScreenState extends State<ConversationScreen>
         sourceKey: 'chat/${widget.conversation.id}',
         userId: widget.conversation.group
             ? null
-            : widget.conversation.members.firstWhere(
-                (id) => id != CoupleService.uid,
-              ),
+            : widget.conversation.members
+                  .where((id) => id != CoupleService.uid)
+                  .firstOrNull,
         members: widget.conversation.group ? widget.conversation.names : null,
       ),
     ),
@@ -906,13 +925,22 @@ class _ConversationScreenState extends State<ConversationScreen>
     body: StreamBuilder<List<ChatMessage>>(
       stream: _stream,
       builder: (context, snapshot) {
+        final incoming = snapshot.data;
+        if (incoming != null) _visibleMessages = incoming;
+        final messages = incoming ?? _visibleMessages;
         if (snapshot.hasError) {
-          return SyncError(label: 'Mektuplar', onRetry: _retry);
+          WidgetsBinding.instance.addPostFrameCallback((_) => _reconnect());
         }
-        if (!snapshot.hasData) {
+        if (snapshot.hasError && messages.isEmpty) {
+          return SyncError(
+            label: 'Sohbet',
+            onRetry: _retry,
+            error: snapshot.error,
+          );
+        }
+        if (messages.isEmpty && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final messages = snapshot.data!;
         final photoMessages = [
           for (final message in messages.reversed)
             if (message.unlocked) message.text,
@@ -921,12 +949,13 @@ class _ConversationScreenState extends State<ConversationScreen>
         final unreadDivider = unreadDividerIndex(messages);
         final hasMoreMessages = messages.length >= _messageLimit;
         if (messages.isEmpty) {
-          return const Center(child: Text('İlk mektubunu aşağıdan gönder.'));
+          return const Center(child: Text('İlk mesajını aşağıdan gönder.'));
         }
         return ListView.builder(
           reverse: true,
           padding: const EdgeInsets.all(12),
-          itemCount: messages.length +
+          itemCount:
+              messages.length +
               (hasMoreMessages ? 1 : 0) +
               (unreadDivider == null ? 0 : 1),
           findChildIndexCallback: (key) {
@@ -944,8 +973,7 @@ class _ConversationScreenState extends State<ConversationScreen>
             if (index == unreadDivider) {
               return const _UnreadMessagesDivider();
             }
-            final messageIndex =
-                unreadDivider != null && index > unreadDivider
+            final messageIndex = unreadDivider != null && index > unreadDivider
                 ? index - 1
                 : index;
             if (messageIndex == messages.length) {

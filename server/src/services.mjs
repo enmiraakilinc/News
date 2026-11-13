@@ -45,9 +45,11 @@ export class Services {
     const [chat,message]=await Promise.all([this.store.get('chats/'+chatId),this.store.get(path)]);
     if(!message||message.scheduled?.booleanValue!==false)continue;
     const recipients=members(chat).filter(uid=>uid!==auth.uid);
-    const recipientDevices=await Promise.all(recipients.map(async recipientUid=>({
-     recipientUid,devices:await this.store.list('chatAccounts/'+recipientUid+'/chatDevices'),
-    })));
+    const recipientDevices=await Promise.all(recipients.map(async recipientUid=>{
+     const chats=await this.store.list('chatAccounts/'+recipientUid+'/chatDevices');
+     const devices=chats.length?chats:await this.store.list('chatAccounts/'+recipientUid+'/callDevices');
+     return {recipientUid,devices};
+    }));
     for(const {recipientUid,devices} of recipientDevices){
      for(const device of devices.filter(d=>str(d,'token')).slice(0,5)){
       targets.push({token:str(device,'token'),recipientUid,chatId,messageId});

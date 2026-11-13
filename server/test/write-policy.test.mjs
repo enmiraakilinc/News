@@ -77,6 +77,12 @@ test('typing indicators are scoped to a chat member and its own document',async(
  await denied(run('chats/direct/typing/alice',null,{...typing,updatedAt:now.add(-1)}));
  await denied(run('chats/direct/typing/bob',typing,null));
 });
+test('both chat members can send a message to each other',async()=>{
+ const fromBob={...message,sender:'bob',readBy:['bob']};
+ await run('chats/direct/messages/a',null,message);
+ await run('chats/direct/messages/b',null,fromBob,{uid:'bob'});
+ await denied(run('chats/direct/messages/b',null,fromBob));
+});
 test('either chat member can clear messages, but outsiders cannot delete them',async()=>{
  await run('chats/direct/messages/a',message,null);
  await run('chats/direct/messages/a',{...message,sender:'bob'},null,{uid:'bob'});

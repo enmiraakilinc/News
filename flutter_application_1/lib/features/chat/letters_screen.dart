@@ -38,8 +38,12 @@ class _LettersScreenState extends State<LettersScreen> {
   }
 
   Future<void> _refresh() async {
-    final cid = await CoupleService.coupleId();
-    final sec = await CoupleService.secret();
+    String? cid;
+    String? sec;
+    try {
+      cid = await CoupleService.coupleId().timeout(const Duration(seconds: 6));
+      sec = await CoupleService.secret().timeout(const Duration(seconds: 6));
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _coupleId = cid;
@@ -90,8 +94,9 @@ class _PairingViewState extends State<_PairingView> {
       if (mounted) widget.onPaired();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(_msg(e))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_msg(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -310,6 +315,7 @@ class _LettersViewState extends State<_LettersView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ActiveConversation.liveRefresh.addListener(_reconnect);
     _watchConversation();
     ContactNames.changes.addListener(_nameChanged);
     ContactNames.load();
@@ -319,10 +325,29 @@ class _LettersViewState extends State<_LettersView>
     });
   }
 
+  DateTime? _reconnectAt;
+
+  void _reconnect() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (_reconnectAt != null && now.isBefore(_reconnectAt!)) return;
+    _reconnectAt = now.add(const Duration(seconds: 2));
+    setState(() {
+      _stream = CoupleService.lettersStream(
+        widget.coupleId,
+        widget.secret,
+        limit: _messageLimit,
+      );
+    });
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _watchConversation();
-    if (state == AppLifecycleState.resumed) ChatPresence.changes.value++;
+    if (state == AppLifecycleState.resumed) {
+      ChatPresence.changes.value++;
+      _reconnect();
+    }
   }
 
   void _nameChanged() {
@@ -332,6 +357,7 @@ class _LettersViewState extends State<_LettersView>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ActiveConversation.liveRefresh.removeListener(_reconnect);
     _presenceTick?.cancel();
     unawaited(ActiveConversation.set(null));
     ContactNames.changes.removeListener(_nameChanged);
@@ -343,9 +369,9 @@ class _LettersViewState extends State<_LettersView>
       await operation();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userError(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(e))));
       }
     }
   }
@@ -428,8 +454,9 @@ class _LettersViewState extends State<_LettersView>
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(userError(error))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(userError(error))));
       }
     } finally {
       if (mounted) setState(() => _clearing = false);
@@ -487,16 +514,9 @@ class _LettersViewState extends State<_LettersView>
           final incoming = snap.data;
           if (incoming != null) _visibleLetters = incoming;
           final letters = incoming ?? _visibleLetters;
-          if (snap.connectionState == ConnectionState.waiting &&
-              letters.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _reconnect());
           }
-          // Hata varsa ama elimizde mektup varsa listeyi silme — sadece uyar.
-          final photoMessages = [
-            for (final letter in letters.reversed)
-              if (letter.acildi && letter.text != null) letter.text!,
-          ];
-          final byId = {for (final letter in letters) letter.id: letter};
           if (snap.hasError && letters.isEmpty) {
             return Center(
               child: Padding(
@@ -520,6 +540,16 @@ class _LettersViewState extends State<_LettersView>
               ),
             );
           }
+          if (snap.connectionState == ConnectionState.waiting &&
+              letters.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          // Hata varsa ama elimizde mektup varsa listeyi silme — sadece uyar.
+          final photoMessages = [
+            for (final letter in letters.reversed)
+              if (letter.acildi && letter.text != null) letter.text!,
+          ];
+          final byId = {for (final letter in letters) letter.id: letter};
           if (letters.isEmpty) {
             return const Center(
               child: Padding(
