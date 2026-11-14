@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2096"
+      },
+      "name": {
+        "stringValue": "1.16.15"
+      },
+      "notes": {
+        "stringValue": "Aramalar d\u00fczeltildi.\nBildirimler d\u00fczeltildi.\nAnl\u0131k foto atma k\u0131sm\u0131 d\u00fczeltildi.\nMesajlar\u0131n ge\u00e7 gelmesi d\u00fczeltildi.\nSon g\u00f6r\u00fclmeler daha d\u00fczg\u00fcn hale getirildi."
+      },
+      "sha256": {
+        "stringValue": "06955bf3091290743838036a3b5db32f2857993439ebbdddc7b431eb64ae42ab"
+      },
+      "assetId": {
+        "integerValue": "744373531"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T16:41:26.681597Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2096"
+      },
+      "name": {
+        "stringValue": "1.16.15"
+      },
+      "notes": {
+        "stringValue": "Aramalar d\u00fczeltildi.\nBildirimler d\u00fczeltildi.\nAnl\u0131k foto atma k\u0131sm\u0131 d\u00fczeltildi.\nMesajlar\u0131n ge\u00e7 gelmesi d\u00fczeltildi.\nSon g\u00f6r\u00fclmeler daha d\u00fczg\u00fcn hale getirildi."
+      },
+      "sha256": {
+        "stringValue": "06955bf3091290743838036a3b5db32f2857993439ebbdddc7b431eb64ae42ab"
+      },
+      "assetId": {
+        "integerValue": "744373531"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T16:41:26.681597Z"
+  }
+}

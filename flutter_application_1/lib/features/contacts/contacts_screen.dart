@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 
 import '../chat/chat_service.dart';
 import '../chat/chat_widgets.dart';
+import '../chat/message_info.dart';
 import '../chat/chat_unread.dart';
 import '../pair/couple_service.dart';
 import '../../core/utils/sync_state.dart';
@@ -150,38 +151,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
     );
     if (ok != true) return;
+    // Kişi listeden anında kalkar; sunucu yanıtı (200/204/404) beklenmez.
+    if (id != ContactNames.posniId && mounted) {
+      setState(() {
+        _removed.add(id);
+        _conversations.removeWhere((chat) => chat.id == id);
+      });
+    }
     try {
       if (id == ContactNames.posniId) {
         await CoupleService.severPair();
       } else {
         await ChatService.deleteDirect(id);
       }
-    } catch (error) {
-      if (isTransientError(error)) {
-        // Ağ/sunucu gecikmesi işlemi engellemez; silme arka planda tekrar denenir.
-        if (id != ContactNames.posniId) {
-          unawaited(
-            Future<void>.delayed(const Duration(seconds: 5), () async {
-              try {
-                await ChatService.deleteDirect(id);
-              } catch (_) {}
-            }),
-          );
-        }
-        if (mounted) setState(() {});
-        return;
-      }
-      if (mounted) {
-        showUserError(
-          context,
-          error,
-          fallback: 'Kişi kaldırılamadı. Yeniden dene.',
+    } catch (_) {
+      if (id != ContactNames.posniId) {
+        unawaited(
+          Future<void>.delayed(const Duration(seconds: 5), () async {
+            try {
+              await ChatService.deleteDirect(id);
+            } catch (_) {}
+          }),
         );
       }
-      return;
     }
     if (mounted) setState(() {});
   }
+
+  final Set<String> _removed = {};
 
   bool _busy = false;
 
@@ -596,7 +593,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       stream: _stream,
                       builder: (context, snapshot) {
                         if (snapshot.hasData) {
-                          _conversations = snapshot.data!.toList();
+                          _conversations = snapshot.data!
+                              .where((chat) => !_removed.contains(chat.id))
+                              .toList();
                         }
                         if (snapshot.hasError && _conversations.isEmpty) {
                           return SyncError(
@@ -1071,6 +1070,32 @@ class _ConversationScreenState extends State<ConversationScreen>
                       message.readBy.contains,
                     ),
                   ),
+                  info: message.mine && !message.pending
+                      ? MessageInfo(
+                          sentAt: message.sentAt,
+                          rows: [
+                            for (final member in widget.conversation.members)
+                              if (member != message.sender)
+                                MessageInfoRow(
+                                  widget.conversation.group
+                                      ? ContactNames.name(
+                                          ChatService.directId(
+                                            CoupleService.uid!,
+                                            member,
+                                          ),
+                                          widget.conversation.names[member] ??
+                                              'Katılımcı',
+                                        )
+                                      : ContactNames.name(
+                                          widget.conversation.id,
+                                          widget.conversation.displayTitle,
+                                        ),
+                                  deliveredAt: message.deliveredAt[member],
+                                  readAt: message.readAt[member],
+                                ),
+                          ],
+                        )
+                      : null,
                   reactions: message.reactions,
                   onReact: message.unlocked
                       ? (emoji) => _action(

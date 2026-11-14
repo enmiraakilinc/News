@@ -18,6 +18,7 @@ import '../media/video_parts.dart';
 import '../starred/starred_messages.dart';
 import '../media/media_names_screen.dart';
 import '../../core/utils/user_errors.dart';
+import 'message_info.dart';
 import '../voice_notes/voice_notes_screen.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -40,6 +41,7 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onEdit;
   final void Function(String)? onReact;
   final Map<String, String> reactions;
+  final MessageInfo? info;
   const MessageBubble({
     super.key,
     this.messageId,
@@ -57,6 +59,7 @@ class MessageBubble extends StatelessWidget {
     this.onReply,
     this.onQuoteTap,
     this.highlighted = false,
+    this.info,
     this.onDelete,
     this.onEdit,
     this.onReact,
@@ -149,7 +152,8 @@ class MessageBubble extends StatelessWidget {
                     onReact == null &&
                     !canStar &&
                     !canCopy &&
-                    !canExtend
+                    !canExtend &&
+                    info == null
                 ? null
                 : () async {
                     final action = await showConversationActions(
@@ -171,6 +175,12 @@ class MessageBubble extends StatelessWidget {
                             'select',
                             'Toplu seç',
                             Icons.checklist,
+                          ),
+                        if (info != null)
+                          const ConversationAction(
+                            'info',
+                            'Bilgi',
+                            Icons.info_outline,
                           ),
                         if (canCopy)
                           const ConversationAction(
@@ -221,6 +231,8 @@ class MessageBubble extends StatelessWidget {
                         await extendChatAttachment(context, text);
                       case 'select':
                         toggleSelection();
+                      case 'info':
+                        await showMessageInfo(context, info!);
                       case 'copy':
                         await Clipboard.setData(ClipboardData(text: text));
                         if (context.mounted) {
@@ -601,8 +613,11 @@ class _ChatComposerState extends State<ChatComposer>
         MaterialPageRoute(
           builder: (_) => MediaNamesScreen(
             names: parts.length == 1
-                ? [file.name]
-                : List.generate(parts.length, (i) => 'Part ${i + 1}'),
+                ? [datedMediaName(video: video)]
+                : List.generate(
+                    parts.length,
+                    (i) => '${datedMediaName(video: video)} · Part ${i + 1}',
+                  ),
             photo: bytes,
           ),
         ),
@@ -692,13 +707,13 @@ class _ChatComposerState extends State<ChatComposer>
         }
         final parts = video ? await VideoParts.prepare(file) : [file];
         prepared.addAll(parts);
+        final base = files.length == 1
+            ? datedMediaName(video: video)
+            : '${datedMediaName(video: video)}_${files.indexOf(file) + 1}';
         names.addAll(
           parts.length == 1
-              ? [file.name]
-              : List.generate(
-                  parts.length,
-                  (i) => '${file.name} · Part ${i + 1}',
-                ),
+              ? [base]
+              : List.generate(parts.length, (i) => '$base · Part ${i + 1}'),
         );
       }
       if (!mounted) return;

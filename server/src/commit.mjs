@@ -81,6 +81,13 @@ export async function commit(pool,body,auth){
     await authorizeWrite({path:op.path,before:await read(op.path),after:after.get(op.path),
       uid:auth.uid,email:auth.email,now,read,readAfter});
    }
+   // Gizli kelime kanıtı doğrulanmış katılım: yalnızca bu işlem için eski satırın RLS kapsamını açar.
+   for(const op of body.operations){
+    if(op.type!=='update'||!/^couples\/[^/]+$/.test(op.path))continue;
+    const was=await read(op.path),next=after.get(op.path);
+    if(Array.isArray(was?.members)&&!was.members.includes(auth.uid)&&Array.isArray(next?.members)&&next.members.includes(auth.uid))
+     await db.query("SELECT set_config('neural.join_path',$1,true)",[op.path]);
+   }
    // Parents exist before inserting children; children disappear before parents.
    const ordered=[...body.operations].sort((a,b)=>{
     const ad=a.type==='delete',bd=b.type==='delete';

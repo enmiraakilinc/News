@@ -1,0 +1,28 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2086"
+      },
+      "name": {
+        "stringValue": "1.16.5"
+      },
+      "notes": {
+        "stringValue": "Genel g\u00f6r\u00fcn\u00fcm ve kararl\u0131l\u0131k iyile\u015ftirmeleri."
+      },
+      "sha256": {
+        "stringValue": "c37add1830f18aeda7286af6b4bd780e8b1d3f2ac4d41076c8460829024a2525"
+      },
+      "assetId": {
+        "integerValue": "698428236"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-01T13:35:15.455156Z"
+  },
+  "githubReleaseId": 437076814
+}

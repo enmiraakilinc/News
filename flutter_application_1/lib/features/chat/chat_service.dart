@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../pair/couple_service.dart';
 import '../../core/utils/open_stream.dart';
+import 'chat_offline_cache.dart';
 import '../../core/utils/refresh_stream.dart';
 import '../media/chat_media.dart';
 import '../../core/data/oracle_client.dart';
@@ -70,6 +71,8 @@ class ChatMessage {
   final List<String> readBy;
   final bool scheduled;
   final bool pending;
+  final Map<String, DateTime> readAt;
+  final Map<String, DateTime> deliveredAt;
   ChatMessage({
     required this.id,
     this.reactions = const {},
@@ -82,6 +85,8 @@ class ChatMessage {
     this.replyTo,
     this.scheduled = true,
     this.pending = false,
+    this.readAt = const {},
+    this.deliveredAt = const {},
   });
   bool get mine => sender == CoupleService.uid;
   bool get unlocked => !scheduled || !openAt.isAfter(DateTime.now());
@@ -151,11 +156,48 @@ class ChatService {
 
   static FirebaseFirestore get _db => FirebaseFirestore.instance;
   static String get _uid => CoupleService.uid!;
-  static Stream<T> _ready<T>(Stream<T> Function() source) => openStreamAfter(
+  static Stream<T> _ready<T>(
+    Stream<T> Function() source, {
+    Future<T?> Function()? cached,
+  }) => openStreamAfter(
     CoupleService.ensureReady,
     source,
+    cached: cached,
     message: 'Sohbet yüklenemedi.',
   );
+
+  static Map<String, DateTime> _timeMap(Object? raw) => {
+    if (raw is Map)
+      for (final entry in raw.entries)
+        if (entry.key is String && entry.value is Timestamp)
+          entry.key as String: (entry.value as Timestamp).toDate(),
+  };
+
+  static final _delivered = <String>{};
+  static void _markDelivered(String chatId, List<ChatMessage> list) {
+    final uid = CoupleService.uid;
+    if (uid == null) return;
+    for (final m in list) {
+      if (m.mine ||
+          m.pending ||
+          !m.unlocked ||
+          m.readBy.contains(uid) ||
+          m.deliveredAt.containsKey(uid) ||
+          m.readAt.containsKey(uid) ||
+          !_delivered.add('$chatId/${m.id}')) {
+        continue;
+      }
+      unawaited(
+        _db
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc(m.id)
+            .update({'deliveredAt.$uid': FieldValue.serverTimestamp()})
+            .catchError((_) {}),
+      );
+    }
+  }
 
   static Map<String, String> _stringMap(Object? raw) {
     if (raw is! Map) return {};
@@ -360,9 +402,37 @@ class ChatService {
               a.updatedAt ?? DateTime(2000),
             ),
           );
+          ChatOfflineCache.saveConversations(result);
           return result;
         }),
+    cached: _cachedConversations,
   );
+
+  static Future<List<Conversation>?> _cachedConversations() async {
+    final saved = await ChatOfflineCache.conversations();
+    if (saved != null && saved.isNotEmpty) return saved;
+    try {
+      final snap = await _db
+          .collection('chats')
+          .where('members', arrayContains: _uid)
+          .limit(50)
+          .get()
+          .timeout(const Duration(seconds: 12));
+      final result = snap.docs
+          .map(_conversation)
+          .whereType<Conversation>()
+          .toList();
+      result.sort(
+        (a, b) => (b.updatedAt ?? DateTime(2000)).compareTo(
+          a.updatedAt ?? DateTime(2000),
+        ),
+      );
+      ChatOfflineCache.saveConversations(result);
+      return result;
+    } catch (_) {
+      return saved;
+    }
+  }
 
   static Conversation? _conversation(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -471,13 +541,18 @@ class ChatService {
                   readBy: readBy is List
                       ? readBy.whereType<String>().toList()
                       : const [],
+                  readAt: _timeMap(data['readAt']),
+                  deliveredAt: _timeMap(data['deliveredAt']),
                 );
               })
               .whereType<ChatMessage>()
               .toList();
           result.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+          ChatOfflineCache.saveMessages(id, result);
+          _markDelivered(id, result);
           return result;
         }),
+    cached: () => ChatOfflineCache.messages(id),
   );
 
   static Future<void> send(
@@ -550,6 +625,7 @@ class ChatService {
         .doc(message.id)
         .update({
           'readBy': FieldValue.arrayUnion([_uid]),
+          'readAt.$_uid': FieldValue.serverTimestamp(),
         });
     try {
       await _db.collection('chats').doc(id).update({

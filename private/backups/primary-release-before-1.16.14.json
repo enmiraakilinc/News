@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2094"
+      },
+      "name": {
+        "stringValue": "1.16.13"
+      },
+      "notes": {
+        "stringValue": "Arama kurulumu, mikrofon me\u015fguliyeti ve mesaj g\u00f6nderim kuyru\u011fu d\u00fczeltildi.\nBuild code: 2094"
+      },
+      "sha256": {
+        "stringValue": "b30606d897dbfe85a902a80f2928bd97aa665c497575a21210100f7105292d4c"
+      },
+      "assetId": {
+        "integerValue": "740164446"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-12T17:32:56.373709Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2094"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      },
+      "notes": {
+        "stringValue": "Arama kurulumu, mikrofon me\u015fguliyeti ve mesaj g\u00f6nderim kuyru\u011fu d\u00fczeltildi.\nBuild code: 2094"
+      },
+      "name": {
+        "stringValue": "1.16.13"
+      },
+      "assetId": {
+        "integerValue": "740164446"
+      },
+      "sha256": {
+        "stringValue": "b30606d897dbfe85a902a80f2928bd97aa665c497575a21210100f7105292d4c"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-12T17:32:56.373709Z"
+  }
+}

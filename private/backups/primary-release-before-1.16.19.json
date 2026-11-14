@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2099"
+      },
+      "name": {
+        "stringValue": "1.16.18"
+      },
+      "notes": {
+        "stringValue": "Aramalar erken kapanm\u0131yor.\nYaln\u0131zca cevaps\u0131z arama sohbete yaz\u0131l\u0131yor.\nSon g\u00f6r\u00fclme saati d\u00fczeltildi.\nAnl\u0131k foto\u011fraf atma d\u00fczeltildi.\nKi\u015fi silmek iki tarafta da kal\u0131c\u0131.\nYeniden yazmak i\u00e7in yeni davet gerekiyor.\nG\u00fcn\u00fcn sorusu kay\u0131tlar\u0131 d\u00fczenlendi.\nAn\u0131lar, dilekler, ders notlar\u0131 y\u00fcklemede tak\u0131l\u0131 kalm\u0131yor.\n\u015eifremi unuttum eklendi.\nBildirimde titre\u015fim bildirimi se\u00e7ene\u011fi se\u00e7ilebiliyor.\nDers notlar\u0131 defter g\u00f6r\u00fcn\u00fcm\u00fcnde."
+      },
+      "sha256": {
+        "stringValue": "930a3c17ed9202d0f3778642626f0f81b11b2ef6d186bab501cf3d72c3fe3428"
+      },
+      "assetId": {
+        "integerValue": "744790569"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T18:59:48.616556Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "notes": {
+        "stringValue": "Aramalar erken kapanm\u0131yor.\nYaln\u0131zca cevaps\u0131z arama sohbete yaz\u0131l\u0131yor.\nSon g\u00f6r\u00fclme saati d\u00fczeltildi.\nAnl\u0131k foto\u011fraf atma d\u00fczeltildi.\nKi\u015fi silmek iki tarafta da kal\u0131c\u0131.\nYeniden yazmak i\u00e7in yeni davet gerekiyor.\nG\u00fcn\u00fcn sorusu kay\u0131tlar\u0131 d\u00fczenlendi.\nAn\u0131lar, dilekler, ders notlar\u0131 y\u00fcklemede tak\u0131l\u0131 kalm\u0131yor.\n\u015eifremi unuttum eklendi.\nBildirimde titre\u015fim bildirimi se\u00e7ene\u011fi se\u00e7ilebiliyor.\nDers notlar\u0131 defter g\u00f6r\u00fcn\u00fcm\u00fcnde."
+      },
+      "assetId": {
+        "integerValue": "744790569"
+      },
+      "name": {
+        "stringValue": "1.16.18"
+      },
+      "sha256": {
+        "stringValue": "930a3c17ed9202d0f3778642626f0f81b11b2ef6d186bab501cf3d72c3fe3428"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      },
+      "code": {
+        "integerValue": "2099"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T18:59:48.616556Z"
+  }
+}

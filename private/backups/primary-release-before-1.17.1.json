@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2100"
+      },
+      "name": {
+        "stringValue": "1.17.0"
+      },
+      "notes": {
+        "stringValue": "Aramalar erken kapanm\u0131yor.\nYaln\u0131zca cevaps\u0131z arama sohbete yaz\u0131l\u0131yor.\nSon g\u00f6r\u00fclme saati d\u00fczeltildi.\nAnl\u0131k foto\u011fraf atma d\u00fczeltildi.\nKi\u015fi silmek iki tarafta da kal\u0131c\u0131.\nYeniden yazmak i\u00e7in yeni davet gerekiyor.\nG\u00fcn\u00fcn sorusu kay\u0131tlar\u0131 d\u00fczenlendi.\nAn\u0131lar, dilekler, ders notlar\u0131 y\u00fcklemede tak\u0131l\u0131 kalm\u0131yor.\n\u015eifremi unuttum eklendi."
+      },
+      "sha256": {
+        "stringValue": "0eba057a1384371eab147f6c6ea81111c7f8e80e90d9cf9caf253c590a5cd550"
+      },
+      "assetId": {
+        "integerValue": "745370689"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T22:14:35.259276Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      },
+      "notes": {
+        "stringValue": "Aramalar erken kapanm\u0131yor.\nYaln\u0131zca cevaps\u0131z arama sohbete yaz\u0131l\u0131yor.\nSon g\u00f6r\u00fclme saati d\u00fczeltildi.\nAnl\u0131k foto\u011fraf atma d\u00fczeltildi.\nKi\u015fi silmek iki tarafta da kal\u0131c\u0131.\nYeniden yazmak i\u00e7in yeni davet gerekiyor.\nG\u00fcn\u00fcn sorusu kay\u0131tlar\u0131 d\u00fczenlendi.\nAn\u0131lar, dilekler, ders notlar\u0131 y\u00fcklemede tak\u0131l\u0131 kalm\u0131yor.\n\u015eifremi unuttum eklendi."
+      },
+      "code": {
+        "integerValue": "2100"
+      },
+      "assetId": {
+        "integerValue": "745370689"
+      },
+      "name": {
+        "stringValue": "1.17.0"
+      },
+      "sha256": {
+        "stringValue": "0eba057a1384371eab147f6c6ea81111c7f8e80e90d9cf9caf253c590a5cd550"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-13T22:14:35.259276Z"
+  }
+}

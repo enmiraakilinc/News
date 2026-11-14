@@ -183,3 +183,15 @@ void showUserErrorOn(ScaffoldMessengerState messenger, Object error) {
   if (isTransientError(error)) return;
   messenger.showSnackBar(SnackBar(content: Text(userError(error))));
 }
+
+/// Kullanıcının devam edemediği akışlar (ör. gizli kelime girişi) için: hata her zaman gösterilir.
+void showBlockingError(BuildContext context, Object error) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(userError(error))));
+}
+
+void showBlockingErrorOn(ScaffoldMessengerState messenger, Object error) {
+  messenger.showSnackBar(SnackBar(content: Text(userError(error))));
+}

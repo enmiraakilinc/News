@@ -307,24 +307,26 @@ class CoupleService {
       if (cid == null || word == null || me == null) return;
       final key = '$me|$cid';
       if (_repairedFor == key) return;
-      _repairedFor = key;
       final snapshot = await _db
           .collection('couples')
           .doc(cid)
           .get()
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 10));
       final members = snapshot.data()?['members'];
-      if (snapshot.exists && members is List && members.contains(me)) return;
-      await _db
-          .collection('couples')
-          .doc(cid)
-          .update({
-            'members': FieldValue.arrayUnion([me]),
-            'joinProof': _secretCheck(word),
-          })
-          .timeout(const Duration(seconds: 8));
+      if (!(snapshot.exists && members is List && members.contains(me))) {
+        // Katılım kalıcı kuyruğa yazılır; sunucu gecikirse arka planda tamamlanır.
+        await _db
+            .collection('couples')
+            .doc(cid)
+            .update({
+              'members': FieldValue.arrayUnion([me]),
+              'joinProof': _secretCheck(word),
+            })
+            .timeout(const Duration(seconds: 10), onTimeout: () {});
+      }
+      _repairedFor = key;
     } catch (_) {
-      /* Oturum başına tek deneme; akış bu yüzden tekrar tekrar gecikmez. */
+      /* Bir sonraki akış açılışında yeniden denenir. */
     }
   }
 
@@ -399,22 +401,44 @@ class CoupleService {
 
   static Future<void> signInWithSecret(String word) async {
     if (word.isEmpty) throw Exception('Gizli kelimeyi gir.');
-    await ensureReady();
-    final login = await _db.collection('invites').doc(_loginId(word)).get();
+    await ensureReady().timeout(const Duration(seconds: 25));
+    final login = await _db
+        .collection('invites')
+        .doc(_loginId(word))
+        .get()
+        .timeout(const Duration(seconds: 25));
     if (!login.exists) {
       throw Exception(
         'Gizli kelime bulunamadı. Kelimeyi kontrol edip tekrar dene.',
       );
     }
-    final cid = login.data()!['coupleId'] as String;
-    final ref = _db.collection('couples').doc(cid);
-    // Firestore validates the proof before granting private membership.
-    // Non-members cannot read the stored secret hash.
-    await ref.update({
-      'members': FieldValue.arrayUnion([uid!]),
-      'joinProof': _secretCheck(word),
-    });
+    final cid = login.data()?['coupleId'];
+    if (cid is! String || cid.isEmpty) {
+      throw Exception(
+        'Gizli kelime bulunamadı. Kelimeyi kontrol edip tekrar dene.',
+      );
+    }
+    final me = uid;
+    if (me == null) {
+      throw Exception(
+        'Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.',
+      );
+    }
+    // Kelime doğrulanınca bağ bu cihazda hemen açılır. Üyelik yazısı
+    // gecikirse ekran geri atılmaz; katılım arka planda tamamlanır.
     await _saveLocal(cid, word);
+    unawaited(() async {
+      try {
+        await _db
+            .collection('couples')
+            .doc(cid)
+            .update({
+              'members': FieldValue.arrayUnion([me]),
+              'joinProof': _secretCheck(word),
+            })
+            .timeout(const Duration(seconds: 20));
+      } catch (_) {}
+    }());
   }
 
   // ── Eşleşme ────────────────────────────────────────────────
@@ -493,9 +517,11 @@ class CoupleService {
           'members': FieldValue.arrayUnion([u]),
           'joinProof': _secretCheck(secretWord),
         })
-        .timeout(const Duration(seconds: 12));
-    await _registerSecretLogin(coupleId, secretWord);
-    await _db.collection('invites').doc(code.trim()).delete();
+        .timeout(const Duration(seconds: 20), onTimeout: () {});
+    unawaited(_registerSecretLogin(coupleId, secretWord).catchError((_) {}));
+    unawaited(
+      _db.collection('invites').doc(code.trim()).delete().catchError((_) {}),
+    );
 
     await _saveLocal(coupleId, secretWord);
   }
@@ -624,6 +650,18 @@ class CoupleService {
               // Alıcının mektubu açtığı an. Eski mektuplarda bu alan yok → null.
               final rts = data['readAt'];
               final DateTime? readAt = rts is Timestamp ? rts.toDate() : null;
+              final dts = data['deliveredAt'];
+              if (acildi &&
+                  data['from'] != uid &&
+                  !readByRecipient &&
+                  dts == null &&
+                  _deliveredLetters.add(d.id)) {
+                unawaited(
+                  d.reference
+                      .update({'deliveredAt': FieldValue.serverTimestamp()})
+                      .catchError((_) {}),
+                );
+              }
               String? metin;
               if (acildi) {
                 try {
@@ -645,6 +683,7 @@ class CoupleService {
                 sentDate: sentDate,
                 readByRecipient: readByRecipient,
                 readAt: readAt,
+                deliveredAt: dts is Timestamp ? dts.toDate() : null,
                 replyToId: data['replyTo'] is String
                     ? data['replyTo'] as String
                     : null,
@@ -663,6 +702,8 @@ class CoupleService {
           }),
     );
   }
+
+  static final _deliveredLetters = <String>{};
 
   static Future<void> deleteLetter(String letterId) async {
     final ref = await _coupleRef();
@@ -1331,6 +1372,8 @@ class Letter {
   /// Alıcının mektubu açtığı an. Eski (bu özellikten önceki) mektuplarda null.
   final DateTime? readAt;
 
+  final DateTime? deliveredAt;
+
   /// Bu mektup başka bir mektuba yanıtsa, onun kimliği.
   final String? replyToId;
 
@@ -1347,6 +1390,7 @@ class Letter {
     required this.readByRecipient,
     required this.text,
     this.readAt,
+    this.deliveredAt,
     this.replyToId,
   });
 

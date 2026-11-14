@@ -5,6 +5,7 @@ import '../contacts/contact_names.dart';
 import '../../core/theme/chat_theme.dart';
 import '../contacts/chat_presence.dart';
 import 'chat_widgets.dart';
+import 'message_info.dart';
 import 'chat_unread.dart';
 
 import 'dart:async';
@@ -38,18 +39,23 @@ class _LettersScreenState extends State<LettersScreen> {
   }
 
   Future<void> _refresh() async {
-    String? cid;
-    String? sec;
     try {
-      cid = await CoupleService.coupleId().timeout(const Duration(seconds: 6));
-      sec = await CoupleService.secret().timeout(const Duration(seconds: 6));
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() {
-      _coupleId = cid;
-      _secret = sec;
-      _loading = false;
-    });
+      final cid = await CoupleService.coupleId().timeout(
+        const Duration(seconds: 6),
+      );
+      final sec = await CoupleService.secret().timeout(
+        const Duration(seconds: 6),
+      );
+      if (!mounted) return;
+      setState(() {
+        _coupleId = cid;
+        _secret = sec;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -94,7 +100,7 @@ class _PairingViewState extends State<_PairingView> {
       if (mounted) widget.onPaired();
     } catch (e) {
       if (mounted) {
-        showUserError(context, e);
+        showBlockingError(context, e);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -117,7 +123,7 @@ class _PairingViewState extends State<_PairingView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      showUserErrorOn(messenger, e);
+      showBlockingErrorOn(messenger, e);
     }
   }
 
@@ -143,7 +149,7 @@ class _PairingViewState extends State<_PairingView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      showUserErrorOn(messenger, e);
+      showBlockingErrorOn(messenger, e);
     }
   }
 
@@ -632,6 +638,21 @@ class _LettersViewState extends State<_LettersView>
                               : letter.readByRecipient
                               ? '✓✓ Okundu'
                               : '✓ İletildi')
+                        : null,
+                    info: letter.fromMe && letter.sentDate != null
+                        ? MessageInfo(
+                            sentAt: letter.sentDate,
+                            rows: [
+                              MessageInfoRow(
+                                ContactNames.name(
+                                  ContactNames.posniId,
+                                  'Posni',
+                                ),
+                                deliveredAt: letter.deliveredAt,
+                                readAt: letter.readAt,
+                              ),
+                            ],
+                          )
                         : null,
                     reactions: letter.reactions,
                     onReact: letter.acildi

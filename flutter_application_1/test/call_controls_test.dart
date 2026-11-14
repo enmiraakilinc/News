@@ -82,16 +82,13 @@ void main() {
       await tester.tap(find.byTooltip('Mikrofonu kapat'));
       await tester.tap(find.byTooltip('Kamerayı kapat'));
       await tester.tap(find.byTooltip('Kamerayı değiştir'));
-      final speaker = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.volume_up),
-      );
+      expect(find.text('Hoparlör'), findsNothing);
       final receive = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.headphones).first,
       );
       final route = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.headphones).last,
       );
-      expect(speaker.onPressed, isNull);
       expect(receive.onPressed, isNull);
       expect(route.onPressed, isNull);
       expect([microphone, camera, switches, routes], [1, 1, 1, 0]);

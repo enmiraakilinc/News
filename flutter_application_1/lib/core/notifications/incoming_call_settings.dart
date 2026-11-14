@@ -364,7 +364,6 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
             ExpansionTile(
               leading: Icon(Icons.notifications_outlined),
               title: Text('Mesajlar ve içerikler'),
-              subtitle: Text('Her özelliği ayrı aç veya kapat.'),
               children: [ContentNotificationSettings()],
             ),
             IncomingNotificationSettings(),

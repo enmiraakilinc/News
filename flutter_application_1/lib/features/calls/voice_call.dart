@@ -353,6 +353,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   DateTime? _connectedAt;
 
   bool _speakerOn = false;
+  bool _videoControlsOpen = false;
+  bool _selfLarge = false;
+  bool _pipDragged = false;
   Offset? _localVideoPosition;
   bool _receiveMuted = false, _audioBusy = false, _restartedIce = false;
   List<CallAudioOutput> _audioOutputs = [];
@@ -1281,6 +1284,28 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     super.dispose();
   }
 
+  Widget _callControls() => CallControls(
+    muted: _muted,
+    speakerOn: _speakerOn,
+    receiveMuted: _receiveMuted,
+    video: widget.video,
+    cameraOff: _cameraOff,
+    audioBusy: _audioBusy,
+    enabled: !_closing,
+    audioRouteLabel: _selectedAudioOutput?.label ?? 'Ses çıkışı',
+    onAudioRoute: Platform.isAndroid ? _showAudioOutputs : null,
+    onMicrophone: _toggleMicrophone,
+    onSpeaker: _toggleSpeaker,
+    onReceive: _toggleReceive,
+    onCamera: () {
+      setState(() => _cameraOff = !_cameraOff);
+      for (final track in _microphone!.getVideoTracks()) {
+        track.enabled = !_cameraOff;
+      }
+    },
+    onSwitchCamera: _switchCamera,
+  );
+
   @override
   Widget build(BuildContext context) {
     final showVideo = widget.video && _renderersReady && !_closing && !_ended;
@@ -1344,7 +1369,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             children: [
                               Positioned.fill(
                                 child: RTCVideoView(
-                                  _remoteVideo,
+                                  _selfLarge ? _localVideo : _remoteVideo,
+                                  mirror: _selfLarge,
                                   objectFit: RTCVideoViewObjectFit
                                       .RTCVideoViewObjectFitCover,
                                 ),
@@ -1413,7 +1439,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                                     width: 82,
                                     height: previewHeight,
                                     child: GestureDetector(
+                                      onPanStart: (_) => _pipDragged = false,
                                       onPanUpdate: (details) {
+                                        if (details.delta.distance > 2) {
+                                          _pipDragged = true;
+                                        }
                                         final previous =
                                             _localVideoPosition ??
                                             Offset(maxLeft - 12, maxTop - 12);
@@ -1428,11 +1458,24 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                                           );
                                         });
                                       },
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: RTCVideoView(
-                                          _localVideo,
-                                          mirror: true,
+                                      onTap: () {
+                                        if (_pipDragged) return;
+                                        setState(() => _selfLarge = !_selfLarge);
+                                      },
+                                      child: Tooltip(
+                                        message: _selfLarge
+                                            ? 'Karşı tarafı büyüt'
+                                            : 'Kendi görüntünü büyüt',
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: RTCVideoView(
+                                            _selfLarge
+                                                ? _remoteVideo
+                                                : _localVideo,
+                                            mirror: !_selfLarge,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1481,34 +1524,49 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                   ),
                 ),
               if (!_ended && _microphone != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  child: CallControls(
-                    muted: _muted,
-                    speakerOn: _speakerOn,
-                    receiveMuted: _receiveMuted,
-                    video: widget.video,
-                    cameraOff: _cameraOff,
-                    audioBusy: _audioBusy,
-                    enabled: !_closing,
-                    audioRouteLabel:
-                        _selectedAudioOutput?.label ?? 'Ses çıkışı',
-                    onAudioRoute: Platform.isAndroid ? _showAudioOutputs : null,
-                    onMicrophone: _toggleMicrophone,
-                    onSpeaker: _toggleSpeaker,
-                    onReceive: _toggleReceive,
-                    onCamera: () {
-                      setState(() => _cameraOff = !_cameraOff);
-                      for (final track in _microphone!.getVideoTracks()) {
-                        track.enabled = !_cameraOff;
-                      }
-                    },
-                    onSwitchCamera: _switchCamera,
-                  ),
-                ),
+                widget.video
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRect(
+                            child: AnimatedAlign(
+                              alignment: Alignment.bottomCenter,
+                              duration: const Duration(milliseconds: 240),
+                              curve: Curves.easeOutCubic,
+                              heightFactor: _videoControlsOpen ? 1 : 0,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  8,
+                                  12,
+                                  0,
+                                ),
+                                child: _callControls(),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: _videoControlsOpen
+                                ? 'Kontrolleri gizle'
+                                : 'Kontrolleri aç',
+                            onPressed: () => setState(
+                              () => _videoControlsOpen = !_videoControlsOpen,
+                            ),
+                            icon: Icon(
+                              _videoControlsOpen
+                                  ? Icons.expand_more
+                                  : Icons.expand_less,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        child: _callControls(),
+                      ),
               if (_receiveMuted && !_ended)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),

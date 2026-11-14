@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2092"
+      },
+      "name": {
+        "stringValue": "1.16.12"
+      },
+      "notes": {
+        "stringValue": "G\u00fcn\u00fcn Sorusu ak\u0131\u015f\u0131 g\u00fcncellendi; Block Blast par\u00e7alar\u0131 art\u0131k s\u00fcr\u00fckle-b\u0131rak ile yerle\u015ftiriliyor. Genel kararl\u0131l\u0131k iyile\u015ftirmeleri."
+      },
+      "sha256": {
+        "stringValue": "714a759af6a1615dc567c1bcf170511ff928185f5b17707aa8d90db683287132"
+      },
+      "assetId": {
+        "integerValue": "721732421"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-07T19:42:10.017300Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      },
+      "sha256": {
+        "stringValue": "a286c62b6c8f1bba2956f0974a522c1be0c6219582e3e99b3d754cfb5e0bcfe7"
+      },
+      "notes": {
+        "stringValue": "G\u00fcn\u00fcn Sorusu ak\u0131\u015f\u0131 g\u00fcncellendi; Block Blast par\u00e7alar\u0131 art\u0131k s\u00fcr\u00fckle-b\u0131rak ile yerle\u015ftiriliyor. Genel kararl\u0131l\u0131k iyile\u015ftirmeleri."
+      },
+      "assetId": {
+        "integerValue": "721732421"
+      },
+      "name": {
+        "stringValue": "1.16.10"
+      },
+      "code": {
+        "integerValue": "2091"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-07T19:42:10.017300Z"
+  }
+}

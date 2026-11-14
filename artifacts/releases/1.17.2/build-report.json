@@ -11,8 +11,8 @@
   "debuggable": false,
   "postgresPrimary": true,
   "dataWriteMode": "postgres-primary",
-  "published": false,
-  "stagedOnVps": false,
+  "published": true,
+  "stagedOnVps": true,
   "physicalDeviceTested": false,
   "verification": {
     "flutterTests": "227 passed",
@@ -21,8 +21,9 @@
   },
   "livePrimaryEnabled": true,
   "primaryCutoverRequired": false,
-  "sourceCommit": "399435238b5a276fdd0ac7adb9fa2d7b7c54581b",
-  "githubDownloadVerified": false,
-  "legacyMetadataUpdated": false,
-  "vpsMetadataUpdated": false
+  "sourceCommit": "0d5ddaa39c96fa86e6f210b5aadb8d57a2ea0fff",
+  "githubDownloadVerified": true,
+  "legacyMetadataUpdated": true,
+  "vpsMetadataUpdated": true,
+  "releaseUrl": "https://github.com/enmiraakilinc/News/releases/tag/v1.17.2"
 }

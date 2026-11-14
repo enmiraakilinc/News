@@ -2,6 +2,20 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
+String _two(int value) => value.toString().padLeft(2, '0');
+
+String datedMediaName({bool video = false, DateTime? at}) {
+  final t = at ?? DateTime.now();
+  return '${video ? 'Video' : 'Foto'}_${_two(t.day)}.${_two(t.month)}.${t.year}'
+      '_${_two(t.hour)}-${_two(t.minute)}';
+}
+
+String datedNoteName({DateTime? at}) {
+  final t = at ?? DateTime.now();
+  return 'Not_${t.year}-${_two(t.month)}-${_two(t.day)}'
+      '_${_two(t.hour)}-${_two(t.minute)}';
+}
+
 class MediaNamesScreen extends StatefulWidget {
   final List<String> names;
   final Uint8List? photo;

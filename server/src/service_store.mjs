@@ -33,5 +33,5 @@ export async function requirePair(store,sourceKey,uid,recipient){
  if(!uid||!/^(chat|couple)\/[A-Za-z0-9_-]{1,200}$/.test(sourceKey??'')||typeof recipient!=='string'||recipient===uid)throw new ApiError(403,'permission-denied','Bu kişiyle işlem yapılamaz.');
  const [kind,id]=sourceKey.split('/');
  const group=await store.get((kind==='chat'?'chats':'couples')+'/'+id),list=members(group);
- if(list.length!==2||!list.includes(uid)||!list.includes(recipient))throw new ApiError(403,'permission-denied','Bu sohbet için iznin yok.');
+ if((kind==='couple'?list.length<2:list.length!==2)||!list.includes(uid)||!list.includes(recipient))throw new ApiError(403,'permission-denied','Bu sohbet için iznin yok.');
 }

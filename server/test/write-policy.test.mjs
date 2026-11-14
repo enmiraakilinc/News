@@ -101,6 +101,10 @@ test('message updates cannot forge another sender or reaction',async()=>{
  await denied(run('chats/direct/messages/a',message,{...message,reactions:{bob:'🌷'}}));
  await run('chats/direct/messages/a',message,{...message,readBy:['alice','bob']},{uid:'bob'});
  await denied(run('chats/direct/messages/a',message,{...message,readBy:['alice','mallory']},{uid:'bob'}));
+ await run('chats/direct/messages/a',message,{...message,readBy:['alice','bob'],readAt:{bob:now}},{uid:'bob'});
+ await run('chats/direct/messages/a',message,{...message,deliveredAt:{bob:now}},{uid:'bob'});
+ await denied(run('chats/direct/messages/a',message,{...message,deliveredAt:{alice:now}},{uid:'bob'}));
+ await denied(run('chats/direct/messages/a',message,{...message,readAt:{bob:now}},{uid:'bob'}));
 });
 test('a recipient can hide another member message only for their own account',async()=>{
  const incoming={...message,sender:'bob'};

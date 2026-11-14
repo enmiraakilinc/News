@@ -18,6 +18,7 @@ import '../../core/utils/search_text.dart';
 import '../pair/couple_service.dart';
 import '../pair/paired_gate.dart';
 import '../media/image_util.dart';
+import '../media/media_names_screen.dart';
 import '../media/media_viewer.dart';
 import '../reminders/reminder_service.dart';
 import '../../core/utils/user_errors.dart';
@@ -432,7 +433,7 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
     parent: widget.folder.id,
   );
 
-  /// Sayfayı defter yaprağı gibi kenarından çevirir.
+  /// Sayfayı kenarından çevirir; dönüş 90 dereceyi geçmez, yaprak kaybolmaz.
   Widget _turn(int index, Widget page) => AnimatedBuilder(
     animation: _pages,
     child: page,
@@ -441,18 +442,36 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
       if (_pages.hasClients && _pages.position.haveDimensions) {
         delta = ((_pages.page ?? index.toDouble()) - index).clamp(-1.0, 1.0);
       }
-      return Opacity(
-        opacity: (1 - delta.abs() * 0.5).clamp(0.0, 1.0),
-        child: Transform(
-          alignment: delta > 0 ? Alignment.centerLeft : Alignment.centerRight,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0012)
-            ..rotateY(-delta * 1.1),
+      return Transform(
+        alignment: delta >= 0 ? Alignment.centerLeft : Alignment.centerRight,
+        filterQuality: FilterQuality.medium,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.0014)
+          ..rotateY(-delta * 0.85),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22 * delta.abs()),
+                blurRadius: 16,
+                offset: Offset(-12 * delta, 0),
+              ),
+            ],
+          ),
           child: child,
         ),
       );
     },
   );
+
+  Future<void> _goToPage(int index) async {
+    if (!_pages.hasClients) return;
+    await _pages.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 480),
+      curve: Curves.easeInOutCubic,
+    );
+  }
 
   Future<void> _sendAudio() async {
     if (_busy) return;
@@ -714,7 +733,11 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
           final note = LessonNote(
             id: id,
             kind: image ? 'image' : _kind,
-            text: index == 0 ? body : '',
+            text: index != 0
+                ? ''
+                : image && body.trim().isEmpty
+                ? datedNoteName()
+                : body,
             image: photo,
             albumId: albumId,
             created: DateTime.now(),
@@ -830,14 +853,15 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
   }
 
   Widget _image(LessonNote note) {
+    final height = MediaQuery.sizeOf(context).height * 0.62;
     if (widget.repository.shared) {
       final bytes = base64Decode(note.image!);
       return InkWell(
         onTap: () => showPrivatePhoto(context, bytes),
         child: Image.memory(
           bytes,
-          height: 180,
-          cacheWidth: 640,
+          width: double.infinity,
+          height: height,
           fit: BoxFit.contain,
         ),
       );
@@ -847,7 +871,7 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
         note.image!,
       ),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox(height: 100);
+        if (!snapshot.hasData) return SizedBox(height: height);
         final file = snapshot.data!;
         return InkWell(
           onTap: () async {
@@ -856,8 +880,8 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
           },
           child: Image.file(
             file,
-            height: 180,
-            cacheWidth: 640,
+            width: double.infinity,
+            height: height,
             fit: BoxFit.contain,
             errorBuilder: (_, _, _) => const Text('Görsel bulunamadı.'),
           ),
@@ -925,8 +949,12 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, index) => ActionChip(
                   avatar: const Icon(Icons.bookmark_outline, size: 18),
-                  backgroundColor: const Color(0xFFFFF6E4),
-                  side: const BorderSide(color: Color(0xFFE7D3A1)),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                   label: Text(topics[index].title),
                   onPressed: () => Navigator.push<void>(
                     context,
@@ -991,48 +1019,62 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
               }
               return PageView.builder(
                 controller: _pages,
+                allowImplicitScrolling: true,
                 itemCount: notes.length,
                 itemBuilder: (context, index) {
                   final note = notes[index];
                   final shown = note.text;
-                  final page = SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                  final dark =
+                      Theme.of(context).brightness == Brightness.dark;
+                  final paper = dark
+                      ? const Color(0xff121212)
+                      : Colors.white;
+                  final ink = dark ? Colors.white : const Color(0xff111111);
+                  final page = ColoredBox(
+                    color: paper,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'Sayfa ${index + 1} / ${notes.length}',
-                          style: const TextStyle(color: Color(0xFF8A5A3B)),
-                        ),
-                        const SizedBox(height: 8),
-                        Card(
-                          key: ValueKey(note.id),
-                          margin: const EdgeInsets.only(bottom: 18),
-                          color: const Color(0xFFFFFBF0),
-                          elevation: 4,
-                          clipBehavior: Clip.antiAlias,
-                          shape: note.kind == 'announcement'
-                              ? RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.tertiary,
-                                    width: 2,
-                                  ),
-                                )
-                              : null,
-                          child: CustomPaint(
-                            painter: const _RuledPaper(),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                40,
-                                16,
-                                16,
-                                16,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'Önceki sayfa',
+                                onPressed: index == 0
+                                    ? null
+                                    : () => _goToPage(index - 1),
+                                icon: const Icon(Icons.chevron_left),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                              Expanded(
+                                child: Text(
+                                  'Sayfa ${index + 1} / ${notes.length}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: ink),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Sonraki sayfa',
+                                onPressed: index == notes.length - 1
+                                    ? null
+                                    : () => _goToPage(index + 1),
+                                icon: const Icon(Icons.chevron_right),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: DefaultTextStyle.merge(
+                              style: TextStyle(color: ink, height: 1.5),
+                              child: IconTheme.merge(
+                                data: IconThemeData(color: ink),
+                                child: Column(
+                                  key: ValueKey(note.id),
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
                                   if (note.kind == 'announcement')
                                     Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
@@ -1062,9 +1104,10 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                                         : note.kind == 'image'
                                         ? 'Görsel not'
                                         : 'Not',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelLarge,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(color: ink),
                                   ),
                                   const SizedBox(height: 12),
                                   if (note.kind == 'audio')
@@ -1198,9 +1241,10 @@ class _CourseNotesScreenState extends State<CourseNotesScreen> {
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  );
+                      ),
+                    ],
+                  ),
+                );
                   return _turn(index, page);
                 },
               );
@@ -1305,34 +1349,6 @@ Future<bool> _confirm(BuildContext context, String message) async =>
       ),
     ) ==
     true;
-
-/// Çizgili defter kağıdı: satır çizgileri, kırmızı kenar boşluğu ve spiral delikleri.
-class _RuledPaper extends CustomPainter {
-  const _RuledPaper();
-  @override
-  void paint(Canvas canvas, Size size) {
-    final line = Paint()
-      ..color = const Color(0xFFB9D3EC)
-      ..strokeWidth = 1;
-    for (double y = 44; y < size.height; y += 28) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
-    }
-    canvas.drawLine(
-      const Offset(32, 0),
-      Offset(32, size.height),
-      Paint()
-        ..color = const Color(0xFFE57373)
-        ..strokeWidth = 1.5,
-    );
-    final hole = Paint()..color = const Color(0xFFE6DCC6);
-    for (double y = 28; y < size.height; y += 64) {
-      canvas.drawCircle(Offset(12, y), 4.5, hole);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RuledPaper oldDelegate) => false;
-}
 
 class _NotebookRow extends StatelessWidget {
   final String title;

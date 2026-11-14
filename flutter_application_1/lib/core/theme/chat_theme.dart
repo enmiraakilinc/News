@@ -91,7 +91,7 @@ class ChatThemes {
     final seed = value == 'love'
         ? const Color(0xff420303)
         : value == 'orange'
-        ? const Color(0xFFED820E)
+        ? const Color(0xFFF77737)
         : accent != null
         ? Color(accent!)
         : value == 'pastel'
@@ -125,14 +125,15 @@ class ChatThemes {
       );
     }
     if (value == 'orange') {
+      // Instagram turuncusu, geniş zeminde değil yalnızca vurguda.
       scheme = scheme.copyWith(
-        primary: const Color(0xFFED820E),
-        onPrimary: const Color(0xff402000),
-        primaryContainer: const Color(0xFFED820E),
-        onPrimaryContainer: Colors.black,
-        surface: const Color(0xff211911),
-        onSurface: const Color(0xffffeadb),
-        surfaceContainer: const Color(0xff3b2314),
+        primary: const Color(0xFFF77737),
+        onPrimary: Colors.white,
+        primaryContainer: const Color(0xFF5A2E18),
+        onPrimaryContainer: const Color(0xffffe6d5),
+        surface: const Color(0xff161311),
+        onSurface: const Color(0xfff4efe9),
+        surfaceContainer: const Color(0xff241c17),
       );
     }
     return ThemeData(
@@ -155,12 +156,8 @@ class ChatThemes {
         ),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: value == 'orange'
-            ? scheme.primaryContainer
-            : scheme.surfaceContainer,
-        foregroundColor: value == 'orange'
-            ? scheme.onPrimaryContainer
-            : scheme.onSurface,
+        backgroundColor: scheme.surfaceContainer,
+        foregroundColor: scheme.onSurface,
       ),
     );
   }

@@ -44,13 +44,14 @@ class CallControls extends StatelessWidget {
         tooltip: muted ? 'Mikrofonu aç' : 'Mikrofonu kapat',
         onPressed: enabled ? onMicrophone : null,
       ),
-      _CallControl(
-        label: 'Hoparlör',
-        active: speakerOn,
-        icon: speakerOn ? Icons.volume_up : Icons.hearing,
-        tooltip: speakerOn ? 'Hoparlörü kapat' : 'Hoparlörü aç',
-        onPressed: enabled && !audioBusy ? onSpeaker : null,
-      ),
+      if (!video)
+        _CallControl(
+          label: 'Hoparlör',
+          active: speakerOn,
+          icon: speakerOn ? Icons.volume_up : Icons.hearing,
+          tooltip: speakerOn ? 'Hoparlörü kapat' : 'Hoparlörü aç',
+          onPressed: enabled && !audioBusy ? onSpeaker : null,
+        ),
       _CallControl(
         label: 'Karşı ses',
         active: !receiveMuted,

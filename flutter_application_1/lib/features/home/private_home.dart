@@ -1232,7 +1232,6 @@ class _CounterScreenState extends State<CounterScreen> {
               const ChatNotificationsSwitch(),
 
               SwitchListTile(
-                contentPadding: EdgeInsets.zero,
                 title: const Text("Bildirimi Göster"),
                 subtitle: const Text("Üst çubukta sürekli görünsün"),
                 value: _notifActive,

@@ -158,8 +158,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
               const SizedBox(height: 18),
 
-              // Changelog kartı
-              if (info.notes.trim().isNotEmpty)
+              // Notlar kayar; Güncelle butonu ekranda kalır.
+              if (_visibleNotes(info.notes).isNotEmpty)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -168,9 +168,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: colors.outlineVariant),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _buildNotes(info.notes),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.28,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _buildNotes(_visibleNotes(info.notes)),
+                      ),
+                    ),
                   ),
                 ),
 
@@ -224,6 +231,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
       ),
     );
   }
+
+  /// Sürüm kodu GitHub yedeği için notta durur, pencerede gösterilmez.
+  String _visibleNotes(String notes) => notes
+      .replaceAll(RegExp(r'^Build code:\s*\d+\s*$', multiLine: true), '')
+      .trim();
 
   /// Notları güzel biçimlendirir: "•" ile başlayan satırlar tikli madde,
   /// diğerleri (örn "Yenilikler:") başlık.

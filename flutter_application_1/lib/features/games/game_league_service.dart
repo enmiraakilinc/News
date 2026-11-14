@@ -1,6 +1,5 @@
 // Oyun skorunu kaydeder.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/open_stream.dart';
 import '../chat/chat_service.dart';
@@ -57,46 +56,9 @@ class GameLeagueService {
     return seasons;
   }
 
-  static Future<String> continuationSeason() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('league_continuation');
-    if (saved != null && RegExp(r'^20\d{2}-Q[1-4]$').hasMatch(saved)) {
-      return saved;
-    }
-    try {
-      await CoupleService.ensureReady().timeout(const Duration(seconds: 6));
-    } catch (_) {}
-    String? fullest;
-    var fullestCount = 0;
-    var probed = false;
-    for (final season in recentSeasons()) {
-      var count = 0;
-      for (final game in games) {
-        try {
-          final snap = await _entries(
-            game.id,
-            null,
-            season,
-          ).limit(20).get().timeout(const Duration(seconds: 6));
-          probed = true;
-          count += snap.docs.length;
-        } catch (_) {}
-      }
-      if (count > fullestCount) {
-        fullestCount = count;
-        fullest = season;
-      }
-    }
-    if (fullest != null) {
-      await prefs.setString('league_continuation', fullest);
-      return fullest;
-    }
-    final seasons = recentSeasons();
-    if (!probed && seasons.length > 1) return seasons[1];
-    final season = seasonId();
-    await prefs.setString('league_continuation', season);
-    return season;
-  }
+  /// Skorlar ve varsayılan görünüm her zaman içinde bulunulan sezondur
+  /// (ilk çalışan davranış); geçmiş sezonlar yalnızca seçilerek görüntülenir.
+  static Future<String> continuationSeason() async => seasonId();
 
   static CollectionReference<Map<String, dynamic>> _entries(
     String game, [

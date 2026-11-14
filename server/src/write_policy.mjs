@@ -54,7 +54,7 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
      ||![d.caller,d.callee].includes(uid)||d.caller===d.callee)return false;
   const source=await read((d.sourceType==='chat'?'chats':'couples')+'/'+d.sourceId);
   if(!source)return true;
-  return source.members?.length===2&&has(source.members,d.caller)&&has(source.members,d.callee);
+  return source.members?.length>=2&&(d.sourceType==='couple'||source.members.length===2)&&has(source.members,d.caller)&&has(source.members,d.callee);
  };
  const allow=()=>{
   return true;
@@ -194,8 +194,13 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
       &&new Set(hiddenAfter).size===hiddenAfter.length
       &&hiddenBefore.every(u=>hiddenAfter.includes(u))
       &&hiddenAfter.every(u=>hiddenBefore.includes(u)||u===uid))return allow();
-   if(changes(a,b,['readBy'])&&list(a.readBy)&&list(b.readBy)&&a.readBy.every(u=>b.readBy.includes(u))
-      &&b.readBy.every(u=>a.readBy.includes(u)||u===uid))return allow();
+   const readOk=list(a.readBy)&&list(b.readBy)&&a.readBy.every(u=>b.readBy.includes(u))
+      &&b.readBy.every(u=>a.readBy.includes(u)||u===uid);
+   const stamp=f=>map(b[f])&&at(b[f][uid],now)&&a[f]?.[uid]==null&&Object.keys(b[f]).length<=20
+      &&Object.keys(b[f]).every(k=>k===uid||equal(b[f][k],a[f]?.[k]));
+   if(changes(a,b,['readBy'])&&readOk)return allow();
+   if(a.sender!==uid&&changes(a,b,['readBy','readAt'])&&readOk&&b.readBy.includes(uid)&&stamp('readAt'))return allow();
+   if(a.sender!==uid&&changes(a,b,['deliveredAt'])&&stamp('deliveredAt'))return allow();
    if(a.sender===uid&&changes(a,b,['text','editedAt'])&&str(b.text,1,800000)&&at(b.editedAt,now))return allow();
    if(changes(a,b,['reactions'])&&map(b.reactions)&&changes(a.reactions??{},b.reactions,[uid])&&str(b.reactions[uid]??'',0,64))return allow();
   }

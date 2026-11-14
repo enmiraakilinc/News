@@ -71,6 +71,14 @@ android {
         }
     }
 
+    // Yerel kütüphaneler sıkıştırılarak paketlenir. Sıkıştırılmazsa WhatsApp
+    // APK'yı boş belge sayıp göndermiyor; kurulum da yarım kalıyor.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String?

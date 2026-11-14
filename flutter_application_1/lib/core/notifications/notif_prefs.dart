@@ -185,15 +185,7 @@ class _FeatureNotificationSwitchState extends State<FeatureNotificationSwitch> {
   @override
   Widget build(BuildContext context) => SwitchListTile(
     title: Text(widget.kind.label),
-    subtitle: Text(
-      widget.kind == kNotifNews
-          ? 'Yeni haberleri uygulama fark ettiğinde haber verir.'
-          : widget.kind == kNotifUpdates
-          ? 'Yeni uygulama sürümü için telefon bildirimi.'
-          : widget.kind == kNotifStorage
-          ? 'Depolama dolmaya yaklaştığında haber verir.'
-          : '${widget.kind.label} için yeni içerik geldiğinde telefon bildirimi. Kapalıysa yalnızca uygulama içinde görürsün.',
-    ),
+    subtitle: const Text('Açıkken bildirim çubuğunda görünür.'),
     value: _enabled ?? false,
     onChanged: _enabled == null || _busy
         ? null
@@ -285,9 +277,6 @@ class _MorseNotificationSwitchState extends State<MorseNotificationSwitch> {
   @override
   Widget build(BuildContext context) => SwitchListTile(
     title: const Text('Titreşim Bildirimi'),
-    subtitle: const Text(
-      'Açıkken bildirim çubuğuna yazı düşmez. Telefon M (-- ) ve H (....) ritminde titrer.',
-    ),
     value: _enabled ?? false,
     onChanged: _enabled == null
         ? null

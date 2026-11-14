@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/utils/random_id.dart';
 import '../wakeup/wakeup_service.dart';
+import '../../core/utils/user_errors.dart';
 
 /// Passwords are handled by Firebase Auth, never stored in preferences/Firestore.
 class ChatAccount {
@@ -156,20 +157,35 @@ class ChatAccount {
   static Future<void> signIn(String code, String password) async {
     normalizeCode(code);
     validatePassword(password);
-    await CoupleService.ensureReady();
+    await CoupleService.ensureReady().timeout(const Duration(seconds: 20));
     final previous = CoupleService.uid;
-    final user = FirebaseAuth.instance.currentUser!;
-    if (user.isAnonymous &&
-        (await FirebaseFirestore.instance
-                .collection('chats')
-                .where('members', arrayContains: previous)
-                .limit(1)
-                .get())
-            .docs
-            .isNotEmpty) {
-      throw const FormatException(
-        'Bu cihazdaki sohbetlerini kaybetmemek için önce mevcut hesabını şifreyle bağla ve kodunu sakla.',
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception(
+        'Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.',
       );
+    }
+    // Sohbet okuması düşerse hesap girişini durdurma; asıl şifre kontrolü
+    // bundan sonra yapılır.
+    if (user.isAnonymous && previous != null) {
+      try {
+        final hasChats =
+            (await FirebaseFirestore.instance
+                    .collection('chats')
+                    .where('members', arrayContains: previous)
+                    .limit(1)
+                    .get()
+                    .timeout(const Duration(seconds: 8)))
+                .docs
+                .isNotEmpty;
+        if (hasChats) {
+          throw const FormatException(
+            'Bu cihazdaki sohbetlerini kaybetmemek için önce mevcut hesabını şifreyle bağla ve kodunu sakla.',
+          );
+        }
+      } on FormatException {
+        rethrow;
+      } catch (_) {}
     }
     final email = await _loginEmail(code);
     final result = await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -177,8 +193,8 @@ class ChatAccount {
       password: password,
     );
     if (result.user?.uid != previous) {
-      // The shared private area still requires its own secret on this device.
-      await CoupleService.unpairLocal();
+      // Cihazdaki gizli kelime eşleşmesi korunur; yeni hesap gizli kelime
+      // kanıtıyla bağa arka planda otomatik katılır.
       await (await SharedPreferences.getInstance()).setString(
         'my_uid',
         result.user!.uid,
@@ -186,6 +202,9 @@ class ChatAccount {
       ContactNames.reset();
       CoupleService.resetConnection();
       revision.value++;
+      try {
+        await ContactNames.load().timeout(const Duration(seconds: 8));
+      } catch (_) {}
     }
   }
 
@@ -263,9 +282,11 @@ class ChatAccount {
           'Bağlantı kurulamadı. İnternetini kontrol et.',
         'operation-not-allowed' => 'Şifreli giriş henüz sunucuda etkin değil.',
         'weak-password' => 'Daha güçlü bir şifre belirle.',
-        _ => 'İşlem tamamlanamadı. Tekrar dene.',
+        'user-disabled' => 'Bu hesap durdurulmuş.',
+        'invalid-email' => 'Hesap kodu veya şifre yanlış.',
+        _ => userError(error),
       };
     }
-    return 'İşlem tamamlanamadı. Tekrar dene.';
+    return userError(error);
   }
 }

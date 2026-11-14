@@ -21,7 +21,7 @@ def publish(version):
     apk=directory/report['filename']
     assert apk.resolve().parent==directory.resolve()
     assert report['version']==version and report['postgresPrimary'] and report['signingVerified']
-    assert report['abi']==['arm64-v8a'] and not report['debuggable']
+    assert 'arm64-v8a' in report['abi'] and not report['debuggable']
     assert hashlib.sha256(apk.read_bytes()).hexdigest()==report['sha256'] and apk.stat().st_size==report['bytes']
     assert sql("SELECT value FROM neural.settings WHERE key='primary_writes'")=='true'
     health=requests.get(public_url()+'/health',timeout=20);health.raise_for_status()

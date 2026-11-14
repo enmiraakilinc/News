@@ -1,5 +1,6 @@
 // Sohbet fotoğraf, ses ve videosunu yükler ve siler.
 import '../../core/data/oracle_media_batch.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
@@ -8,13 +9,15 @@ import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/foundation.dart';
 import '../pair/couple_service.dart';
+import '../../core/utils/user_errors.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class MediaPreview {
   final Uint8List bytes;
   final DateTime expiresAt;
-  MediaPreview(this.bytes, this.expiresAt);
+  final bool diskCacheable;
+  MediaPreview(this.bytes, this.expiresAt, {this.diskCacheable = false});
 }
 
 // Decode one fetched batch in one worker instead of starting a worker for
@@ -268,12 +271,10 @@ class ChatMedia {
       _cacheScope = scope;
     }
     final key = '$scope/$id';
-    final cached = _cache.get(key);
+    final cached = _cache.get(key) ?? await _readDisk(scope, id);
     if (cached != null) {
-      await checkAccess(id);
-      if (CoupleService.uid != uid) {
-        throw Exception('Hesabın değişti. Yeniden aç.');
-      }
+      _cache.put(key, cached);
+      unawaited(_verifyCached(scope, id, key));
       onProgress?.call(1);
       return cached.bytes;
     }
@@ -287,9 +288,71 @@ class ChatMedia {
         throw Exception('Sohbet bağlantısı değişti. Yeniden aç.');
       }
       _cache.put(key, result);
+      if (result.diskCacheable) unawaited(_writeDisk(scope, id, result));
       return result.bytes;
     } finally {
       if (identical(_pending[key], future)) _pending.remove(key);
+    }
+  }
+
+  static Future<File> _diskFile(String scope, String id) async {
+    final root = await getApplicationSupportDirectory();
+    final folder = sha256
+        .convert(utf8.encode(scope))
+        .toString()
+        .substring(0, 24);
+    return File('${root.path}/media_cache/$folder/$id.bin');
+  }
+
+  static Future<MediaPreview?> _readDisk(String scope, String id) async {
+    try {
+      final file = await _diskFile(scope, id);
+      final meta = File('${file.path}.exp');
+      if (!await file.exists() || !await meta.exists()) return null;
+      final expires = DateTime.fromMillisecondsSinceEpoch(
+        int.parse((await meta.readAsString()).trim()),
+      );
+      if (!expires.isAfter(DateTime.now())) {
+        await _dropDisk(scope, id);
+        return null;
+      }
+      return MediaPreview(await file.readAsBytes(), expires);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _writeDisk(
+    String scope,
+    String id,
+    MediaPreview item,
+  ) async {
+    try {
+      final file = await _diskFile(scope, id);
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(item.bytes, flush: true);
+      await File(
+        '${file.path}.exp',
+      ).writeAsString('${item.expiresAt.millisecondsSinceEpoch}', flush: true);
+    } catch (_) {}
+  }
+
+  static Future<void> _dropDisk(String scope, String id) async {
+    try {
+      final file = await _diskFile(scope, id);
+      for (final f in [file, File('${file.path}.exp')]) {
+        if (await f.exists()) await f.delete();
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _verifyCached(String scope, String id, String key) async {
+    try {
+      await checkAccess(id);
+    } catch (error) {
+      if (isTransientError(error)) return;
+      _cache.remove(key);
+      await _dropDisk(scope, id);
     }
   }
 
@@ -356,7 +419,11 @@ class ChatMedia {
     }
     final bytes = builder.takeBytes();
     if (bytes.length != size) throw Exception('Dosya eksik.');
-    return MediaPreview(bytes, chatMediaExpiresAt(data));
+    return MediaPreview(
+      bytes,
+      chatMediaExpiresAt(data),
+      diskCacheable: data['kind'] == 'photo' && data['instantCapture'] != true,
+    );
   }
 
   static Future<List<Uint8List>> decodedChunks(

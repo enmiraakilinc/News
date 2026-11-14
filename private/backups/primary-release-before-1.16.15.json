@@ -1,0 +1,52 @@
+{
+  "postgres": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "code": {
+        "integerValue": "2095"
+      },
+      "name": {
+        "stringValue": "1.16.14"
+      },
+      "notes": {
+        "stringValue": "Aramalar d\u00fczeltildi.\nOyunlar d\u00fczeltildi.\nBildirimler d\u00fczeltildi.\nGereksiz dosyalar silinip ayarland\u0131.\nMikrofon me\u015fgul etme \u00f6zelli\u011fi silindi.\nAnl\u0131k fotolar i\u00e7in iki ki\u015finin izni ile indirme eklendi.\nNormal galeriden sohbete at\u0131lan foto\u011fraf indirmelerde de indirme izni, biraz daha d\u00fczg\u00fcn hale getirildi, art\u0131k s\u00fcrekli \u00fcstte g\u00f6z\u00fckmemesi sa\u011fland\u0131."
+      },
+      "sha256": {
+        "stringValue": "8e150ba9e3b10512032146460b4cdcb3a480ff8a50d5fc60e42564af642eff64"
+      },
+      "assetId": {
+        "integerValue": "740631637"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-12T18:47:29.699327Z"
+  },
+  "legacy": {
+    "name": "projects/star-galeri/databases/(default)/documents/config/private_app_version",
+    "fields": {
+      "assetId": {
+        "integerValue": "740631637"
+      },
+      "code": {
+        "integerValue": "2095"
+      },
+      "notes": {
+        "stringValue": "Aramalar d\u00fczeltildi.\nOyunlar d\u00fczeltildi.\nBildirimler d\u00fczeltildi.\nGereksiz dosyalar silinip ayarland\u0131.\nMikrofon me\u015fgul etme \u00f6zelli\u011fi silindi.\nAnl\u0131k fotolar i\u00e7in iki ki\u015finin izni ile indirme eklendi.\nNormal galeriden sohbete at\u0131lan foto\u011fraf indirmelerde de indirme izni, biraz daha d\u00fczg\u00fcn hale getirildi, art\u0131k s\u00fcrekli \u00fcstte g\u00f6z\u00fckmemesi sa\u011fland\u0131."
+      },
+      "sha256": {
+        "stringValue": "8e150ba9e3b10512032146460b4cdcb3a480ff8a50d5fc60e42564af642eff64"
+      },
+      "repository": {
+        "stringValue": "enmiraakilinc/News"
+      },
+      "name": {
+        "stringValue": "1.16.14"
+      }
+    },
+    "createTime": "2026-10-18T15:06:51.531630Z",
+    "updateTime": "2026-11-12T18:47:29.699327Z"
+  }
+}

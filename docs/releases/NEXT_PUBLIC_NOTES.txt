@@ -1,10 +1,6 @@
-Aramalar erken kapanmıyor.
-Yalnızca cevapsız arama sohbete yazılıyor.
-Son görülme saati düzeltildi.
-Anlık fotoğraf atma düzeltildi.
-Kişi silmek iki tarafta da kalıcı.
-Yeniden yazmak için yeni davet gerekiyor.
-Günün sorusu kayıtları düzenlendi.
-Anılar, dilekler, ders notları yüklemede takılı kalmıyor.
-Şifremi unuttum eklendi.
-
+• Ders sayfası temaya uyar, çevrilir.
+• Turuncu tema yumuşadı.
+• Görüntülü aramada menü gizli.
+• Kendi görüntünü büyütebilirsin.
+• Bildirim yazıları kısaldı.
+Build code: 2106
