@@ -15,7 +15,10 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
   final _oldPassword = TextEditingController();
+  final _username = TextEditingController();
+  final _email = TextEditingController();
   String? _linkedCode;
+  String? _usernameShown;
   String? _error;
   bool _busy = true;
   bool _login = false;
@@ -46,11 +49,22 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
     } catch (_) {
       /* Eski kod geçerli kalır; kısa kod sunucuya ulaşınca görünür. */
     }
+    try {
+      final name = await ChatAccount.attachIdentity();
+      if (mounted && name != null) setState(() => _usernameShown = name);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    for (final controller in [_code, _password, _confirmation, _oldPassword]) {
+    for (final controller in [
+      _code,
+      _password,
+      _confirmation,
+      _oldPassword,
+      _username,
+      _email,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -95,7 +109,9 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
   Future<void> _forgot() async {
     final code = _code.text.trim();
     if (code.isEmpty) {
-      setState(() => _error = 'Önce hesap kodunu yaz.');
+      setState(
+        () => _error = 'Önce kullanıcı adını, e-postanı veya hesap kodunu yaz.',
+      );
       return;
     }
     setState(() {
@@ -109,6 +125,27 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
           const SnackBar(
             content: Text('Şifre sıfırlama bağlantısı gönderildi.'),
           ),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = ChatAccount.errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _saveLogin(Future<Object?> Function() save) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await save();
+      final name = await ChatAccount.savedUsername();
+      if (mounted) {
+        setState(() => _usernameShown = name ?? _usernameShown);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Giriş bilgin kaydedildi.')),
         );
       }
     } catch (error) {
@@ -160,6 +197,52 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
                   ),
                 ],
               ),
+            if (_usernameShown != null)
+              SelectableText('Kullanıcı adın: $_usernameShown')
+            else ...[
+              TextField(
+                controller: _username,
+                enabled: !_busy,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Kullanıcı adı',
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _saveLogin(
+                          () => ChatAccount.claimUsername(_username.text),
+                        ),
+                  child: const Text('Kullanıcı adını kaydet'),
+                ),
+              ),
+            ],
+            TextField(
+              controller: _email,
+              enabled: !_busy,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Giriş e-postası (isteğe bağlı)',
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _saveLogin(
+                        () => ChatAccount.claimEmail(_email.text),
+                      ),
+                child: const Text('E-postayı kaydet'),
+              ),
+            ),
+            const Text(
+              'Girişte kullanıcı adın, bu e-posta veya eski kodun geçerlidir. Şifren değişmez.',
+            ),
             TextButton.icon(
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: _linkedCode!));
@@ -187,7 +270,7 @@ class _ChatAccountScreenState extends State<ChatAccountScreen> {
                 enabled: !_busy,
                 autocorrect: false,
                 decoration: const InputDecoration(
-                  labelText: 'Kişisel hesap kodu',
+                  labelText: 'Kullanıcı adı, e-posta veya hesap kodu',
                 ),
               ),
               const Text(

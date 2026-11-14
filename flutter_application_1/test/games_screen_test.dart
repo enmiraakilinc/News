@@ -111,7 +111,9 @@ void main() {
     final cell = clues.indexWhere((number) => number == 0);
 
     await tester.tap(find.byKey(ValueKey('sudoku-cell-$cell')));
-    await tester.tap(find.text('Aday notu çiz'));
+    expect(find.text('Aday notu çiz'), findsNothing);
+    expect(find.text('Çözümü denetle'), findsNothing);
+    expect(find.text('Adayları denetle'), findsNothing);
     final numberButton = find.byKey(
       ValueKey('sudoku-number-${solution[cell]}'),
     );
@@ -124,12 +126,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final updated = jsonDecode(prefs.getString('sudoku_game')!) as Map;
-    expect((updated['candidates'] as Map)['$cell'], contains(solution[cell]));
-    await tester.drag(find.byType(ListView).first, const Offset(0, 1000));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Adayları denetle'));
-    await tester.pumpAndSettle();
-    expect(find.text('Aday notlarında çakışma yok.'), findsOneWidget);
+    expect(updated['board'][cell], solution[cell]);
+    expect(find.textContaining('Sudoku 00:'), findsOneWidget);
   });
 
   testWidgets('Sudoku can restart its current puzzle without replacing it', (
@@ -244,20 +242,13 @@ void main() {
     });
     await tester.pumpWidget(const MaterialApp(home: SudokuScreen()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Çözümü denetle'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('1 hücredeki sayı yanlış; kırmızı hücreleri gözden geçir.'),
-      findsOneWidget,
-    );
+    expect(find.text('Çözümü denetle'), findsNothing);
     final cellTile = find.byKey(ValueKey('sudoku-cell-$cell'));
     final decoration = tester.widget<Container>(
       find.descendant(of: cellTile, matching: find.byType(Container)).first,
     );
-    expect(
-      (decoration.decoration! as BoxDecoration).color,
-      Theme.of(tester.element(cellTile)).colorScheme.errorContainer,
-    );
+    final border = (decoration.decoration! as BoxDecoration).border! as Border;
+    expect(border.top.color, Colors.black);
   });
 
   testWidgets('Completing Sudoku offers to start another puzzle', (

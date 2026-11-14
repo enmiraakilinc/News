@@ -33,4 +33,14 @@ void main() {
       ChatAccount.validatePassword('example-passphrase');
     },
   );
+  test('Profile names become login names without touching the password', () {
+    expect(ChatAccount.usernameKey('Yazılım'), 'yazilim');
+    expect(ChatAccount.usernameKey('  Adaçayı '), 'adacayi');
+    expect(ChatAccount.usernameKey('ab'), isNull);
+    expect(ChatAccount.emailKey('Melek@Example.com'), 'melek@example.com');
+    expect(
+      ChatAccount.emailKey('abc@accounts.neural.invalid'),
+      isNull,
+    );
+  });
 }

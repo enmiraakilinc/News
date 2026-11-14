@@ -3,15 +3,40 @@ import {randomUUID} from 'node:crypto';
 import {ApiError} from './access.mjs';
 import {ServiceStore,str,bool,members,requirePair} from './service_store.mjs';
 import {deliverPush} from './push_transport.mjs';
+
+export function loginNameKey(value){
+ let text=String(value??'').trim().toLocaleLowerCase('tr-TR').replace(/\u0307/g,'');
+ const folded={ç:'c',ğ:'g',ı:'i',ö:'o',ş:'s',ü:'u',â:'a',î:'i',û:'u'};
+ text=[...text].map(ch=>folded[ch]??ch).join('').replace(/[^a-z0-9_]/g,'');
+ return /^[a-z0-9_]{3,24}$/.test(text)?text:null;
+}
+export function loginEmailKey(value){
+ const text=String(value??'').trim().toLowerCase();
+ if(!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(text)||text.endsWith('@accounts.neural.invalid'))return null;
+ return text;
+}
 export class Services {
  constructor(pool,{push=deliverPush}={}){this.store=new ServiceStore(pool);this.push=push;}
  async account(body,auth,ip){
   if(!auth.uid)throw new ApiError(401,'unauthenticated','Yeniden giriş yap.');
-  if(!/^\d{12}$/.test(body.code??''))throw new ApiError(400,'invalid-argument','Hesap kodunu kontrol et.');
-  for(const [key,limit] of [['ip:'+ip,20],['uid:'+auth.uid,10],['code:'+body.code,6]]){
+  const login=typeof body.login==='string'?body.login.trim():'';
+  const compact=String(body.code??login).replace(/[\s-]/g,'').toLowerCase();
+  const bucket=(/^\d{12}$/.test(compact)?compact:login.toLowerCase()).slice(0,80);
+  if(!bucket)throw new ApiError(400,'invalid-argument','Kullanıcı adını, e-postanı veya hesap kodunu yaz.');
+  for(const [key,limit] of [['ip:'+ip,20],['uid:'+auth.uid,10],['login:'+bucket,6]]){
    if(!await this.store.reserve(key,limit))throw new ApiError(429,'resource-exhausted','Çok fazla deneme yapıldı. 10 dakika sonra yeniden dene.');
   }
-  const alias=await this.store.get('accountCodeAliases/'+body.code),email=str(alias,'email');
+  let path=null;
+  if(/^\d{12}$/.test(compact))path='accountCodeAliases/'+compact;
+  else if(login.includes('@')){
+   const emailKey=loginEmailKey(login);
+   if(emailKey)path='accountEmailAliases/'+emailKey;
+  }else{
+   const nameKey=loginNameKey(login);
+   if(nameKey)path='accountUsernames/'+nameKey;
+  }
+  if(!path)throw new ApiError(404,'not-found','Hesap kodu veya şifre yanlış.');
+  const alias=await this.store.get(path),email=str(alias,'email');
   if(!/^[a-f0-9]{32}@accounts\.neural\.invalid$/.test(email??''))throw new ApiError(404,'not-found','Hesap kodu veya şifre yanlış.');
   return {email};
  }

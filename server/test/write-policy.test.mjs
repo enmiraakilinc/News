@@ -173,6 +173,12 @@ test('account alias cannot claim another UID or email',async()=>{
  await run('accountCodeAliases/123456789012',null,{owner:'alice',email},{email,readAfter});
  await denied(run('accountCodeAliases/123456789012',null,{owner:'bob',email},{email,readAfter}));
  await denied(run('accountCodeAliases/123456789012',null,{owner:'alice',email:'other@example.com'},{email,readAfter}));
+ const named=async p=>p==='accountLoginNames/alice'?{name:'melek'}:p==='accountLoginEmails/alice'?{email:'melek@example.com'}:source[p];
+ await run('accountUsernames/melek',null,{owner:'alice',email},{email,readAfter:named});
+ await run('accountLoginNames/alice',null,{name:'melek'},{email,readAfter:async p=>p==='accountUsernames/melek'?{owner:'alice',email}:source[p]});
+ await denied(run('accountUsernames/melek',null,{owner:'bob',email},{uid:'bob',email,readAfter:named}));
+ await run('accountEmailAliases/melek@example.com',null,{owner:'alice',email},{email,readAfter:named});
+ await denied(run('accountEmailAliases/melek@accounts.neural.invalid',null,{owner:'alice',email},{email,readAfter:named}));
 });
 test('timestamp comparisons keep nanoseconds and fail closed on missing bounds',async()=>{
  const a=Instant.parse('2026-10-24T18:00:00.123456788Z');

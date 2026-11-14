@@ -221,8 +221,8 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                                   myScore == null
                                       ? 'Bu sezon henüz puanın yok.'
                                       : rank == null
-                                      ? 'Puanın: $myScore · İlk 100 dışında'
-                                      : 'Sıran: $rank · Puanın: $myScore',
+                                      ? '${_leagueResult(game.id, myScore)} · İlk 100 dışında'
+                                      : 'Sıran: $rank · ${_leagueResult(game.id, myScore)}',
                                   textAlign: TextAlign.center,
                                 ),
                               ],
@@ -251,6 +251,7 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                           for (var i = 0; i < entries.take(10).length; i++)
                             _entryTile(
                               context,
+                              game: game.id,
                               entry: entries[i],
                               rank: i + 1,
                               highlighted: entries[i].uid == myUid,
@@ -263,7 +264,7 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
                                 myData?['displayName'] as String? ?? 'Sen',
                               ),
                               subtitle: const Text('İlk 100 dışında'),
-                              trailing: Text('$myScore puan'),
+                              trailing: Text(_leagueResult(game.id, myScore)),
                             ),
                           ),
                       ],
@@ -296,6 +297,7 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
 
   Widget _entryTile(
     BuildContext context, {
+    required String game,
     required GameLeagueEntry entry,
     required int rank,
     required bool highlighted,
@@ -304,7 +306,20 @@ class _GameLeagueScreenState extends State<GameLeagueScreen> {
     child: ListTile(
       leading: CircleAvatar(child: Text('$rank')),
       title: Text(entry.displayName),
-      trailing: Text('${entry.score} puan'),
+      trailing: Text(_leagueResult(game, entry.score)),
     ),
   );
+}
+
+String _leagueResult(String game, int score) {
+  if (game == 'sudoku') {
+    final seconds = (1000000 - score).clamp(0, 999999);
+    final minutes = seconds ~/ 60;
+    final rest = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}';
+  }
+  if (game == 'sliding_puzzle') {
+    return '${(10000 - score).clamp(0, 9999)} hamle';
+  }
+  return '$score puan';
 }

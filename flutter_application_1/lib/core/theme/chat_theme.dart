@@ -24,7 +24,6 @@ class ChatThemes {
     'blue': 'Gece mavisi',
     'purple': 'Mor',
     'pastel': 'Pastel mavi • Krem',
-    'mist': 'Sis • Adaçayı',
     'moon': 'Ay ışığı',
     'rose': 'Pudra',
     'love': 'Love',
@@ -36,7 +35,12 @@ class ChatThemes {
     accent = null;
     roundness = 14;
     final saved = prefs.getString('neural_chat_theme');
-    if (names.containsKey(saved)) selected.value = saved!;
+    if (saved == 'mist') {
+      selected.value = 'light';
+      await prefs.setString('neural_chat_theme', 'light');
+    } else if (names.containsKey(saved)) {
+      selected.value = saved!;
+    }
     selected.refresh();
   }
 
@@ -96,8 +100,6 @@ class ChatThemes {
         ? Color(accent!)
         : value == 'pastel'
         ? const Color(0xff83abc5)
-        : value == 'mist'
-        ? const Color(0xff6e9697)
         : value == 'moon'
         ? const Color(0xff9c86ed)
         : value == 'rose'
@@ -109,7 +111,7 @@ class ChatThemes {
         : const Color(0xff479c86);
     var scheme = ColorScheme.fromSeed(
       seedColor: seed,
-      brightness: ['light', 'pastel', 'mist', 'rose'].contains(value)
+      brightness: ['light', 'pastel', 'rose'].contains(value)
           ? Brightness.light
           : Brightness.dark,
     );

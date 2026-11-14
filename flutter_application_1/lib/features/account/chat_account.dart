@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../chat/chat_service.dart';
 import '../contacts/contact_names.dart';
 import '../pair/couple_service.dart';
 import 'dart:convert';
@@ -40,6 +41,37 @@ class ChatAccount {
 
   static String emailForCode(String code) => '${normalizeCode(code)}@$domain';
 
+  /// Profil adını giriş adına çevirir. Türkçe harfler sadeleşir, boşluklar düşer.
+  static String? usernameKey(String value) {
+    var text = value.trim().toLowerCase().replaceAll('\u0307', '');
+    const folded = {
+      'ç': 'c',
+      'ğ': 'g',
+      'ı': 'i',
+      'ö': 'o',
+      'ş': 's',
+      'ü': 'u',
+      'â': 'a',
+      'î': 'i',
+      'û': 'u',
+    };
+    text = text.split('').map((char) => folded[char] ?? char).join();
+    text = text.replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    if (!RegExp(r'^[a-z0-9_]{3,24}$').hasMatch(text)) return null;
+    return text;
+  }
+
+  static String? emailKey(String value) {
+    final text = value.trim().toLowerCase();
+    if (!RegExp(
+      r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$',
+    ).hasMatch(text)) {
+      return null;
+    }
+    if (text.endsWith('@$domain')) return null;
+    return text;
+  }
+
   static String newCode() => displayCode(randomHex(16));
 
   /// Immutable owner-only alias. Existing Firebase identity/password remain intact.
@@ -71,9 +103,12 @@ class ChatAccount {
         .timeout(const Duration(seconds: 15));
   }
 
-  static Future<String> _loginEmail(String code) async {
-    final clean = normalizeCode(code);
-    if (clean.length == 32) return emailForCode(clean);
+  static Future<String> _loginEmail(String login) async {
+    final compact = login.replaceAll(RegExp(r'[\s-]'), '').toLowerCase();
+    if (RegExp(r'^[a-f0-9]{32}$').hasMatch(compact)) {
+      return '$compact@$domain';
+    }
+    final shortCode = RegExp(r'^[0-9]{12}$').hasMatch(compact);
     final endpoint = await WakeupService.endpoint();
     if (endpoint == null) {
       throw const FormatException(
@@ -89,7 +124,9 @@ class ChatAccount {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({'code': clean}),
+          body: jsonEncode(
+            shortCode ? {'code': compact} : {'login': login.trim()},
+          ),
         )
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(r.body) as Map;
@@ -154,8 +191,102 @@ class ChatAccount {
     }
   }
 
-  static Future<void> signIn(String code, String password) async {
-    normalizeCode(code);
+  static Future<String?> savedUsername() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || currentCode == null) return null;
+    final doc = await FirebaseFirestore.instance
+        .doc('accountLoginNames/${user.uid}')
+        .get()
+        .timeout(const Duration(seconds: 8));
+    final name = doc.data()?['name'];
+    return name is String ? name : null;
+  }
+
+  /// Mevcut kimliğe kullanıcı adı bağlar. Şifre ve eski kod aynı kalır.
+  static Future<String> claimUsername(String name) async {
+    final key = usernameKey(name);
+    if (key == null) {
+      throw const FormatException(
+        'Kullanıcı adı 3–24 karakter olmalı. Harf, sayı ve alt çizgi kullanılır.',
+      );
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email;
+    if (user == null || email == null || !email.endsWith('@$domain')) {
+      throw const FormatException('Önce mevcut hesabınla giriş yap.');
+    }
+    final db = FirebaseFirestore.instance;
+    final own = db.doc('accountLoginNames/${user.uid}');
+    return db
+        .runTransaction<String>((transaction) async {
+          final saved = await transaction.get(own);
+          final current = saved.data()?['name'];
+          if (saved.exists && current is String) {
+            if (current == key) return key;
+            throw const FormatException('Kullanıcı adın zaten kayıtlı.');
+          }
+          transaction.set(db.doc('accountUsernames/$key'), {
+            'owner': user.uid,
+            'email': email,
+          });
+          transaction.set(own, {'name': key});
+          return key;
+        })
+        .timeout(const Duration(seconds: 15));
+  }
+
+  static Future<void> claimEmail(String value) async {
+    final key = emailKey(value);
+    if (key == null) {
+      throw const FormatException('E-posta adresini kontrol et.');
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email;
+    if (user == null || email == null || !email.endsWith('@$domain')) {
+      throw const FormatException('Önce mevcut hesabınla giriş yap.');
+    }
+    final db = FirebaseFirestore.instance;
+    final own = db.doc('accountLoginEmails/${user.uid}');
+    await db
+        .runTransaction((transaction) async {
+          final saved = await transaction.get(own);
+          final current = saved.data()?['email'];
+          if (saved.exists && current is String) {
+            if (current == key) return;
+            throw const FormatException('Giriş e-postan zaten kayıtlı.');
+          }
+          transaction.set(db.doc('accountEmailAliases/$key'), {
+            'owner': user.uid,
+            'email': email,
+          });
+          transaction.set(own, {'email': key});
+        })
+        .timeout(const Duration(seconds: 15));
+  }
+
+  /// Kayıtlı adı yoksa sohbet adını kullanıcı adına çevirir.
+  static Future<String?> attachIdentity() async {
+    final existing = await savedUsername();
+    if (existing != null) return existing;
+    final name = await ChatService.myName();
+    if (name == null || usernameKey(name) == null) return null;
+    try {
+      return await claimUsername(name);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> signIn(String login, String password) async {
+    final compact = login.replaceAll(RegExp(r'[\s-]'), '').toLowerCase();
+    final knownCode = RegExp(
+      r'^([a-f0-9]{32}|[0-9]{12})$',
+    ).hasMatch(compact);
+    if (!knownCode && usernameKey(login) == null && emailKey(login) == null) {
+      throw const FormatException(
+        'Kullanıcı adını, e-postanı veya hesap kodunu yaz.',
+      );
+    }
     validatePassword(password);
     await CoupleService.ensureReady().timeout(const Duration(seconds: 20));
     final previous = CoupleService.uid;
@@ -187,7 +318,7 @@ class ChatAccount {
         rethrow;
       } catch (_) {}
     }
-    final email = await _loginEmail(code);
+    final email = await _loginEmail(login);
     final result = await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: email,
       password: password,

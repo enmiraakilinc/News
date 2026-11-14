@@ -10,7 +10,7 @@ test('reject traversal and control characters',()=>{
  assert.equal(docPath('couples/a/courses/b/entries/c'),'couples/a/courses/b/entries/c');
 });
 test('invites, login aliases and profiles cannot be enumerated',()=>{
- for(const path of ['invites','chatInvites','chatProfiles','accountCodeAliases','accountLoginCodes','config','couples'])assert.throws(()=>queryAllowed({path},'alice'));
+ for(const path of ['invites','chatInvites','chatProfiles','accountCodeAliases','accountLoginCodes','accountUsernames','accountLoginNames','accountEmailAliases','accountLoginEmails','config','couples'])assert.throws(()=>queryAllowed({path},'alice'));
 });
 test('address books are owner-only',()=>{
  assert.throws(()=>queryAllowed({path:'chatAccounts/bob/contacts'},'alice'));

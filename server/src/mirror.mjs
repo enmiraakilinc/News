@@ -10,7 +10,7 @@ const mode=await pool.query("SELECT value FROM neural.settings WHERE key='primar
 if(mode.rows[0]?.value===true){await pool.end();process.exit(0);}
 const firestore=getFirestore();
 firestore.settings({useBigInt:true});
-const extra=['accountCodeAliases','accountLoginCodes','chatInvites','chatMedia','chatProfiles','chats','config','couples','invites','updateAccess','voiceCalls','contacts','callDevices','starredMessages','wakeDevices','wakePermissions','names','chunks','preview','messages','courses','hiddenimages','letters','notes','questions','timeline','voicenotes','wishes','candidates','entries','downloadRequests','recipes','sharedLocations','mediaDownloadRequests'];
+const extra=['accountCodeAliases','accountLoginCodes','accountUsernames','accountLoginNames','accountEmailAliases','accountLoginEmails','chatInvites','chatMedia','chatProfiles','chats','config','couples','invites','updateAccess','voiceCalls','contacts','callDevices','starredMessages','wakeDevices','wakePermissions','names','chunks','preview','messages','courses','hiddenimages','letters','notes','questions','timeline','voicenotes','wishes','candidates','entries','downloadRequests','recipes','sharedLocations','mediaDownloadRequests'];
 const rows=await pool.query('SELECT DISTINCT collection_id FROM neural.documents');
 const groups=[...new Set([...extra,...rows.rows.map(r=>r.collection_id)])];
 await pool.query('UPDATE neural.sync_state SET ready=false,error_code=NULL');

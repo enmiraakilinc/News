@@ -299,5 +299,17 @@ export async function authorizeWrite({path,before:a,after:b,uid,email,now,read,r
     &&!await read('accountLoginCodes/'+uid)&&(await readAfter('accountLoginCodes/'+uid))?.code===p[1])return allow();
  if(p[0]==='accountLoginCodes'&&p.length===2&&create&&p[1]===uid&&only(b,['code'])&&/^[0-9]{12}$/.test(b.code??'')
     &&(await readAfter('accountCodeAliases/'+b.code))?.owner===uid)return allow();
+ if(p[0]==='accountUsernames'&&p.length===2&&create&&/^[a-z0-9_]{3,24}$/.test(p[1])
+    &&only(b,['owner','email'])&&b.owner===uid&&b.email===email&&/^[a-f0-9]{32}@accounts[.]neural[.]invalid$/.test(b.email??'')
+    &&!await read('accountLoginNames/'+uid)&&(await readAfter('accountLoginNames/'+uid))?.name===p[1])return allow();
+ if(p[0]==='accountLoginNames'&&p.length===2&&create&&p[1]===uid&&only(b,['name'])&&/^[a-z0-9_]{3,24}$/.test(b.name??'')
+    &&(await readAfter('accountUsernames/'+b.name))?.owner===uid)return allow();
+ if(p[0]==='accountEmailAliases'&&p.length===2&&create&&/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(p[1])
+    &&!p[1].endsWith('@accounts.neural.invalid')
+    &&only(b,['owner','email'])&&b.owner===uid&&b.email===email&&/^[a-f0-9]{32}@accounts[.]neural[.]invalid$/.test(b.email??'')
+    &&!await read('accountLoginEmails/'+uid)&&(await readAfter('accountLoginEmails/'+uid))?.email===p[1])return allow();
+ if(p[0]==='accountLoginEmails'&&p.length===2&&create&&p[1]===uid&&only(b,['email'])&&b.email===p[1]
+    &&/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(b.email??'')&&!String(b.email).endsWith('@accounts.neural.invalid')
+    &&(await readAfter('accountEmailAliases/'+b.email))?.owner===uid)return allow();
  return deny();
 }

@@ -128,15 +128,7 @@ class ContactAvatar extends StatelessWidget {
         child: CircleAvatar(
           child: avatar?.photo == null
               ? Text(avatar?.emoji ?? '👤')
-              : ClipOval(
-                  child: Image.memory(
-                    avatar!.photo!,
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
-                    cacheWidth: 128,
-                  ),
-                ),
+              : _StableAvatarPhoto(bytes: avatar!.photo!),
         ),
       );
     },
@@ -160,6 +152,7 @@ class ProfileAvatar extends StatefulWidget {
 class _ProfileAvatarState extends State<ProfileAvatar> {
   late Stream<ChatProfile?> _stream =
       widget.profiles ?? ChatService.profileStream(widget.userId);
+  ChatProfile? _shown;
   @override
   void didUpdateWidget(covariant ProfileAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -200,21 +193,13 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
   Widget build(BuildContext context) => StreamBuilder<ChatProfile?>(
     stream: _stream,
     builder: (_, snapshot) {
-      final profile = snapshot.data;
+      if (snapshot.data != null) _shown = snapshot.data;
+      final profile = snapshot.data ?? _shown;
       if (profile?.photo != null) {
         return InkWell(
           onTap: widget.onTap ?? () => _show(profile),
           child: CircleAvatar(
-            child: ClipOval(
-              child: Image.memory(
-                profile!.photo!,
-                width: 40,
-                height: 40,
-                fit: BoxFit.cover,
-                cacheWidth: 128,
-                errorBuilder: (_, _, _) => const Icon(Icons.person_outline),
-              ),
-            ),
+            child: _StableAvatarPhoto(bytes: profile!.photo!),
           ),
         );
       }
@@ -228,5 +213,53 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
         ),
       );
     },
+  );
+}
+
+/// Aynı fotoğraf baytları yeni nesne gelse de resmi baştan çözmez.
+class _StableAvatarPhoto extends StatefulWidget {
+  final Uint8List bytes;
+  const _StableAvatarPhoto({required this.bytes});
+  @override
+  State<_StableAvatarPhoto> createState() => _StableAvatarPhotoState();
+}
+
+class _StableAvatarPhotoState extends State<_StableAvatarPhoto> {
+  MemoryImage? _image;
+
+  @override
+  void initState() {
+    super.initState();
+    _image = MemoryImage(widget.bytes);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StableAvatarPhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_same(oldWidget.bytes, widget.bytes)) {
+      _image?.evict();
+      _image = MemoryImage(widget.bytes);
+    }
+  }
+
+  bool _same(Uint8List a, Uint8List b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipOval(
+    child: Image(
+      image: _image!,
+      width: 40,
+      height: 40,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => const Icon(Icons.person_outline),
+    ),
   );
 }

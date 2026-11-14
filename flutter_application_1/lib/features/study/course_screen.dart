@@ -347,17 +347,40 @@ class _CourseFoldersScreenState extends State<CourseFoldersScreen> {
                 itemCount: folders.length,
                 itemBuilder: (context, i) => _NotebookRow(
                   title: folders[i].title,
-                  subtitle: widget.parent == null ? 'Ders' : 'Konu',
                   color: courseFolderColors[folders[i].color],
                   onTap: _busy
                       ? null
                       : () => Navigator.push<void>(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => CourseNotesScreen(
+                          PageRouteBuilder<void>(
+                            transitionDuration: const Duration(
+                              milliseconds: 480,
+                            ),
+                            reverseTransitionDuration: const Duration(
+                              milliseconds: 420,
+                            ),
+                            pageBuilder: (_, _, _) => CourseNotesScreen(
                               repository: widget.repository,
                               folder: folders[i],
                             ),
+                            transitionsBuilder: (_, animation, _, child) {
+                              final turn = CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeInOutCubic,
+                              );
+                              return AnimatedBuilder(
+                                animation: turn,
+                                child: child,
+                                builder: (context, child) => Transform(
+                                  alignment: Alignment.centerLeft,
+                                  filterQuality: FilterQuality.medium,
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.0014)
+                                    ..rotateY((1 - turn.value) * 1.15),
+                                  child: child,
+                                ),
+                              );
+                            },
                           ),
                         ),
                   trailing: Row(
@@ -1352,71 +1375,74 @@ Future<bool> _confirm(BuildContext context, String message) async =>
 
 class _NotebookRow extends StatelessWidget {
   final String title;
-  final String subtitle;
   final Color? color;
   final VoidCallback? onTap;
   final Widget trailing;
   const _NotebookRow({
     required this.title,
-    required this.subtitle,
     required this.color,
     required this.onTap,
     required this.trailing,
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Material(
-      color: const Color(0xFFFFF6E4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
-        side: const BorderSide(color: Color(0xFFE7D3A1)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              Container(width: 8, color: const Color(0xFFE53935)),
-              const SizedBox(width: 10),
-              Icon(
-                Icons.menu_book_outlined,
-                color: color ?? const Color(0xFF8A5A3B),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF8A5A3B),
-                          fontSize: 11,
-                        ),
-                      ),
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Color(0xFF3E2C1C),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final cover = dark ? const Color(0xff1a1a1a) : Colors.white;
+    final ink = dark ? Colors.white : const Color(0xff161616);
+    final page = dark ? const Color(0xff2a2a2a) : const Color(0xffececec);
+    final spine = color ?? Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        height: 92,
+        child: Material(
+          color: cover,
+          elevation: 1,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(4),
+              right: Radius.circular(10),
+            ),
+            side: BorderSide(color: ink.withValues(alpha: 0.18)),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Row(
+              children: [
+                Container(
+                  width: 14,
+                  decoration: BoxDecoration(
+                    color: spine,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(4),
+                    ),
                   ),
                 ),
-              ),
-              IconTheme(
-                data: const IconThemeData(color: Color(0xFF3E2C1C)),
-                child: trailing,
-              ),
-            ],
+                Container(width: 3, color: page),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: ink,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                IconTheme(
+                  data: IconThemeData(color: ink),
+                  child: trailing,
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

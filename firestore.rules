@@ -532,6 +532,42 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/accountLoginCodes/$(request.auth.uid))
         && getAfter(/databases/$(database)/documents/accountLoginCodes/$(request.auth.uid)).data.code == code;
     }
+    match /accountUsernames/{name} {
+      allow get: if girisYapti() && resource.data.owner == request.auth.uid;
+      allow create: if girisYapti() && name.matches('^[a-z0-9_]{3,24}$')
+        && request.resource.data.keys().hasOnly(['owner', 'email'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email.matches('^[a-f0-9]{32}@accounts[.]neural[.]invalid$')
+        && !exists(/databases/$(database)/documents/accountLoginNames/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/accountLoginNames/$(request.auth.uid)).data.name == name;
+    }
+    match /accountLoginNames/{uid} {
+      allow get: if girisYapti() && uid == request.auth.uid;
+      allow create: if girisYapti() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name'])
+        && request.resource.data.name.matches('^[a-z0-9_]{3,24}$')
+        && getAfter(/databases/$(database)/documents/accountUsernames/$(request.resource.data.name)).data.owner == uid;
+    }
+    match /accountEmailAliases/{address} {
+      allow get: if girisYapti() && resource.data.owner == request.auth.uid;
+      allow create: if girisYapti()
+        && address.matches('^[a-z0-9._%+-]+@[a-z0-9.-]+[.][a-z]{2,}$')
+        && !address.matches('.*@accounts[.]neural[.]invalid$')
+        && request.resource.data.keys().hasOnly(['owner', 'email'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && !exists(/databases/$(database)/documents/accountLoginEmails/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/accountLoginEmails/$(request.auth.uid)).data.email == address;
+    }
+    match /accountLoginEmails/{uid} {
+      allow get: if girisYapti() && uid == request.auth.uid;
+      allow create: if girisYapti() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['email'])
+        && request.resource.data.email.matches('^[a-z0-9._%+-]+@[a-z0-9.-]+[.][a-z]{2,}$')
+        && !request.resource.data.email.matches('.*@accounts[.]neural[.]invalid$')
+        && getAfter(/databases/$(database)/documents/accountEmailAliases/$(request.resource.data.email)).data.owner == uid;
+    }
     match /accountLoginCodes/{uid} {
       allow get: if girisYapti() && uid == request.auth.uid;
       allow create: if girisYapti() && uid == request.auth.uid

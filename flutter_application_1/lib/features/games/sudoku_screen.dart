@@ -78,7 +78,8 @@ class SudokuScreen extends StatefulWidget {
   State<SudokuScreen> createState() => _SudokuScreenState();
 }
 
-class _SudokuScreenState extends State<SudokuScreen> {
+class _SudokuScreenState extends State<SudokuScreen>
+    with WidgetsBindingObserver {
   SudokuPuzzle? _puzzle;
   List<int> _board = [];
   final Map<int, Set<int>> _candidates = {};
@@ -88,23 +89,67 @@ class _SudokuScreenState extends State<SudokuScreen> {
   bool _drawingMode = false;
   bool _completionPromptShown = false;
   bool _leagueScoreSubmitted = false;
-  DateTime _startedAt = DateTime.now();
+  int _activeSeconds = 0;
+  DateTime? _tickFrom;
+  Timer? _clock;
   final List<List<Offset>> _drawingStrokes = [];
   final Set<int> _incorrectCells = {};
   Future<void> _saving = Future.value();
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     ChatPresence.setActivity('Sudoku');
     _load();
   }
 
   @override
   void dispose() {
+    _pauseClock(save: false);
+    WidgetsBinding.instance.removeObserver(this);
     if (ChatPresence.activity.value == 'Sudoku') {
       ChatPresence.setActivity(null);
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startClock();
+    } else {
+      _pauseClock();
+    }
+  }
+
+  int get _shownSeconds =>
+      _activeSeconds +
+      (_tickFrom == null ? 0 : DateTime.now().difference(_tickFrom!).inSeconds);
+
+  void _startClock() {
+    if (_leagueScoreSubmitted || _isSolved) return;
+    _tickFrom ??= DateTime.now();
+    _clock ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _pauseClock({bool save = true}) {
+    if (_tickFrom != null) {
+      _activeSeconds += DateTime.now().difference(_tickFrom!).inSeconds;
+      _tickFrom = null;
+    }
+    _clock?.cancel();
+    _clock = null;
+    if (save && _puzzle != null) _save();
+  }
+
+  void _resetClock() {
+    _clock?.cancel();
+    _clock = null;
+    _activeSeconds = 0;
+    _tickFrom = null;
+    _startClock();
   }
 
   Future<void> _load() async {
@@ -125,10 +170,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
         setState(() {
           _puzzle = SudokuPuzzle(solution, clues);
           _board = board;
-          final startedAt = d['startedAt'];
-          _startedAt = startedAt is int
-              ? DateTime.fromMillisecondsSinceEpoch(startedAt)
-              : DateTime.now();
+          _activeSeconds = d['elapsed'] is int ? d['elapsed'] as int : 0;
           _leagueScoreSubmitted = List.generate(
             81,
             (i) => board[i] == solution[i],
@@ -140,6 +182,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
             ..clear()
             ..addAll(_readDrawingStrokes(d['drawings']));
         });
+        if (!_leagueScoreSubmitted) _startClock();
       }
     } catch (_) {
       _newGame();
@@ -160,9 +203,9 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _drawingMode = false;
       _completionPromptShown = false;
       _leagueScoreSubmitted = false;
-      _startedAt = DateTime.now();
       _drawingStrokes.clear();
     });
+    _resetClock();
     _save();
   }
 
@@ -211,7 +254,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
       'solution': _puzzle!.solution,
       'clues': _puzzle!.clues,
       'board': List.of(_board),
-      'startedAt': _startedAt.millisecondsSinceEpoch,
+      'elapsed': _shownSeconds,
       'candidates': {
         for (final entry in _candidates.entries)
           '${entry.key}': entry.value.toList()..sort(),
@@ -258,6 +301,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
     });
     _save();
     if (_isSolved) {
+      _pauseClock();
       if (!_leagueScoreSubmitted) {
         _leagueScoreSubmitted = true;
         unawaited(_recordLeagueScore());
@@ -267,6 +311,17 @@ class _SudokuScreenState extends State<SudokuScreen> {
       });
     }
   }
+
+  String _formatClock(int seconds) {
+    final minutes = seconds ~/ 60;
+    final rest = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}';
+  }
+
+  Color _gridInk(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? Colors.white
+      : Colors.black;
 
   bool get _isSolved =>
       _puzzle != null &&
@@ -307,10 +362,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _selected == null ? null : _conflictDescription(_selected!);
 
   Future<void> _recordLeagueScore() async {
-    final seconds = DateTime.now()
-        .difference(_startedAt)
-        .inSeconds
-        .clamp(1, 999999);
+    final seconds = _shownSeconds.clamp(1, 999999);
     try {
       await GameLeagueService.recordBestScore(
         game: 'sudoku',
@@ -323,61 +375,6 @@ class _SudokuScreenState extends State<SudokuScreen> {
         );
       }
     }
-  }
-
-  void _checkCandidates() {
-    _invalidCandidates
-      ..clear()
-      ..addAll({
-        for (final entry in _candidates.entries)
-          if (entry.value.any(
-            (number) => !SudokuPuzzle.allowed(_board, entry.key, number),
-          ))
-            entry.key: entry.value
-                .where(
-                  (number) => !SudokuPuzzle.allowed(_board, entry.key, number),
-                )
-                .toSet(),
-      });
-    setState(() {});
-    final invalidCount = _invalidCandidates.values.fold<int>(
-      0,
-      (count, numbers) => count + numbers.length,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          invalidCount == 0
-              ? 'Aday notlarında çakışma yok.'
-              : '$invalidCount aday mevcut sayılarla çakışıyor.',
-        ),
-      ),
-    );
-  }
-
-  void _checkPuzzle() {
-    final incorrect = <int>{};
-    for (var cell = 0; cell < _board.length; cell++) {
-      if (_board[cell] != 0 &&
-          (_board[cell] != _puzzle!.solution[cell] ||
-              !SudokuPuzzle.allowed(_board, cell, _board[cell]))) {
-        incorrect.add(cell);
-      }
-    }
-    setState(() {
-      _incorrectCells
-        ..clear()
-        ..addAll(incorrect);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          incorrect.isEmpty
-              ? 'Yerleştirilen sayılar doğru.'
-              : '${incorrect.length} hücredeki sayı yanlış; kırmızı hücreleri gözden geçir.',
-        ),
-      ),
-    );
   }
 
   Future<void> _restartCurrentPuzzle() async {
@@ -411,9 +408,9 @@ class _SudokuScreenState extends State<SudokuScreen> {
       _drawingMode = false;
       _completionPromptShown = false;
       _leagueScoreSubmitted = false;
-      _startedAt = DateTime.now();
       _drawingStrokes.clear();
     });
+    _resetClock();
     _save();
   }
 
@@ -443,7 +440,7 @@ class _SudokuScreenState extends State<SudokuScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Sudoku'),
+      title: Text('Sudoku ${_formatClock(_shownSeconds)}'),
       actions: [
         if (_drawingMode)
           IconButton(
@@ -518,14 +515,6 @@ class _SudokuScreenState extends State<SudokuScreen> {
                   spacing: 8,
                   children: [
                     FilterChip(
-                      label: const Text('Aday notu çiz'),
-                      selected: _candidateMode,
-                      onSelected: (enabled) => setState(() {
-                        _candidateMode = enabled;
-                        if (enabled) _drawingMode = false;
-                      }),
-                    ),
-                    FilterChip(
                       key: const ValueKey('sudoku-drawing-mode'),
                       label: const Text('Serbest çizim'),
                       selected: _drawingMode,
@@ -534,24 +523,13 @@ class _SudokuScreenState extends State<SudokuScreen> {
                         if (enabled) _candidateMode = false;
                       }),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: _checkPuzzle,
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Çözümü denetle'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _checkCandidates,
-                      icon: const Icon(Icons.rule_outlined),
-                      label: const Text('Adayları denetle'),
-                    ),
                   ],
                 ),
                 if (_drawingMode) ...[
                   const SizedBox(height: 4),
                   const Center(
                     child: Text(
-                      'Parmağınla tahtanın üzerine not al. Çizimler saklanır; '
-                      'çözüm denetimi girilen sayıları kontrol eder.',
+                      'Parmağınla tahtanın üzerine not al. Çizimler saklanır.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -617,13 +595,21 @@ class _SudokuScreenState extends State<SudokuScreen> {
                                           : null,
                                       border: Border(
                                         top: BorderSide(
-                                          width: i ~/ 9 % 3 == 0 ? 2 : 0.5,
+                                          color: _gridInk(context),
+                                          width: i ~/ 9 % 3 == 0 ? 2 : 0.6,
                                         ),
                                         left: BorderSide(
-                                          width: i % 3 == 0 ? 2 : 0.5,
+                                          color: _gridInk(context),
+                                          width: i % 3 == 0 ? 2 : 0.6,
                                         ),
-                                        right: const BorderSide(width: 0.5),
-                                        bottom: const BorderSide(width: 0.5),
+                                        right: BorderSide(
+                                          color: _gridInk(context),
+                                          width: 0.6,
+                                        ),
+                                        bottom: BorderSide(
+                                          color: _gridInk(context),
+                                          width: 0.6,
+                                        ),
                                       ),
                                     ),
                                     child: _board[i] == 0

@@ -1,6 +1,6 @@
-• Ders sayfası temaya uyar, çevrilir.
-• Turuncu tema yumuşadı.
-• Görüntülü aramada menü gizli.
-• Kendi görüntünü büyütebilirsin.
-• Bildirim yazıları kısaldı.
-Build code: 2106
+• Ders klasörleri kitap gibi, temaya uyar.
+• Sudoku süre tutar; ligde süre yazar.
+• 15-taş ligde hamle sayısı yazar.
+• Sohbet fotoğrafı titremez.
+• Kullanıcı adı veya e-posta ile giriş. Eski kod geçerli.
+Build code: 2107
